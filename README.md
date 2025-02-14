@@ -1,5 +1,3 @@
----
-
 1. **Navigate to the main folder**:
    ```bash
    cd marong
@@ -26,5 +24,3 @@
    ```bash
    docker compose down
    ```
-
----
