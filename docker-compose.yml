@@ -1,0 +1,44 @@
+# docker/docker-compose.yml
+version: "3.9"
+
+services:
+  llm_server:
+    container_name: llm_server
+    build:
+      context: llm_server
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      # Bind-mount your local file into the container
+      - ./llm_server/config/config.json:/app/llm_server/config/config.json
+    # environment:
+    #   - SOME_ENV_VAR=some_value
+    # command: ["/app/build/llm_server", "--some-arg"]
+
+  bot:
+    # Since the bot folder is empty, we can just run a minimal image as a placeholder
+    # so that "docker compose up" will bring up two containers.
+    image: busybox:latest
+    container_name: bot
+    command: ["tail", "-f", "/dev/null"]  
+    # Or use 'echo' if you just want it to exit. 'tail -f /dev/null' keeps container running.
+    # If you eventually add a Dockerfile in /bot, update to:
+    # build:
+    #   context: ./bot
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - ./grafana.yml:/etc/grafana/provisioning/datasources/grafana.yml
+    ports:
+      - "3000:3000"
