@@ -5,13 +5,8 @@
 #include <string>
 
 namespace server {
+    nlohmann::json handleLLMQuery(const nlohmann::json& input);
+}
 
-/**
- * A simple function to handle requests intended for the Qingyunke model.
- * This might expand into a larger dispatch system for multiple models.
- */
-nlohmann::json handleQingyunke(const std::string& message);
-
-} // namespace server
 
 #endif // REQUEST_HANDLER_HPP
