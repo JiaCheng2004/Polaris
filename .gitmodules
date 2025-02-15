@@ -1,3 +1,0 @@
-[submodule "llm_server/libs/crow"]
-	path = llm_server/libs/crow
-	url = https://github.com/CrowCpp/Crow.git
