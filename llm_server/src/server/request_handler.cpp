@@ -1,48 +1,42 @@
+// src/server/request_handler.cpp
+
 #include "server/request_handler.hpp"
 #include "models/openai_o3_mini.hpp"
-
-// Other includes for other models
-// #include "models/qingyunke.hpp"
-// #include "models/anthropic.hpp"
-// #include "models/gemini.hpp"
-// #include "models/openai.hpp"
-// #include "models/xai.hpp"
-
+#include "models/google_gemini2_pro.hpp" // or anthropic, claude, etc.
 #include "utils/logger.hpp"
 #include "utils/token_tracker.hpp"
+
 #include <nlohmann/json.hpp>
+#include <crow/multipart.h>
+
+using namespace models;
 
 namespace server {
 
-nlohmann::json handleLLMQuery(const nlohmann::json& input) {
+/**
+ * We'll overload handleLLMQuery to also receive fileParts.
+ */
+nlohmann::json handleLLMQuery(const nlohmann::json& input,
+                              const std::vector<crow::multipart::part>& fileParts)
+{
+    // Prepare a standard response JSON
     nlohmann::json response = {
         {"model_used",  ""},
         {"message",     ""},
-        {"files",       nlohmann::json::array()},
+        {"files",       nlohmann::json::array()},  // We might fill with file info
         {"token_usage", 0},
         {"error_code",  200},
         {"details",     ""}
     };
 
-    // Example: we read a "model_name" or "model" from the input
     std::string modelName = input.value("model_name", "");
-    // Could also be "openai_o3mini" or something you define
     if (modelName.empty()) {
         response["error_code"] = 400;
         response["details"]    = "No model_name provided.";
         return response;
     }
 
-    // Convert "messages" array from input into a vector<ChatMessage>
-    // Expecting something like:
-    // {
-    //   "model_name": "openai_o3mini",
-    //   "messages": [
-    //     {"role": "system",    "content": "You are a helpful assistant."},
-    //     {"role": "user",      "content": "Hello, world."},
-    //     {"role": "assistant", "content": "Hi, how can I help?"}
-    //   ]
-    // }
+    // Convert JSON "messages" to vector<ChatMessage>
     std::vector<ChatMessage> messagesVec;
     if (input.contains("messages") && input["messages"].is_array()) {
         for (auto& m : input["messages"]) {
@@ -53,46 +47,62 @@ nlohmann::json handleLLMQuery(const nlohmann::json& input) {
         }
     }
 
+    // We'll hold the final model result in this
+    ModelResult modelResult;
+
+    // 2. Route to the correct model
     try {
-        nlohmann::json modelResponse;
-
-        if (modelName == "openai_o3_mini") {
-            // Example usage: default reasoning_effort = "high"
-            modelResponse = models::OpenAIo3mini::query(messagesVec, "high");
+        if (modelName == "openai_o3_mini_high") {
+            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "high");
+        } else if (modelName == "openai_o3_mini_medium") {
+            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "medium");
+        } else if (modelName == "openai_o3_mini_low") {
+            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "low");
+        } else if (modelName == "google_gemini_2.0_pro") {
+            modelResult = GoogleGemini2Pro::uploadAndQuery(messagesVec, fileParts);
         } 
-        else if (modelName == "openai") {
-            // If you have a separate openai.cpp for “gpt-4” or other
-            // modelResponse = models::OpenAI::query(...);
-        }
-        // else if (modelName == "anthropic") { ... }
-        // else if (modelName == "qingyunke") { ... }
-        // else if (modelName == "gemini") { ... }
-        // else if (modelName == "xai") { ... }
+        // else if (modelName == "anthropic_claude3") { ... }
+        // else if (modelName == "xai_model")         { ... }
         else {
-            response["error_code"] = 400;
-            response["details"]    = "Unrecognized model_name: " + modelName;
-            return response;
+            // Unknown model
+            modelResult.success      = false;
+            modelResult.errorCode    = 400;
+            modelResult.errorMessage = "Unrecognized model_name: " + modelName;
         }
-
-        // Merge modelResponse into your standardized response
-        response["model_used"]  = modelResponse.value("model_used", modelName);
-        response["message"]     = modelResponse.value("message", "");
-        response["files"]       = modelResponse.value("files", nlohmann::json::array());
-        response["token_usage"] = modelResponse.value("token_usage", 0);
-        response["error_code"]  = modelResponse.value("error_code", 200);
-        response["details"]     = modelResponse.value("details", "");
-
-        // Optionally track tokens
-        utils::TokenTracker::addUsage(response["token_usage"].get<int>());
-
     } catch (const std::exception& e) {
-        utils::Logger::error("Error in handleLLMQuery: " + std::string(e.what()));
-        response["error_code"]  = 500;
-        response["details"]     = e.what();
-        response["token_usage"] = 0;
+        modelResult.success      = false;
+        modelResult.errorCode    = 500;
+        modelResult.errorMessage = std::string("Exception: ") + e.what();
+    }
+
+    // 3. Convert ModelResult -> standardized JSON
+    response["model_used"]  = modelResult.modelUsed;
+    response["message"]     = modelResult.message;
+    response["token_usage"] = modelResult.tokenUsage;
+    response["error_code"]  = modelResult.errorCode;
+    if (!modelResult.success) {
+        response["details"] = modelResult.errorMessage;
+    }
+
+    // If any file IDs were returned, we can store them in response["files"].
+    for (auto& fID : modelResult.fileIds) {
+        nlohmann::json f;
+        f["file_id"] = fID;
+        response["files"].push_back(f);
+    }
+
+    // 4. If model succeeded, track tokens
+    if (modelResult.success) {
+        utils::TokenTracker::addUsage(modelResult.tokenUsage);
     }
 
     return response;
+}
+
+// Overload that uses an empty vector for fileParts if not given
+nlohmann::json handleLLMQuery(const nlohmann::json& input) {
+    std::vector<crow::multipart::part> empty;
+    return handleLLMQuery(input, empty);
 }
 
 } // namespace server

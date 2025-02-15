@@ -1,46 +1,81 @@
 #include "server/http_server.hpp"
 #include "server/request_handler.hpp"
 #include "utils/logger.hpp"
+#include "utils/multipart_utils.hpp"
 
 #include <crow.h>
+#include <crow/multipart.h>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 namespace server {
 
 void startServer() {
-    // Create a Crow application
     crow::SimpleApp app;
 
-    // Example route: POST /api/v1/llm/query
-    // You can define any other routes you need, e.g., GET /health
     CROW_ROUTE(app, "/api/v1/llm/query")
         .methods(crow::HTTPMethod::POST)
     ([&](const crow::request& req){
-        // Parse the incoming JSON body
-        auto bodyJson = nlohmann::json::parse(req.body, nullptr, false);
-        if (bodyJson.is_discarded()) {
-            // Invalid JSON
-            crow::response res;
-            res.code = 400;
-            res.set_header("Content-Type", "application/json");
-            res.body = R"({"error_code":400,"details":"Invalid JSON in request body"})";
-            return res;
+        crow::response res;
+        res.set_header("Content-Type", "application/json");
+
+        // We'll keep track of any files in this vector
+        std::vector<crow::multipart::part> fileParts;
+
+        // We'll store JSON data here
+        nlohmann::json bodyJson;
+        bool jsonParsed = false;
+
+        // Attempt to parse the request as multipart
+        crow::multipart::message multipartReq(req);
+
+        // If we have multipart parts, iterate over them
+        if (!multipartReq.parts.empty()) {
+            // We have at least some multipart fields
+            for (auto& field : multipartReq.parts) {
+                // Retrieve the "name" from Content-Disposition
+                std::string fieldName = utils::getPartName(field);
+
+                if (fieldName == "files") {
+                    // This is a file upload field
+                    fileParts.push_back(field);
+                }
+                
+                else if (fieldName == "json") {
+                    // This might be the JSON data (the user put JSON in a part named "json")
+                    try {
+                        bodyJson = nlohmann::json::parse(field.body);
+                        jsonParsed = true;
+                    } catch(...) {
+                        res.code = 400;
+                        res.body = R"({"error_code":400,"details":"Invalid JSON in 'json' part"})";
+                        return res;
+                    }
+                }
+            }
         }
 
-        // Pass the request body to request handler
-        auto result = server::handleLLMQuery(bodyJson);
+        // If we still have not parsed JSON, maybe the user sent raw JSON (not multipart)
+        if (!jsonParsed) {
+            try {
+                bodyJson = nlohmann::json::parse(req.body);
+            } catch(...) {
+                // Invalid JSON
+                res.code = 400;
+                res.body = R"({"error_code":400,"details":"Invalid JSON in request body"})";
+                return res;
+            }
+        }
 
-        // Build the Crow response based on the handler result
-        crow::response crowRes;
-        crowRes.code = result.value("error_code", 500);
-        crowRes.set_header("Content-Type", "application/json");
-        crowRes.body = result.dump();
-
-        return crowRes;
+        // Now call the handler with the JSON and the file parts
+        auto resultJson = server::handleLLMQuery(bodyJson, fileParts);
+        res.code = resultJson.value("error_code", 500);
+        res.body = resultJson.dump();
+        return res;
     });
 
-    // (Optional) Example route: GET /health
+    // Optional health-check route
     CROW_ROUTE(app, "/health")
     ([](){
         nlohmann::json health;
@@ -48,10 +83,7 @@ void startServer() {
         return crow::response{health.dump()};
     });
 
-    // Log server startup
     utils::Logger::info("Starting server on port 8080...");
-
-    // Run the server (blocks indefinitely unless an exception or shutdown signal occurs)
     app.port(8080).multithreaded().run();
 }
 
