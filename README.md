@@ -1,8 +1,6 @@
----
-
 1. **Navigate to the main folder**:
    ```bash
-   cd marong
+   cd Polaris
    ```
 
 2. **Build and run both services**:
@@ -26,5 +24,3 @@
    ```bash
    docker compose down
    ```
-
----
