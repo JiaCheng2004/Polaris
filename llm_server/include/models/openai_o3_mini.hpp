@@ -1,46 +1,67 @@
 #ifndef OPENAI_O3_MINI_HPP
 #define OPENAI_O3_MINI_HPP
 
-#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
+#include <crow/multipart.h>
+#include <nlohmann/json.hpp>
+#include "utils/model_common.hpp"  // Contains models::ModelResult, models::ChatMessage, etc.
+
+namespace models
+{
 
 /**
- * A structure to represent a single chat message, with a role and content.
+ * A structure to encapsulate the result of a single file-upload attempt
+ * to the OpenAI Files endpoint.
+ * 
+ * We keep it here in the SAME namespace as OpenAIo3mini,
+ * so references like `models::UploadResult` are consistent.
  */
-struct ChatMessage {
-    std::string role;    // "system", "user", or "assistant"
-    std::string content; // text content of the message
+struct UploadResult {
+    bool        success;      // True if file was uploaded successfully
+    std::string fileId;       // Returned by OpenAI (e.g. "file-abc123")
+    std::string errorReason;  // Explanation if unsuccessful
 };
 
-namespace models {
-
 /**
- * OpenAIo3mini class for calling the "o3-mini" model with optional "reasoning_effort" parameter.
- * This is distinct from the existing openai.cpp if you prefer separate implementations.
+ * OpenAIo3mini class for calling your GPT-based model with optional file uploads.
  */
 class OpenAIo3mini {
 public:
     /**
-     * query - Sends a chat request to OpenAI's "o3-mini" endpoint.
+     * Uploads any provided fileParts to OpenAI, then calls ChatCompletion.
      *
-     * @param messages   A vector of ChatMessage objects (system/user/assistant).
-     * @param reasoningEffort Could be "high", "medium", "low", etc. Some models might not accept it.
+     * @param messages        Vector of ChatMessage objects (roles: system/user/assistant).
+     * @param fileParts       Zero or more uploaded files from user (multipart).
+     * @param reasoningEffort e.g. "high", "medium", "low"
      *
-     * @return A JSON object with the standardized fields:
-     * {
-     *   "model_used": "openai-o3-mini",
-     *   "message": "...",
-     *   "files": [],
-     *   "token_usage": 0,
-     *   "error_code": 200,
-     *   "details": "OK"
-     * }
+     * @return ModelResult with success/failure, message, token usage, etc.
      */
-    static nlohmann::json query(const std::vector<ChatMessage>& messages,
-                                const std::string& reasoningEffort = "high");
+    static ModelResult uploadAndQuery(
+        const std::vector<ChatMessage>& messages,
+        const std::vector<crow::multipart::part>& fileParts,
+        const std::string& reasoningEffort
+    );
+
+private:
+    /**
+     * Uploads a single file to OpenAI's File endpoint with multipart/form-data.
+     *
+     * @param filePath Path on disk for the file to upload.
+     * @param filename The name shown in the server side (Content-Disposition).
+     * @param apiKey   Your OpenAI API key.
+     * @param purpose  The "purpose" field (default "assistants").
+     *
+     * @return UploadResult with success/failure and file ID.
+     */
+    static UploadResult uploadFileOpenAI(
+        const std::string& filePath,
+        const std::string& filename,
+        const std::string& apiKey,
+        const std::string& purpose = "assistants"
+    );
 };
 
-} // namespace models
+} // end namespace models
 
 #endif // OPENAI_O3_MINI_HPP

@@ -13,6 +13,9 @@ public:
     // Log an error-level message
     static void error(const std::string& message);
 
+    // Log a warning-level message
+    static void warn(const std::string& message);
+
 private:
     Logger() = default;
     ~Logger() = default;
