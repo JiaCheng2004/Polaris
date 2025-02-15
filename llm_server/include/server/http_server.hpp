@@ -4,13 +4,14 @@
 #define HTTP_SERVER_HPP
 
 namespace server {
+
     /**
-     * Starts the HTTP server (e.g., with Crow or another framework).
-     * It should listen on port 8080 (by default) and route requests
-     * to the appropriate request handler.
+     * Starts the HTTP server, listening on port 8080 (by default).
+     * This function typically blocks until the server is shut down.
      */
     void startServer();
-}
+
+} // namespace server
 
 #endif // HTTP_SERVER_HPP
 
