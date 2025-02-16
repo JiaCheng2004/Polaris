@@ -1,12 +1,18 @@
 // src/server/request_handler.cpp
 
 #include "server/request_handler.hpp"
-#include "models/openai_o3_mini.hpp"
-#include "models/google_gemini2_pro.hpp" // or anthropic, claude, etc.
 #include "utils/logger.hpp"
 #include "utils/token_tracker.hpp"
+#include "utils/model_result.hpp"
+
+#include "models/openai_gpt_4.hpp"
+#include "models/openai_gpt_4o.hpp"
+#include "models/openai_o1.hpp"
+#include "models/openai_o3.hpp"
+#include "models/google_gemini2_pro.hpp"
 
 #include <nlohmann/json.hpp>
+#include <crow.h>
 #include <crow/multipart.h>
 
 using namespace models;
@@ -14,60 +20,62 @@ using namespace models;
 namespace server {
 
 /**
- * We'll overload handleLLMQuery to also receive fileParts.
+ * Handler that checks the model, retrieves the context if desired,
+ * and delegates everything else to the sub-model's functions.
  */
 nlohmann::json handleLLMQuery(const nlohmann::json& input,
                               const std::vector<crow::multipart::part>& fileParts)
 {
     // Prepare a standard response JSON
+    // Renamed keys + added model_info & additional objects
     nlohmann::json response = {
-        {"model_used",  ""},
+        {"model",       ""},                              // (was model_used)
         {"message",     ""},
-        {"files",       nlohmann::json::array()},  // We might fill with file info
-        {"token_usage", 0},
-        {"error_code",  200},
-        {"details",     ""}
+        {"files",       nlohmann::json::array()},
+        {"token_used",  0},                               // (was token_usage)
+        {"ecode",       200},                             // (was error_code)
+        {"emessage",    ""},                              // (was details)
+        {"model_info",  nlohmann::json::object()},        // newly added
+        {"additional",  nlohmann::json::object()}         // newly added
     };
 
-    std::string modelName = input.value("model_name", "");
+    // 1. Check for model
+    std::string modelName = input.value("model", "");
     if (modelName.empty()) {
-        response["error_code"] = 400;
-        response["details"]    = "No model_name provided.";
+        response["ecode"]    = 400;
+        response["emessage"] = "No model provided.";
         return response;
     }
 
-    // Convert JSON "messages" to vector<ChatMessage>
-    std::vector<ChatMessage> messagesVec;
-    if (input.contains("messages") && input["messages"].is_array()) {
-        for (auto& m : input["messages"]) {
-            ChatMessage cm;
-            cm.role    = m.value("role", "");
-            cm.content = m.value("content", "");
-            messagesVec.push_back(cm);
-        }
-    }
-
-    // We'll hold the final model result in this
-    ModelResult modelResult;
+    // If you want to pass a "context" field to sub-models, grab it here
+    std::string context = input.value("context", "");
 
     // 2. Route to the correct model
+    ModelResult modelResult;
     try {
-        if (modelName == "openai_o3_mini_high") {
-            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "high");
-        } else if (modelName == "openai_o3_mini_medium") {
-            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "medium");
-        } else if (modelName == "openai_o3_mini_low") {
-            modelResult = OpenAIo3mini::uploadAndQuery(messagesVec, fileParts, "low");
-        } else if (modelName == "google_gemini_2.0_pro") {
-            modelResult = GoogleGemini2Pro::uploadAndQuery(messagesVec, fileParts);
-        } 
-        // else if (modelName == "anthropic_claude3") { ... }
-        // else if (modelName == "xai_model")         { ... }
-        else {
+        if (modelName == "openai-gpt-4") {
+            modelResult = OpenAIGPT4::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-gpt-4o") {
+            modelResult = OpenAIGPT4o::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o1-low") {
+            modelResult = OpenAIo1::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o1-medium") {
+            modelResult = OpenAIo1::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o1-high") {
+            modelResult = OpenAIo1::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o3-mini-low") {
+            modelResult = OpenAIo3mini::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o3-mini-medium") {
+            modelResult = OpenAIo3mini::uploadAndQuery(context, fileParts);
+        } else if (modelName == "openai-o3-mini-high") {
+            modelResult = OpenAIo3mini::uploadAndQuery(context, fileParts);
+        } else if (modelName == "google-gemini-2.0-pro") {
+            modelResult = GoogleGemini2Pro::uploadAndQuery(context, fileParts);
+        } else {
             // Unknown model
             modelResult.success      = false;
             modelResult.errorCode    = 400;
-            modelResult.errorMessage = "Unrecognized model_name: " + modelName;
+            modelResult.errorMessage = "Unrecognized model: " + modelName;
         }
     } catch (const std::exception& e) {
         modelResult.success      = false;
@@ -75,16 +83,16 @@ nlohmann::json handleLLMQuery(const nlohmann::json& input,
         modelResult.errorMessage = std::string("Exception: ") + e.what();
     }
 
-    // 3. Convert ModelResult -> standardized JSON
-    response["model_used"]  = modelResult.modelUsed;
-    response["message"]     = modelResult.message;
-    response["token_usage"] = modelResult.tokenUsage;
-    response["error_code"]  = modelResult.errorCode;
+    // 3. Convert ModelResult -> standardized JSON response
+    response["model"]      = modelResult.modelUsed;  
+    response["message"]    = modelResult.message;
+    response["token_used"] = modelResult.tokenUsage;
+    response["ecode"]      = modelResult.errorCode;
     if (!modelResult.success) {
-        response["details"] = modelResult.errorMessage;
+        response["emessage"] = modelResult.errorMessage;
     }
 
-    // If any file IDs were returned, we can store them in response["files"].
+    // If any file IDs were returned, store them in response
     for (auto& fID : modelResult.fileIds) {
         nlohmann::json f;
         f["file_id"] = fID;
@@ -96,10 +104,14 @@ nlohmann::json handleLLMQuery(const nlohmann::json& input,
         utils::TokenTracker::addUsage(modelResult.tokenUsage);
     }
 
+    // In the future, you could populate "model_info" or "additional" fields:
+    // response["model_info"] = { {"param1", "value"}, {"param2", 42} };
+    // response["additional"] = { {"hint", "some future usage"}, {"debug", "..."} };
+
     return response;
 }
 
-// Overload that uses an empty vector for fileParts if not given
+// Overload that doesn't accept fileParts
 nlohmann::json handleLLMQuery(const nlohmann::json& input) {
     std::vector<crow::multipart::part> empty;
     return handleLLMQuery(input, empty);
