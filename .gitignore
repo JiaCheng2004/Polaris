@@ -2,4 +2,3 @@ llm_server/tests/*
 llm_server/config/config.json
 .env
 .vscode/
-prompt.txt

@@ -1,5 +1,5 @@
-#ifndef GOOGLE_GEMINI2_PRO_HPP
-#define GOOGLE_GEMINI2_PRO_HPP
+#ifndef OPENAI_GPT_4_HPP
+#define OPENAI_GPT_4_HPP
 
 #include "utils/model_result.hpp"
 #include <crow/multipart.h>
@@ -8,7 +8,7 @@
 
 namespace models {
 
-class GoogleGemini2Pro
+class OpenAIGPT4
 {
 public:
     static ModelResult uploadAndQuery(const std::string& context,
@@ -17,4 +17,4 @@ public:
 
 } // namespace models
 
-#endif // GOOGLE_GEMINI2_PRO_HPP
+#endif // OPENAI_GPT_4_HPP

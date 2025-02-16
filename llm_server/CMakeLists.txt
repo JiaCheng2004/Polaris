@@ -3,6 +3,9 @@ project(llm_server)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Enable Crow multipart support globally
+add_compile_definitions(CROW_ENABLE_MULTIPART)
+
 # 1) Find the required Boost and nlohmann_json
 find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(nlohmann_json REQUIRED)
@@ -20,23 +23,10 @@ FetchContent_Declare(
 # This will download Crow into crow_SOURCE_DIR and build it
 FetchContent_MakeAvailable(crow)
 
-# 3) Gather or list your source files
+# 3) Gather your source files
 file(GLOB SERVER_SOURCES "src/server/*.cpp")
 file(GLOB MODEL_SOURCES  "src/models/*.cpp")
 file(GLOB UTILS_SOURCES  "src/utils/*.cpp")
-
-# Alternatively, you can explicitly list them:
-# set(SERVER_SOURCES
-#     src/server/http_server.cpp
-#     src/server/request_handler.cpp
-# )
-# set(MODEL_SOURCES
-#     src/models/qingyunke.cpp
-# )
-# set(UTILS_SOURCES
-#     src/utils/logger.cpp
-#     src/utils/token_tracker.cpp
-# )
 
 # 4) Define your executable
 add_executable(llm_server
@@ -46,6 +36,8 @@ add_executable(llm_server
     ${UTILS_SOURCES}
 )
 
+target_compile_definitions(llm_server PRIVATE CROW_ENABLE_MULTIPART)
+
 # 5) Include directories
 target_include_directories(llm_server PRIVATE
     ${Boost_INCLUDE_DIRS}
@@ -54,11 +46,13 @@ target_include_directories(llm_server PRIVATE
     ${crow_SOURCE_DIR}/include
 )
 
-# 6) Link libraries: Boost, nlohmann_json, and Crow
-#   Depending on the Crow version, the library target might be 'crow', 'crow_all', etc.
-#   Usually you'll see 'crow' or 'crow::crow'.
+# 6) Link libraries: Boost, nlohmann_json, and (optionally) Crow
 target_link_libraries(llm_server
     ${Boost_LIBRARIES}
     nlohmann_json::nlohmann_json
     CURL::libcurl
+    # If your Crow build/export provides a library target, link it here:
+    # crow
+    # or crow::crow (depending on how Crow is exported)
 )
+
