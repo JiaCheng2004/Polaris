@@ -1,18 +1,19 @@
 #include "models/google_gemini2_pro.hpp"
+#include "utils/logger.hpp"
 
 namespace models {
 
-ModelResult GoogleGemini2Pro::uploadAndQuery(const std::string& context,
-                                             const std::vector<crow::multipart::part>& fileParts)
+ModelResult GoogleGemini2Pro::uploadAndQuery(const nlohmann::json& input,
+                                        const std::vector<crow::multipart::part>& fileParts)
 {
+    utils::Logger::info("GoogleGemini2Pro: fileParts.size() = " + std::to_string(fileParts.size()));
+
     ModelResult result;
     result.success   = true;
     result.modelUsed = "google-gemini-2.0-pro";
-    // Dummy message
-    result.message   = "Hello from Google Gemini 2.0 Pro with no files allowed.";
-    result.tokenUsage = 50;
-    result.errorCode = 200; // OK
-    
+    result.message   = "Hello World";
+    result.tokenUsage = 666;
+
     return result;
 }
 

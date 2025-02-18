@@ -1,16 +1,16 @@
-#include "models/openai_o1.hpp"
+#include "models/openai_o3_mini.hpp"
 #include "utils/logger.hpp"
 
 namespace models {
 
-ModelResult OpenAIo1::uploadAndQuery(const nlohmann::json& input,
+ModelResult OpenAIo3mini::uploadAndQuery(const nlohmann::json& input,
                                         const std::vector<crow::multipart::part>& fileParts)
 {
-    utils::Logger::info("OpenAIo1: fileParts.size() = " + std::to_string(fileParts.size()));
+    utils::Logger::info("OpenAIo3mini: fileParts.size() = " + std::to_string(fileParts.size()));
 
     ModelResult result;
     result.success   = true;
-    result.modelUsed = "openai-o1";
+    result.modelUsed = "openai-o3-mini";
     result.message   = "Hello World";
     result.tokenUsage = 666;
 

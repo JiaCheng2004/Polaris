@@ -1,5 +1,5 @@
-#ifndef OPENAI_O1_HPP
-#define OPENAI_O1_HPP
+#ifndef OPENAI_O3_MINI_HPP
+#define OPENAI_O3_MINI_HPP
 
 #pragma once
 
@@ -11,7 +11,7 @@
 
 namespace models {
 
-class OpenAIo1 : public IModel {
+class OpenAIo3mini : public IModel {
 public:
     ModelResult uploadAndQuery(const nlohmann::json& input,
                                const std::vector<crow::multipart::part>& fileParts) override;
@@ -19,4 +19,4 @@ public:
 
 } // namespace models
 
-#endif // OPENAI_O1_HPP
+#endif // OPENAI_O3_MINI_HPP
