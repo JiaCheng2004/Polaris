@@ -1,8 +1,18 @@
 # docker/Dockerfile
 FROM ubuntu:24.04
 
-# Install dependencies
+# --[1] Set environment variables related to tzdata --
+# Disable interactive prompts during tzdata install
+ENV DEBIAN_FRONTEND=noninteractive
+# Set the timezone to Los Angeles (Pacific Time)
+ENV TZ=America/Los_Angeles
+
+# Name of the application
+ENV APP_NAME="llm_server"
+
+# --[2] Install dependencies, including tzdata for timezones --
 RUN apt-get update && apt-get install -y \
+    tzdata \
     cmake \
     g++ \
     make \
@@ -12,19 +22,24 @@ RUN apt-get update && apt-get install -y \
     libboost-all-dev \
     nlohmann-json3-dev \
     libcurl4-openssl-dev \
- && rm -rf /var/lib/apt/lists/*
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create a working directory
+# --[3] Create folder + log file --
+RUN mkdir -p /var/log/${APP_NAME} \
+    && touch /var/log/${APP_NAME}/server.log \
+    && chmod 666 /var/log/${APP_NAME}/server.log
+
+# --[4] Working directory --
 WORKDIR /app
 
-# Copy everything into the container (adjust as needed)
+# --[5] Copy sources --
 COPY . /app
 
-# Build the project
+# --[6] Build --
 RUN mkdir -p build && cd build && cmake .. && make
 
-# Expose the server port (adjust if your app listens on a different port)
+# --[7] Expose and run --
 EXPOSE 8080
-
-# By default, run the server when starting the container
-CMD ["/app/build/llm_server"]
+CMD /app/build/$APP_NAME
