@@ -3,6 +3,8 @@
    cd Polaris
    ```
 
+   - Make sure to modify `example.config.json` located at `llm_server/config/` folder with your own API Keys
+
 2. **Build and run both services**:
    ```bash
    docker compose up --build
