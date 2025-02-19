@@ -3,7 +3,8 @@
    cd Polaris
    ```
 
-   - Make sure to modify `example.config.json` located at `llm_server/config/` folder with your own API Keys
+   - Make sure to rename `example.config.json` into `config.json` located at `llm_server/config/` folder
+   - Make sure to fill the apikey value with your own API Keys.
 
 2. **Build and run both services**:
    ```bash
