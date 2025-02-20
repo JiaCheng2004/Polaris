@@ -1,16 +1,14 @@
 # docker/Dockerfile
 FROM ubuntu:24.04
 
-# --[1] Set environment variables related to tzdata --
-# Disable interactive prompts during tzdata install
+# Disable interactive prompts (e.g. tzdata)
 ENV DEBIAN_FRONTEND=noninteractive
-# Set the timezone to Los Angeles (Pacific Time)
 ENV TZ=America/Los_Angeles
 
 # Name of the application
 ENV APP_NAME="llm_server"
 
-# --[2] Install dependencies, including tzdata for timezones --
+# [1] Install system dependencies
 RUN apt-get update && apt-get install -y \
     tzdata \
     cmake \
@@ -22,24 +20,39 @@ RUN apt-get update && apt-get install -y \
     libboost-all-dev \
     nlohmann-json3-dev \
     libcurl4-openssl-dev \
-    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
-    && echo $TZ > /etc/timezone \
-    && rm -rf /var/lib/apt/lists/*
+    libjsoncpp-dev \
+    sqlite3 \
+    libsqlite3-dev \
+    uuid-dev \
+    zlib1g-dev \
+  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+  && echo $TZ > /etc/timezone \
+  && rm -rf /var/lib/apt/lists/*
 
-# --[3] Create folder + log file --
+# [2] Build & install Drogon from source (with submodules)
+RUN git clone --recursive --branch v1.9.9 \
+      https://github.com/drogonframework/drogon.git /tmp/drogon \
+ && cd /tmp/drogon \
+ && mkdir build && cd build \
+ && cmake -DCMAKE_INSTALL_PREFIX=/usr .. \
+ && make -j$(nproc) \
+ && make install \
+ && rm -rf /tmp/drogon
+
+# [3] Create folder + log file
 RUN mkdir -p /var/log/${APP_NAME} \
-    && touch /var/log/${APP_NAME}/server.log \
-    && chmod 666 /var/log/${APP_NAME}/server.log
+  && touch /var/log/${APP_NAME}/server.log \
+  && chmod 666 /var/log/${APP_NAME}/server.log
 
-# --[4] Working directory --
+# [4] Workdir & copy sources
 WORKDIR /app
-
-# --[5] Copy sources --
 COPY . /app
 
-# --[6] Build --
-RUN mkdir -p build && cd build && cmake .. && make
+# [5] Build your project
+RUN mkdir -p build && cd build \
+ && cmake .. \
+ && make -j$(nproc)
 
-# --[7] Expose and run --
+# [6] Expose & run
 EXPOSE 8080
-CMD /app/build/$APP_NAME
+CMD ["/app/build/llm_server"]
