@@ -1,22 +1,33 @@
 #ifndef MULTIPART_UTILS_HPP
 #define MULTIPART_UTILS_HPP
 
-#include <crow/multipart.h>
 #include <string>
 
 namespace utils
 {
-    /**
-     * Extracts the form-data field name ("files", "json", etc.) 
-     * from the "Content-Disposition" header of a Crow multipart part.
-     *
-     * E.g. if the header is: 
-     *      Content-Disposition: form-data; name="files"; filename="my.jpg"
-     * then the returned string is "files".
-     *
-     * Returns empty string if "name" is not found.
-     */
-    std::string getPartName(const crow::multipart::part& part);
+/**
+ * @brief Represents a single part of a multipart/form-data submission.
+ *
+ * Contains a filename, the entire file body in memory, and the content type.
+ */
+struct MultipartPart
+{
+    std::string filename;    ///< e.g. "my_image.png"
+    std::string body;        ///< Raw file content
+    std::string contentType; ///< e.g. "image/png"
+};
+
+/**
+ * @brief Extracts the 'name' attribute from a multipart form-data header.
+ *
+ * For example, if the Content-Disposition header is:
+ *     Content-Disposition: form-data; name="files"; filename="my.jpg"
+ * the returned string would be "files".
+ *
+ * @param part The multipart part from which to extract the field name.
+ * @return The form-data field name (e.g., "files"), or an empty string if not found.
+ */
+std::string getPartName(const MultipartPart &part);
 
 } // namespace utils
 

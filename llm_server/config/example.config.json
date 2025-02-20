@@ -1,0 +1,20 @@
+{
+    "openai": {
+        "apikey": ""
+    },
+    "google":{
+        "apikey": ""
+    },
+    "anthropic":{
+        "apikey": ""
+    },
+    "xai": {
+        "apikey": ""
+    },
+    "zhipu": {
+        "apikey": ""
+    },
+    "llama": {
+        "apikey": ""
+    }
+}

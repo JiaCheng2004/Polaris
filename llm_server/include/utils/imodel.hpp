@@ -3,26 +3,31 @@
 
 #pragma once
 
-#include "utils/model_result.hpp" // So we can use ModelResult
+#include "utils/model_result.hpp"
+#include "utils/multipart_utils.hpp"
 #include <nlohmann/json.hpp>
-#include <crow/multipart.h>
 #include <vector>
 
-namespace models {
-
+namespace models
+{
 /**
- * Common interface for all LLM models.
+ * @brief Common interface for all LLM models.
  */
-class IModel {
+class IModel
+{
 public:
     virtual ~IModel() = default;
 
     /**
-     * Given the entire JSON input and (optional) file parts,
-     * perform the desired model query and return a ModelResult.
+     * @brief Perform a model query given the JSON input and file attachments.
+     *
+     * @param input     The JSON input containing model request details.
+     * @param fileParts A list of file attachments (if any).
+     * @return A ModelResult describing success/failure and any model output.
      */
-    virtual ModelResult uploadAndQuery(const nlohmann::json& input,
-                                       const std::vector<crow::multipart::part>& fileParts) = 0;
+    virtual ModelResult uploadAndQuery(
+        const nlohmann::json &input,
+        const std::vector<utils::MultipartPart> &fileParts) = 0;
 };
 
 } // namespace models

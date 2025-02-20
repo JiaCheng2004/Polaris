@@ -1,144 +1,129 @@
-// src/server/request_handler.cpp
-
 #include "server/request_handler.hpp"
 #include "utils/logger.hpp"
 #include "utils/token_tracker.hpp"
 #include "utils/model_result.hpp"
-
-// Model headers
+#include "utils/multipart_utils.hpp"
 #include "models/openai_gpt_4.hpp"
-#include "models/openai_gpt_4o.hpp"
-#include "models/openai_o1.hpp"
-#include "models/openai_o3_mini.hpp"
-#include "models/google_gemini2_pro.hpp"
 
 #include <nlohmann/json.hpp>
-#include <crow.h>
-#include <crow/multipart.h>
+#include <string>
+#include <vector>
 
 using namespace models;
 
-namespace server {
+namespace server
+{
 
 /**
- * Handler that checks the model
- * and delegates everything else to the sub-model's functions.
+ * @brief Handles incoming requests for language model queries.
+ *
+ * This function parses the input JSON and optional file attachments, 
+ * then routes the request to the appropriate model. It ultimately
+ * returns a standardized JSON response indicating success/failure
+ * and any relevant output from the model.
+ *
+ * @param input     The JSON input that contains model parameters (e.g., "model", "prompt").
+ * @param fileParts A list of file attachments (if any) uploaded with the request.
+ * @return A JSON object containing the query result, including error codes or model output.
  */
-nlohmann::json handleLLMQuery(const nlohmann::json& input,
-                              const std::vector<crow::multipart::part>& fileParts)
+nlohmann::json handleLLMQuery(
+    const nlohmann::json &input,
+    const std::vector<utils::MultipartPart> &fileParts)
 {
-    // Log that we're entering the function
-    utils::Logger::info("handleLLMQuery called with potential fileParts = " 
-        + std::to_string(fileParts.size()));
+    // Log basic call information
+    utils::Logger::info("[handleLLMQuery] Invoked. Number of file parts: "
+                        + std::to_string(fileParts.size()));
 
-    // Prepare a standard response JSON
+    // Prepare a standard response JSON structure
     nlohmann::json response = {
-        {"model",       ""},                      // (was model_used)
+        {"model",       ""},
         {"message",     ""},
         {"files",       nlohmann::json::array()},
-        {"token_used",  0},                       // (was token_usage)
-        {"ecode",       200},                     // (was error_code)
-        {"emessage",    ""},                      // (was details)
+        {"token_used",  0},
+        {"ecode",       200},
+        {"emessage",    ""},
         {"model_info",  nlohmann::json::object()},
         {"additional",  nlohmann::json::object()}
     };
 
-    // 1. Check for model
+    // Extract and validate the model name
     std::string modelName = input.value("model", "");
-    if (modelName.empty()) {
-        utils::Logger::warn("No 'model' field provided in JSON request.");
+    if (modelName.empty())
+    {
+        utils::Logger::warn("[handleLLMQuery] No 'model' field provided in input JSON.");
         response["ecode"]    = 400;
         response["emessage"] = "No model was provided.";
         return response;
     }
 
-    utils::Logger::info("Processing request for model: " + modelName);
+    utils::Logger::info("[handleLLMQuery] Request for model: " + modelName);
 
-    // 2. Route to the correct model
+    // Route request to the appropriate model
     ModelResult modelResult;
-    try {
-        if (modelName == "openai-gpt-4") {
-            utils::Logger::info("Routing to OpenAIGPT4");
+    try
+    {
+        if (modelName == "openai-gpt-4")
+        {
+            utils::Logger::info("[handleLLMQuery] Routing to OpenAIGPT4.");
             modelResult = OpenAIGPT4().uploadAndQuery(input, fileParts);
-        } 
-        else if (modelName == "openai-gpt-4o") {
-            utils::Logger::info("Routing to OpenAIGPT4o");
-            modelResult = OpenAIGPT4o().uploadAndQuery(input, fileParts);
-        } 
-        else if (modelName == "openai-o1"
-              || modelName == "openai-o1-low"
-              || modelName == "openai-o1-medium"
-              || modelName == "openai-o1-high")
-        {
-            utils::Logger::info("Routing to OpenAI-o1 variants");
-            modelResult = OpenAIo1().uploadAndQuery(input, fileParts);
         }
-        else if (modelName == "openai-o3-mini"
-              || modelName == "openai-o3-mini-low"
-              || modelName == "openai-o3-mini-medium"
-              || modelName == "openai-o3-mini-high")
+        else
         {
-            utils::Logger::info("Routing to OpenAI-o3-mini variants");
-            modelResult = OpenAIo3mini().uploadAndQuery(input, fileParts);
-        }
-        else if (modelName == "google-gemini-2.0-pro") {
-            utils::Logger::info("Routing to GoogleGemini2Pro");
-            modelResult = GoogleGemini2Pro().uploadAndQuery(input, fileParts);
-        } 
-        else {
-            // Unknown model
-            utils::Logger::warn("Unrecognized model requested: " + modelName);
+            // Handle unknown model
+            utils::Logger::warn("[handleLLMQuery] Unrecognized model: " + modelName);
             modelResult.success      = false;
             modelResult.errorCode    = 400;
             modelResult.errorMessage = "Unrecognized model: " + modelName;
         }
-    } catch (const std::exception& e) {
-        utils::Logger::error("Exception caught in handleLLMQuery: " + std::string(e.what()));
+    }
+    catch (const std::exception &e)
+    {
+        // Log any exceptions
+        utils::Logger::error("[handleLLMQuery] Exception caught: " + std::string(e.what()));
         modelResult.success      = false;
         modelResult.errorCode    = 500;
-        modelResult.errorMessage = std::string("Exception: ") + e.what();
+        modelResult.errorMessage = "Exception: " + std::string(e.what());
     }
 
-    // 3. Convert ModelResult -> standardized JSON response
-    response["model"]      = modelResult.modelUsed;  
+    // Convert the ModelResult into our standardized JSON response
+    response["model"]      = modelResult.modelUsed;
     response["message"]    = modelResult.message;
     response["token_used"] = modelResult.tokenUsage;
     response["ecode"]      = modelResult.errorCode;
-    if (!modelResult.success) {
+
+    if (!modelResult.success)
+    {
         response["emessage"] = modelResult.errorMessage;
     }
 
-    // If any file IDs were returned, store them in response
-    for (auto& fID : modelResult.fileIds) {
+    // If any files were returned, add them to the response
+    for (const auto &fID : modelResult.fileIds)
+    {
         nlohmann::json f;
         f["file_id"] = fID;
         response["files"].push_back(f);
     }
 
-    // 4. If model succeeded, track tokens
-    if (modelResult.success) {
-        utils::Logger::info("Model succeeded; tracking token usage: "
+    // Track token usage if the model was successful
+    if (modelResult.success)
+    {
+        utils::Logger::info("[handleLLMQuery] Model succeeded; tracking token usage: "
                             + std::to_string(modelResult.tokenUsage));
         utils::TokenTracker::addUsage(modelResult.tokenUsage);
-    } else {
-        utils::Logger::warn("Model call failed with ecode="
+    }
+    else
+    {
+        utils::Logger::warn("[handleLLMQuery] Model call failed. ecode="
                             + std::to_string(modelResult.errorCode)
-                            + " : " + modelResult.errorMessage);
+                            + " | " + modelResult.errorMessage);
     }
 
-    // Optionally log the final response summary
-    utils::Logger::info("handleLLMQuery returning ecode=" 
+    // Final log before returning
+    utils::Logger::info("[handleLLMQuery] Returning ecode="
                         + std::to_string(response["ecode"].get<int>())
                         + " for model=" + modelName);
 
     return response;
-}
-
-// Overload that doesn't accept fileParts
-nlohmann::json handleLLMQuery(const nlohmann::json& input) {
-    utils::Logger::info("handleLLMQuery called (no files).");
-    std::vector<crow::multipart::part> empty;
-    return handleLLMQuery(input, empty);
 }
 
 } // namespace server

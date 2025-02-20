@@ -1,21 +1,20 @@
-#include <crow/multipart.h>
+#include "utils/multipart_utils.hpp"
 
 namespace utils
 {
-    std::string getPartName(const crow::multipart::part& part)
-    {
-        // Find "Content-Disposition" in part.headers
-        auto it = part.headers.find("Content-Disposition");
-        if (it == part.headers.end())
-            return {};
+/**
+ * @brief Extracts the name field (such as "files", "json", etc.) from a MultipartPart.
+ *
+ * @note In this example, the implementation simply returns the filename, but
+ *       you may modify this function to parse the Content-Disposition header
+ *       if needed.
+ *
+ * @param part The multipart part from which to extract the field name.
+ * @return A string containing the extracted field name.
+ */
+std::string getPartName(const MultipartPart &part)
+{
+    return part.filename;
+}
 
-        // Instead of parsing `it->second.value`, look in `it->second.params`
-        // for the key "name".
-        auto nameIt = it->second.params.find("name");
-        if (nameIt == it->second.params.end())
-            return {};
-
-        // That’s the field name (e.g., "json" or "files")
-        return nameIt->second;
-    }
 } // namespace utils

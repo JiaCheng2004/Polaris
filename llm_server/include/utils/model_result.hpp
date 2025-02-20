@@ -4,22 +4,23 @@
 #include <string>
 #include <vector>
 
-namespace models {
-
+namespace models
+{
 /**
- * A simple struct that models might return.
+ * @brief Struct representing the result of a model operation.
+ *
+ * Includes success/failure status, error codes and messages, model identifiers,
+ * token usage details, and optionally any file IDs.
  */
 struct ModelResult
 {
-    bool success = true;
-    std::string modelUsed;
-    std::string message;
-    int tokenUsage = 0;
-    int errorCode = 200; // 200 for OK
-    std::string errorMessage;
-    
-    // If you need file IDs or other info from the model:
-    std::vector<std::string> fileIds;
+    bool success = true;            ///< Whether the model call succeeded
+    std::string modelUsed;          ///< The model identifier (e.g., "openai-gpt-4")
+    std::string message;            ///< Main output or message returned by the model
+    int tokenUsage = 0;             ///< Number of tokens used
+    int errorCode = 200;            ///< HTTP-like error code (200 for OK)
+    std::string errorMessage;       ///< Additional error message if not successful
+    std::vector<std::string> fileIds; ///< Optional list of file IDs returned by the model
 };
 
 } // namespace models

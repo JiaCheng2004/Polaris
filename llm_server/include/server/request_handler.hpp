@@ -1,29 +1,23 @@
 #ifndef REQUEST_HANDLER_HPP
 #define REQUEST_HANDLER_HPP
 
+#include "utils/multipart_utils.hpp"
 #include <nlohmann/json.hpp>
-#include <crow/multipart.h> 
+#include <string>
+#include <vector>
 
-namespace server {
-
+namespace server
+{
 /**
- * The function that handles a raw JSON request body (application/json).
+ * @brief Handles language model queries, with optional multipart file uploads.
+ *
+ * @param input     The JSON input containing model request parameters.
+ * @param fileParts A list of file attachments (if any).
+ * @return A JSON object containing the model's response or any error information.
  */
-nlohmann::json handleLLMQuery(const nlohmann::json& input);
-
-/**
- * The function that handles multipart/form-data (with optional files).
- * Make sure the signature matches what you use in http_server.cpp.
- */
-nlohmann::json handleLLMQuery(const nlohmann::json& input,
-                              const std::vector<crow::multipart::part>& fileParts);
-
-/**
- * Alternative approach:
- *   or a distinct function if you want to accept the entire crow::multipart::message
- *   and parse inside the handler.
- */
-nlohmann::json handleLLMQueryMultipart(const crow::multipart::message& multipartReq);
+nlohmann::json handleLLMQuery(
+    const nlohmann::json &input,
+    const std::vector<utils::MultipartPart> &fileParts);
 
 } // namespace server
 

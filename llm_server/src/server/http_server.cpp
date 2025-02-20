@@ -1,35 +1,47 @@
 #include "server/http_server.hpp"
 #include "server/request_handler.hpp"
 #include "utils/logger.hpp"
-#include "utils/multipart_utils.hpp"
+#include "utils/token_tracker.hpp"
 
-#include <crow.h>
-#include <crow/multipart.h>
+#include <drogon/drogon.h>
+#include <drogon/MultiPart.h>
 #include <nlohmann/json.hpp>
+#include <atomic>
+#include <chrono>
+#include <ctime>
+#include <sstream>
 
 #ifdef __linux__
 #include <unistd.h>
 #include <fstream>
 #endif
 
-#include <chrono>
-#include <ctime>
-#include <atomic>
-#include <sstream>
-
-namespace {
-    // Server start time
+namespace
+{
+    /**
+     * @brief The time point at which the server is started.
+     */
     static auto g_serverStartTime = std::chrono::steady_clock::now();
 
-    // Total requests (for metrics)
+    /**
+     * @brief Atomic counter to track the total number of requests.
+     */
     static std::atomic<long> g_totalRequests{0};
 
 #ifdef __linux__
+    /**
+     * @brief Retrieves the memory usage in kilobytes (KB) for the current process on Linux.
+     *
+     * @return The memory usage in KB, or -1 if it could not be determined.
+     */
     static long getMemoryUsageKB()
     {
         std::ifstream statm("/proc/self/statm");
-        long totalPages = 0, residentPages = 0, share = 0;
-        if (statm.good()) {
+        long totalPages = 0;
+        long residentPages = 0;
+        long share = 0;
+        if (statm.good())
+        {
             statm >> totalPages >> residentPages >> share;
             long pageSizeKB = sysconf(_SC_PAGE_SIZE) / 1024;
             return residentPages * pageSizeKB;
@@ -37,16 +49,24 @@ namespace {
         return -1;
     }
 
+    /**
+     * @brief Formats a size in bytes into a human-readable string (e.g., "12.34 MB").
+     *
+     * @param bytes The size in bytes.
+     * @return The formatted string with the appropriate unit (B, KB, MB, GB, TB).
+     */
     static std::string formatMemorySizeBytes(long bytes)
     {
-        if (bytes < 0) {
+        if (bytes < 0)
+        {
             return "unknown";
         }
         static const char* SUFFIXES[] = {"B", "KB", "MB", "GB", "TB"};
         int suffixIndex = 0;
         double value = static_cast<double>(bytes);
 
-        while (value >= 1024.0 && suffixIndex < 4) {
+        while (value >= 1024.0 && suffixIndex < 4)
+        {
             value /= 1024.0;
             ++suffixIndex;
         }
@@ -57,190 +77,269 @@ namespace {
 #endif
 
     /**
-     * Helper to build a JSON response with code=200 by default
+     * @brief Builds and returns a JSON-based HTTP response.
+     *
+     * @param j    The JSON object to return as the response body.
+     * @param code The HTTP status code to set. Defaults to 200.
+     * @return A drogon::HttpResponsePtr with the provided JSON body.
      */
-    static crow::response makeJSONResponse(const nlohmann::json& j, int code = 200)
+    drogon::HttpResponsePtr makeJSONResponse(const nlohmann::json& j, int code = 200)
     {
-        crow::response resp;
-        resp.code = code;
-        resp.set_header("Content-Type", "application/json");
-        resp.body = j.dump();
+        auto resp = drogon::HttpResponse::newHttpResponse();
+        resp->setStatusCode(static_cast<drogon::HttpStatusCode>(code));
+        resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
+        resp->setBody(j.dump());
         return resp;
     }
 
 } // anonymous namespace
 
-namespace server {
+namespace server
+{
 
-void startServer() {
-    crow::SimpleApp app;
-
-    // Optional: set a custom log file name
+/**
+ * @brief Initializes logging, registers all HTTP handlers (endpoints),
+ *        and starts the Drogon server.
+ *
+ * This function configures the logger, sets up the server routes for:
+ * - LLM completions (POST /api/v1/llm/completions)
+ * - status checks (GET /api/v1/status)
+ * - Prometheus-style metrics (GET /metrics)
+ * - Log retrieval (GET /api/v1/logs)
+ *
+ * Finally, it binds the server to 0.0.0.0:8080 and runs the main loop.
+ */
+void startServer()
+{
+    // Configure logging
     utils::Logger::setLogFile("/var/log/llm_server/server.log");
+    utils::Logger::info("Logger initialized and file set to /var/log/llm_server/server.log.");
 
-    // -----------------------------
+    // ----------------------------------------------------------------------
     // POST /api/v1/llm/completions
-    // -----------------------------
-    CROW_ROUTE(app, "/api/v1/llm/completions")
-        .methods(crow::HTTPMethod::POST)
-    ([&](const crow::request& req){
-        g_totalRequests.fetch_add(1, std::memory_order_relaxed);
+    // ----------------------------------------------------------------------
+    drogon::app().registerHandler(
+        "/api/v1/llm/completions",
+        [](const drogon::HttpRequestPtr& req,
+           std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+        {
+            utils::Logger::info("[/api/v1/llm/completions] Received request.");
 
-        utils::Logger::info("[/api/v1/llm/completions] Received request.");
+            nlohmann::json bodyJson;
+            std::vector<utils::MultipartPart> fileParts;
+            bool jsonParsed = false;
 
-        std::vector<crow::multipart::part> fileParts;
-        nlohmann::json bodyJson;
-        bool jsonParsed = false;
+            // Handle multipart form data if present
+            if (req->contentType() == drogon::CT_MULTIPART_FORM_DATA)
+            {
+                drogon::MultiPartParser parser;
+                if (parser.parse(req) == 0)
+                {
+                    auto jsonField = parser.getParameter<std::string>("json");
+                    if (!jsonField.empty())
+                    {
+                        try
+                        {
+                            bodyJson = nlohmann::json::parse(jsonField);
+                            jsonParsed = true;
+                            utils::Logger::info("[/api/v1/llm/completions] JSON parsed from multipart form data.");
+                        }
+                        catch (...)
+                        {
+                            utils::Logger::error("[/api/v1/llm/completions] Invalid JSON in 'json' field.");
+                            nlohmann::json errJson{
+                                {"error_code", 400},
+                                {"details", "Invalid JSON in 'json' field"}};
+                            callback(makeJSONResponse(errJson, 400));
+                            return;
+                        }
+                    }
 
-        auto contentType = req.get_header_value("Content-Type");
-        utils::Logger::info("[/api/v1/llm/completions] Content-Type: " + contentType);
+                    // Collect any uploaded files
+                    auto uploadedFiles = parser.getFiles();
+                    for (auto& f : uploadedFiles)
+                    {
+                        utils::MultipartPart part;
+                        part.filename = f.getFileName();
+                        part.contentType = f.getContentType();
+                        part.body = std::string{f.fileContent()};
+                        fileParts.push_back(std::move(part));
+                    }
 
-        // Attempt parse as multipart
-        crow::multipart::message multipartReq(req);
-        if (!multipartReq.parts.empty()) {
-            for (auto& field : multipartReq.parts) {
-                std::string fieldName = utils::getPartName(field);
-                if (fieldName == "files") {
-                    fileParts.push_back(field);
-                } else if (fieldName == "json") {
-                    try {
-                        bodyJson = nlohmann::json::parse(field.body);
-                        jsonParsed = true;
-                    } catch(...) {
-                        utils::Logger::warn("[/api/v1/llm/completions] Invalid JSON in 'json' part.");
-                        nlohmann::json errJson = {
-                            {"error_code", 400},
-                            {"details", "Invalid JSON in 'json' part"}
-                        };
-                        return makeJSONResponse(errJson, 400);
+                    if (!uploadedFiles.empty())
+                    {
+                        utils::Logger::info("[/api/v1/llm/completions] Received "
+                                            + std::to_string(uploadedFiles.size()) + " file(s).");
                     }
                 }
+                else
+                {
+                    utils::Logger::warn("[/api/v1/llm/completions] Failed to parse multipart data.");
+                    nlohmann::json errJson{
+                        {"error_code", 400},
+                        {"details", "Failed to parse multipart data"}};
+                    callback(makeJSONResponse(errJson, 400));
+                    return;
+                }
             }
-        }
 
-        // If no JSON yet, parse raw request body
-        if (!jsonParsed) {
-            try {
-                bodyJson = nlohmann::json::parse(req.body);
-            } catch(...) {
-                utils::Logger::warn("[/api/v1/llm/completions] Invalid JSON in request body.");
-                nlohmann::json errJson = {
-                    {"error_code", 400},
-                    {"details", "Invalid JSON in request body"}
-                };
-                return makeJSONResponse(errJson, 400);
+            // If JSON was not parsed yet, attempt to parse the request body as JSON
+            if (!jsonParsed && !req->body().empty())
+            {
+                try
+                {
+                    bodyJson = nlohmann::json::parse(req->body());
+                    utils::Logger::info("[/api/v1/llm/completions] JSON parsed from request body.");
+                }
+                catch (...)
+                {
+                    utils::Logger::error("[/api/v1/llm/completions] Invalid JSON in body.");
+                    nlohmann::json errJson{
+                        {"error_code", 400},
+                        {"details", "Invalid JSON in body"}};
+                    callback(makeJSONResponse(errJson, 400));
+                    return;
+                }
             }
-        }
 
-        // Call the actual request handler
-        auto resultJson = server::handleLLMQuery(bodyJson, fileParts);
+            // Log request body size
+            utils::Logger::info("[/api/v1/llm/completions] Request body size: "
+                                + std::to_string(req->body().size()) + " bytes.");
 
-        // The request_handler uses "ecode" for error code. 
-        int httpCode = resultJson.value("ecode", 500);
+            // Delegate to the request handler
+            auto resultJson = server::handleLLMQuery(bodyJson, fileParts);
+            int httpCode = resultJson.value("ecode", 500);
 
-        utils::Logger::info("[/api/v1/llm/completions] Responding with HTTP " + std::to_string(httpCode));
-        return makeJSONResponse(resultJson, httpCode);
-    });
+            // Update request metrics
+            ++g_totalRequests;
 
-    // ---------------
-    // GET /api/v1/health
-    // ---------------
-    // Example health endpoint with consistent naming & response
-    CROW_ROUTE(app, "/api/v1/health")
-    ([](){
-        utils::Logger::info("[/api/v1/health] Received request.");
+            utils::Logger::info("[/api/v1/llm/completions] Responding with HTTP "
+                                + std::to_string(httpCode));
+            callback(makeJSONResponse(resultJson, httpCode));
+        },
+        {drogon::Post});
 
-        nlohmann::json health;
-        health["health_status"] = "healthy";
+    // ----------------------------------------------------------------------
+    // GET /api/v1/status
+    // ----------------------------------------------------------------------
+    drogon::app().registerHandler(
+        "/api/v1/status",
+        [](const drogon::HttpRequestPtr&,
+           std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+        {
+            utils::Logger::info("[/api/v1/status] Received request.");
 
-        auto now = std::chrono::steady_clock::now();
-        auto uptimeSec = std::chrono::duration_cast<std::chrono::seconds>(now - g_serverStartTime).count();
-        health["uptime_seconds"] = uptimeSec;
+            nlohmann::json status;
+            status["status_status"] = "statusy";
+
+            auto now = std::chrono::steady_clock::now();
+            auto uptimeSec = std::chrono::duration_cast<std::chrono::seconds>(
+                now - g_serverStartTime).count();
+            status["uptime_seconds"] = uptimeSec;
 
 #ifdef __linux__
-        long rssKB = getMemoryUsageKB();
-        if (rssKB >= 0) {
-            long bytes = rssKB * 1024;
-            health["memory_usage"] = formatMemorySizeBytes(bytes);
-        } else {
-            health["memory_usage"] = "unknown";
-        }
-#else
-        health["memory_usage"] = "not available";
-#endif
-        health["build_version"] = "v1.0.0";
-
-        // UTC time
-        auto t = std::time(nullptr);
-        std::tm utcTm{};
-#ifdef _WIN32
-        gmtime_s(&utcTm, &t);
-#else
-        gmtime_r(&t, &utcTm);
-#endif
-        char timeBuf[64];
-        std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &utcTm);
-        health["timestamp_utc"] = timeBuf;
-
-        // Return standard JSON response
-        utils::Logger::info("[/api/v1/health] Responding with HTTP 200");
-        return makeJSONResponse(health, 200);
-    });
-
-    // ---------------
-    // GET /metrics
-    // ---------------
-    // Simple Prometheus text-based output
-    CROW_ROUTE(app, "/metrics")
-    ([](){
-        utils::Logger::info("[/metrics] Received request.");
-
-        std::ostringstream oss;
-        oss << "# HELP llm_server_requests_total The total number of LLM requests processed.\n"
-            << "# TYPE llm_server_requests_total counter\n"
-            << "llm_server_requests_total " << g_totalRequests.load(std::memory_order_relaxed) << "\n";
-
-        crow::response r;
-        r.code = 200;
-        r.set_header("Content-Type", "text/plain; version=0.0.4"); 
-        r.body = oss.str();
-
-        utils::Logger::info("[/metrics] Responding with HTTP 200");
-        return r;
-    });
-
-    // ---------------
-    // GET /api/v1/logs
-    // ---------------
-    // Expose recent logs from memory
-    CROW_ROUTE(app, "/api/v1/logs")
-    ([&](const crow::request& req){
-        utils::Logger::info("[/api/v1/logs] Received request.");
-
-        int amount = 50; // default
-        if (auto amountStr = req.url_params.get("amount")) {
-            try {
-                amount = std::stoi(amountStr);
-            } catch(...) {
-                utils::Logger::warn("[/api/v1/logs] Invalid amount param. Defaulting to 50.");
+            long rssKB = getMemoryUsageKB();
+            if (rssKB >= 0)
+            {
+                long bytes = rssKB * 1024;
+                status["memory_usage"] = formatMemorySizeBytes(bytes);
             }
-        }
+            else
+            {
+                status["memory_usage"] = "unknown";
+            }
+#else
+            status["memory_usage"] = "not available";
+#endif
+            status["build_version"] = "v1.0.0";
 
-        auto recentLogs = utils::Logger::getRecentLogs(amount);
+            // Generate a UTC timestamp
+            auto t = std::time(nullptr);
+            std::tm utcTm{};
+#ifdef _WIN32
+            gmtime_s(&utcTm, &t);
+#else
+            gmtime_r(&t, &utcTm);
+#endif
+            char timeBuf[64];
+            std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &utcTm);
+            status["timestamp_utc"] = timeBuf;
 
-        // Build JSON array
-        nlohmann::json logsJson = nlohmann::json::array();
-        for (auto &logLine : recentLogs) {
-            logsJson.push_back(logLine);
-        }
+            utils::Logger::info("[/api/v1/status] Responding with HTTP 200");
+            callback(makeJSONResponse(status, 200));
+        },
+        {drogon::Get});
 
-        utils::Logger::info("[/api/v1/logs] Responding with last " + std::to_string(amount) + " logs.");
-        return makeJSONResponse(logsJson, 200);
-    });
+    // ----------------------------------------------------------------------
+    // GET /metrics
+    // ----------------------------------------------------------------------
+    drogon::app().registerHandler(
+        "/metrics",
+        [](const drogon::HttpRequestPtr&,
+           std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+        {
+            utils::Logger::info("[/metrics] Received request.");
 
-    // Start server
-    utils::Logger::info("Starting server on port 8080...");
-    app.port(8080).multithreaded().run();
+            std::ostringstream oss;
+            oss << "# HELP llm_server_requests_total The total number of LLM requests processed.\n"
+                << "# TYPE llm_server_requests_total counter\n"
+                << "llm_server_requests_total "
+                << g_totalRequests.load(std::memory_order_relaxed) << "\n";
+
+            auto resp = drogon::HttpResponse::newHttpResponse();
+            resp->setStatusCode(drogon::k200OK);
+            resp->setContentTypeCode(drogon::CT_TEXT_PLAIN);
+            resp->setBody(oss.str());
+
+            utils::Logger::info("[/metrics] Responding with HTTP 200");
+            callback(resp);
+        },
+        {drogon::Get});
+
+    // ----------------------------------------------------------------------
+    // GET /api/v1/logs
+    // ----------------------------------------------------------------------
+    drogon::app().registerHandler(
+        "/api/v1/logs",
+        [](const drogon::HttpRequestPtr& req,
+           std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+        {
+            utils::Logger::info("[/api/v1/logs] Received request.");
+
+            int amount = 50; // default log amount
+            auto amountStr = req->getParameter("amount");
+            if (!amountStr.empty())
+            {
+                try
+                {
+                    amount = std::stoi(amountStr);
+                }
+                catch (...)
+                {
+                    utils::Logger::warn("[/api/v1/logs] Invalid amount param. Defaulting to 50.");
+                }
+            }
+
+            auto recentLogs = utils::Logger::getRecentLogs(amount);
+
+            // Build a JSON array of the log lines
+            nlohmann::json logsJson = nlohmann::json::array();
+            for (auto& logLine : recentLogs)
+            {
+                logsJson.push_back(logLine);
+            }
+
+            utils::Logger::info("[/api/v1/logs] Responding with last "
+                                + std::to_string(amount) + " logs.");
+            callback(makeJSONResponse(logsJson, 200));
+        },
+        {drogon::Get});
+
+    // Configure server and start
+    utils::Logger::info("Starting Drogon server on port 8080...");
+    drogon::app().addListener("0.0.0.0", 8080);
+    drogon::app().setThreadNum(std::thread::hardware_concurrency());
+    drogon::app().run();
 }
 
 } // namespace server
