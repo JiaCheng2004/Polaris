@@ -3,3 +3,7 @@ llm_server/config/config.json
 .env
 .vscode/
 test.py
+.env.local
+*.key
+*.crt
+*.sql
