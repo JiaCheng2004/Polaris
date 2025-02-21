@@ -1,0 +1,115 @@
+server:
+  # Use your environment variable design for the port
+  port: ${LAVALINK_PORT:2333}
+  address: 0.0.0.0
+  http2:
+    enabled: false
+
+plugins:
+  #  name: # Name of the plugin
+  #    some_key: some_value # Some key-value pair for the plugin
+  #    another_key: another_value
+
+lavalink:
+  plugins:
+    # - dependency: "com.github.example:example-plugin:1.0.0" # required, the coordinates of your plugin
+    #   repository: "https://maven.example.com/releases" # optional, defaults to the Lavalink releases repository by default
+    #   snapshot: false # optional, defaults to false, used to tell Lavalink to use the snapshot repository instead of the release repository
+  # pluginsDir: "./plugins" # optional, defaults to "./plugins"
+  # defaultPluginRepository: "https://maven.lavalink.dev/releases" # optional, defaults to the Lavalink release repository
+  # defaultPluginSnapshotRepository: "https://maven.lavalink.dev/snapshots" # optional, defaults to the Lavalink snapshot repository
+
+  server:
+    # Use your environment variable design for the password
+    password: ${LAVALINK_PASSWORD:LavalinkPassword}
+
+    sources:
+      # Note: Official default now discourages youtube built-in source
+      # (the official sample sets youtube: false),
+      # but you have set it to true, so we'll preserve that.
+      youtube: true
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      nico: true
+      http: true   # warning: keeping HTTP enabled without a proxy configured could expose your server's IP address.
+      local: false
+
+    # Official filter settings (all enabled by default)
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+
+    nonAllocatingFrameBuffer: false
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    youtubePlaylistLoadLimit: 6
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+    #ratelimit:
+      #ipBlocks: ["1.0.0.0/8", "..."] # list of ip blocks
+      #excludedIps: ["...", "..."] # ips which should be explicitly excluded from usage by lavalink
+      #strategy: "RotateOnBan" # RotateOnBan | LoadBalance | NanoSwitch | RotatingNanoSwitch
+      #searchTriggersFail: true # Whether a search 429 should trigger marking the ip as failing
+      #retryLimit: -1 # -1 = use default lavaplayer value | 0 = infinity | >0 = retry will happen this number of times
+
+    #youtubeConfig: # Required for avoiding all age restrictions by YouTube
+      #email: "" # Email of Google account
+      #password: "" # Password of Google account
+
+    #httpConfig: # Useful for blocking bad-actors from IP-grabbing your node
+      #proxyHost: "localhost" # Hostname of the proxy (IP or domain)
+      #proxyPort: 3128 # Proxy port, 3128 is the default for squidProxy
+      #proxyUser: "" # Optional user for basic authentication
+      #proxyPassword: "" # Password for basic authentication
+
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+
+sentry:
+  dsn: ""
+  environment: ""
+  # tags:
+  #   some_key: some_value
+  #   another_key: another_value
+
+logging:
+  # Your design
+  file: application.log
+  path: .
+  level:
+    root: INFO
+    lavalink: INFO
+    org.springframework.web: WARN
+    org.springframework.boot.autoconfigure: WARN
+
+  # Additional official settings from the sample
+  request:
+    enabled: true
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: true
+    maxPayloadLength: 10000
+
+  logback:
+    rollingpolicy:
+      max-file-size: 1GB
+      max-history: 30

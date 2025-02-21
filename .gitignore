@@ -7,4 +7,3 @@ test.py
 *.crt
 *.sql
 config.json
-application.yml
