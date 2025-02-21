@@ -73,6 +73,8 @@ services:
     build:
       context: bot
       dockerfile: docker/Dockerfile
+      args:
+        INSTALL_DPP_METHOD: source
     container_name: bot
     depends_on:
       - database
