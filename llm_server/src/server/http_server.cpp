@@ -102,7 +102,7 @@ namespace server
  *        and starts the Drogon server.
  *
  * This function configures the logger, sets up the server routes for:
- * - LLM completions (POST /api/v1/llm/completions)
+ * - LLM completions (POST /api/v1/chat/completions)
  * - status checks (GET /api/v1/status)
  * - Prometheus-style metrics (GET /metrics)
  * - Log retrieval (GET /api/v1/logs)
@@ -116,14 +116,14 @@ void startServer()
     utils::Logger::info("Logger initialized and file set to /var/log/llm_server/server.log.");
 
     // ----------------------------------------------------------------------
-    // POST /api/v1/llm/completions
+    // POST /api/v1/chat/completions
     // ----------------------------------------------------------------------
     drogon::app().registerHandler(
-        "/api/v1/llm/completions",
+        "/api/v1/chat/completions",
         [](const drogon::HttpRequestPtr& req,
            std::function<void(const drogon::HttpResponsePtr&)>&& callback)
         {
-            utils::Logger::info("[/api/v1/llm/completions] Received request.");
+            utils::Logger::info("[/api/v1/chat/completions] Received request.");
 
             nlohmann::json bodyJson;
             std::vector<utils::MultipartPart> fileParts;
@@ -142,11 +142,11 @@ void startServer()
                         {
                             bodyJson = nlohmann::json::parse(jsonField);
                             jsonParsed = true;
-                            utils::Logger::info("[/api/v1/llm/completions] JSON parsed from multipart form data.");
+                            utils::Logger::info("[/api/v1/chat/completions] JSON parsed from multipart form data.");
                         }
                         catch (...)
                         {
-                            utils::Logger::error("[/api/v1/llm/completions] Invalid JSON in 'json' field.");
+                            utils::Logger::error("[/api/v1/chat/completions] Invalid JSON in 'json' field.");
                             nlohmann::json errJson{
                                 {"error_code", 400},
                                 {"details", "Invalid JSON in 'json' field"}};
@@ -168,13 +168,13 @@ void startServer()
 
                     if (!uploadedFiles.empty())
                     {
-                        utils::Logger::info("[/api/v1/llm/completions] Received "
+                        utils::Logger::info("[/api/v1/chat/completions] Received "
                                             + std::to_string(uploadedFiles.size()) + " file(s).");
                     }
                 }
                 else
                 {
-                    utils::Logger::warn("[/api/v1/llm/completions] Failed to parse multipart data.");
+                    utils::Logger::warn("[/api/v1/chat/completions] Failed to parse multipart data.");
                     nlohmann::json errJson{
                         {"error_code", 400},
                         {"details", "Failed to parse multipart data"}};
@@ -189,11 +189,11 @@ void startServer()
                 try
                 {
                     bodyJson = nlohmann::json::parse(req->body());
-                    utils::Logger::info("[/api/v1/llm/completions] JSON parsed from request body.");
+                    utils::Logger::info("[/api/v1/chat/completions] JSON parsed from request body.");
                 }
                 catch (...)
                 {
-                    utils::Logger::error("[/api/v1/llm/completions] Invalid JSON in body.");
+                    utils::Logger::error("[/api/v1/chat/completions] Invalid JSON in body.");
                     nlohmann::json errJson{
                         {"error_code", 400},
                         {"details", "Invalid JSON in body"}};
@@ -203,7 +203,7 @@ void startServer()
             }
 
             // Log request body size
-            utils::Logger::info("[/api/v1/llm/completions] Request body size: "
+            utils::Logger::info("[/api/v1/chat/completions] Request body size: "
                                 + std::to_string(req->body().size()) + " bytes.");
 
             // Delegate to the request handler
@@ -213,7 +213,7 @@ void startServer()
             // Update request metrics
             ++g_totalRequests;
 
-            utils::Logger::info("[/api/v1/llm/completions] Responding with HTTP "
+            utils::Logger::info("[/api/v1/chat/completions] Responding with HTTP "
                                 + std::to_string(httpCode));
             callback(makeJSONResponse(resultJson, httpCode));
         },

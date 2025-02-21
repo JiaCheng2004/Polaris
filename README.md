@@ -69,9 +69,9 @@ You can run them together via `docker compose`.
 3. **Verify the server is up**:
    - Open [`http://localhost:8080/`](http://localhost:8080/) in your browser or use `curl`:
      ```bash
-     curl http://localhost:8080/api/v1/health
+     curl http://localhost:8080/api/v1/status
      ```
-   - You should see a JSON response indicating server health.
+   - You should see a JSON response indicating server status.
 
 4. **Run only the LLM server** (optional):
    ```bash
@@ -90,7 +90,7 @@ You can run them together via `docker compose`.
 
 Below are some typical endpoints your **llm_server** exposes. All are available at `http://<HOST>:8080`.
 
-1. **POST** `/api/v1/llm/completions`  
+1. **POST** `/api/v1/chat/completions`  
    - **Purpose**: Query various LLM models (OpenAI, Google, etc.).  
    - **Accepts**: 
      - `application/json` in the request body, **or**  
@@ -101,7 +101,7 @@ Below are some typical endpoints your **llm_server** exposes. All are available 
 
    ### Example 1: Simple JSON POST
    ```bash
-   curl -X POST http://localhost:8080/api/v1/llm/completions \
+   curl -X POST http://localhost:8080/api/v1/chat/completions \
         -H "Content-Type: application/json" \
         -d '{
               "model": "openai-gpt-4",
@@ -110,7 +110,7 @@ Below are some typical endpoints your **llm_server** exposes. All are available 
    ```
    ### Example 2: Multipart with file upload
    ```bash
-   curl -X POST http://localhost:8080/api/v1/llm/completions \
+   curl -X POST http://localhost:8080/api/v1/chat/completions \
         -F 'json={"model":"openai-gpt-4","prompt":"Analyze this file"}' \
         -F 'files=@/path/to/localfile.pdf'
    ```
@@ -129,10 +129,10 @@ Below are some typical endpoints your **llm_server** exposes. All are available 
    }
    ```
 
-2. **GET** `/api/v1/health`  
-   - Returns a basic health status and server info:
+2. **GET** `/api/v1/status`  
+   - Returns a basic status and server info:
    ```bash
-   curl http://localhost:8080/api/v1/health
+   curl http://localhost:8080/api/v1/status
    ```
    - Typical output:
      ```json
@@ -235,8 +235,8 @@ You might see references to models like `"openai-gpt-4"`, `"google-gemini-2.0-pr
 
 You now have a working **C++ LLM server** with Docker Compose. You can:
 
-- **Send JSON** or **upload files** to `/api/v1/llm/completions`.  
-- **Check health** at `/api/v1/health`.  
+- **Send JSON** or **upload files** to `/api/v1/chat/completions`.  
+- **Check status** at `/api/v1/status`.  
 - **Review logs** at `/api/v1/logs`.  
 - **See metrics** at `/metrics`.  
 

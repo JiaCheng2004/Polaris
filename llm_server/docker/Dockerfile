@@ -1,11 +1,8 @@
-# docker/Dockerfile
 FROM ubuntu:24.04
 
 # Disable interactive prompts (e.g. tzdata)
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Los_Angeles
-
-# Name of the application
 ENV APP_NAME="llm_server"
 
 # [1] Install system dependencies

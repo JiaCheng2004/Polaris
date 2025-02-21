@@ -1,5 +1,4 @@
-llm_server/tests/*
-llm_server/config/config.json
+llm_server/test/*
 .env
 .vscode/
 test.py
@@ -7,3 +6,5 @@ test.py
 *.key
 *.crt
 *.sql
+config.json
+application.yml
