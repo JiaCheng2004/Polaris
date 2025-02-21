@@ -69,7 +69,7 @@
 3. **确认服务器已启动**：
    - 在浏览器中打开 [`http://localhost:8080/`](http://localhost:8080/) 或者使用 `curl`：
      ```bash
-     curl http://localhost:8080/api/v1/health
+     curl http://localhost:8080/api/v1/status
      ```
    - 你应当能看到一个 JSON 返回结果，表示服务器健康状态。
 
@@ -90,7 +90,7 @@
 
 以下是 **llm_server** 常见的几个接口，访问地址为 `http://<HOST>:8080`。
 
-1. **POST** `/api/v1/llm/completions`  
+1. **POST** `/api/v1/chat/completions`  
    - **用途**：向各种 LLM 模型（OpenAI, Google 等）发送请求并获得回复。  
    - **支持**：  
      - `application/json` 格式请求体，或  
@@ -101,7 +101,7 @@
 
    ### 示例 1：纯 JSON 请求
    ```bash
-   curl -X POST http://localhost:8080/api/v1/llm/completions \
+   curl -X POST http://localhost:8080/api/v1/chat/completions \
         -H "Content-Type: application/json" \
         -d '{
               "model": "openai-gpt-4",
@@ -111,7 +111,7 @@
 
    ### 示例 2：Multipart 文件上传
    ```bash
-   curl -X POST http://localhost:8080/api/v1/llm/completions \
+   curl -X POST http://localhost:8080/api/v1/chat/completions \
         -F 'json={"model":"openai-gpt-4","prompt":"请分析此文件"}' \
         -F 'files=@/path/to/localfile.pdf'
    ```
@@ -130,10 +130,10 @@
    }
    ```
 
-2. **GET** `/api/v1/health`  
+2. **GET** `/api/v1/status`  
    - 返回服务器健康与信息：
    ```bash
-   curl http://localhost:8080/api/v1/health
+   curl http://localhost:8080/api/v1/status
    ```
    - 一般会返回：
      ```json
@@ -219,8 +219,8 @@
 
 现在你拥有一个在 Docker Compose 中运行的 **C++ LLM 服务器**。可以通过下列操作与之交互：
 
-- **JSON 或文件**请求 -> `/api/v1/llm/completions`  
-- **查看健康状态** -> `/api/v1/health`  
+- **JSON 或文件**请求 -> `/api/v1/chat/completions`  
+- **查看状态** -> `/api/v1/status`  
 - **查看日志** -> `/api/v1/logs`  
 - **监控指标** -> `/metrics`  
 

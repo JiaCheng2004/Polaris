@@ -8,7 +8,7 @@
 #include <string>
 
 /**
- * @brief A global configuration object loaded at startup from config/config.json.
+ * @brief A global configuration object loaded at startup from config/settings.json.
  */
 nlohmann::json g_config;
 
@@ -30,10 +30,10 @@ int main(int argc, char *argv[])
     try
     {
         // 1) Load configuration from a JSON file
-        std::ifstream ifs("config/config.json");
+        std::ifstream ifs("config/settings.json");
         if (!ifs.is_open())
         {
-            throw std::runtime_error("Cannot open config/config.json");
+            throw std::runtime_error("Cannot open config/settings.json");
         }
         ifs >> g_config;
         ifs.close();
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     }
     catch (const std::exception &e)
     {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        utils::Logger::warn(std::string("Fatal error: ") + e.what());
         return 1;
     }
 
