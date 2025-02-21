@@ -27,7 +27,7 @@ int main(int argc, char const *argv[])
     /* Register slash command on_ready */
     bot.on_ready([&bot](const dpp::ready_t& event) {
         if (dpp::run_once<struct register_bot_commands>()) {
-            bot.global_command_create(dpp::slashcommand("hello", "world", bot.me.id));
+            bot.global_command_create(dpp::slashcommand("ping", "ping pong testing!", bot.me.id));
         }
     });
 
