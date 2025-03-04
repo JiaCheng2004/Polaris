@@ -1,4 +1,7 @@
 {
     "prefix": "!",
-    "intents": "all"
-}
+    "intents": {
+        "all": true
+    }
+  }
+  

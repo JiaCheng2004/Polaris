@@ -1,0 +1,5 @@
+discord.py
+wavelink
+yt-dlp
+python-dotenv
+pycurl
