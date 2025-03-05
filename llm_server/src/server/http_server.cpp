@@ -1,5 +1,5 @@
 #include "server/http_server.hpp"
-#include "server/request_handler.hpp"
+#include "server/discord_request.hpp"
 #include "utils/logger.hpp"
 #include "utils/token_tracker.hpp"
 
@@ -206,18 +206,70 @@ void startServer()
             utils::Logger::info("[/api/v1/chat/completions] Request body size: "
                                 + std::to_string(req->body().size()) + " bytes.");
 
-            // Delegate to the request handler
-            auto resultJson = server::handleLLMQuery(bodyJson, fileParts);
-            int httpCode = resultJson.value("ecode", 500);
+            // ------------------------------------------------------------------
+            // Check the "purpose" parameter
+            // ------------------------------------------------------------------
+            if (!bodyJson.contains("purpose"))
+            {
+                utils::Logger::error("[/api/v1/chat/completions] 'purpose' parameter is missing.");
+                nlohmann::json errJson{
+                    {"error_code", 400},
+                    {"details", "'purpose' parameter is required"}};
+                callback(makeJSONResponse(errJson, 400));
+                return;
+            }
 
-            // Update request metrics
-            ++g_totalRequests;
+            // We'll store the string version to avoid repeated lookups
+            const std::string purpose = bodyJson["purpose"].get<std::string>();
 
-            utils::Logger::info("[/api/v1/chat/completions] Responding with HTTP "
-                                + std::to_string(httpCode));
-            callback(makeJSONResponse(resultJson, httpCode));
+            // Choose logic based on "purpose"
+            if (purpose == "discord-bot")
+            {
+                // --------------------------------------------------------------
+                // Call Discord Bot handler
+                // --------------------------------------------------------------
+                auto resultJson = server::handleDiscordBotLLMQuery(bodyJson, fileParts);
+                int httpCode = resultJson.value("ecode", 500);
+
+                // Update metrics
+                ++g_totalRequests;
+
+                utils::Logger::info("[/api/v1/chat/completions] Responding with HTTP "
+                                    + std::to_string(httpCode));
+                callback(makeJSONResponse(resultJson, httpCode));
+                return;
+            }
+            else if (purpose == "webpage")
+            {
+                // --------------------------------------------------------------
+                // Placeholder for webpage logic
+                // --------------------------------------------------------------
+                nlohmann::json resultJson;
+                resultJson["message"] = "Webpage placeholder not implemented yet";
+
+                // Update metrics
+                ++g_totalRequests;
+
+                utils::Logger::info("[/api/v1/chat/completions] Responding with HTTP 200 (webpage placeholder).");
+                callback(makeJSONResponse(resultJson, 200));
+                return;
+            }
+            else
+            {
+                // --------------------------------------------------------------
+                // No valid "purpose" found
+                // --------------------------------------------------------------
+                utils::Logger::error("[/api/v1/chat/completions] 'purpose' must be either 'discord-bot' or 'webpage'.");
+                nlohmann::json errJson{
+                    {"error_code", 400},
+                    {"details", "'purpose' must be 'discord-bot' or 'webpage'"}};
+
+                callback(makeJSONResponse(errJson, 400));
+                return;
+            }
         },
-        {drogon::Post});
+        {drogon::Post}
+    );
 
     // ----------------------------------------------------------------------
     // GET /api/v1/status
@@ -230,7 +282,7 @@ void startServer()
             utils::Logger::info("[/api/v1/status] Received request.");
 
             nlohmann::json status;
-            status["status_status"] = "statusy";
+            status["status_status"] = "normal";
 
             auto now = std::chrono::steady_clock::now();
             auto uptimeSec = std::chrono::duration_cast<std::chrono::seconds>(

@@ -1,5 +1,5 @@
-#ifndef OPENAI_GPT_4_HPP
-#define OPENAI_GPT_4_HPP
+#ifndef GPT4_HPP
+#define GPT4_HPP
 
 #pragma once
 
@@ -30,4 +30,4 @@ public:
 
 } // namespace models
 
-#endif // OPENAI_GPT_4_HPP
+#endif // GPT4_HPP

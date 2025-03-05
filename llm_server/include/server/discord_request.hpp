@@ -15,7 +15,7 @@ namespace server
  * @param fileParts A list of file attachments (if any).
  * @return A JSON object containing the model's response or any error information.
  */
-nlohmann::json handleLLMQuery(
+nlohmann::json handleDiscordBotLLMQuery(
     const nlohmann::json &input,
     const std::vector<utils::MultipartPart> &fileParts);
 

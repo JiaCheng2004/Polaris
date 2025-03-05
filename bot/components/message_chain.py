@@ -1,10 +1,13 @@
 # components/message_chain.py
 import discord
 
-async def build_message_chain(message: discord.Message) -> list[discord.Message]:
+async def build_message_chain(
+    message: discord.Message, 
+    limit: int = 20
+) -> list[discord.Message]:
     """
-    Recursively/iteratively build a list of messages starting with `message`
-    and following its replies all the way back.
+    Recursively (or iteratively) build a list of messages starting from `message`
+    and following its replies all the way back, but only up to `limit` messages.
 
     Returns a list of Messages in *reverse chronological order*:
     [NewestMessage, ..., OldestMessage].
@@ -12,9 +15,8 @@ async def build_message_chain(message: discord.Message) -> list[discord.Message]
     chain = []
     current = message
 
-    while True:
+    while len(chain) < limit:
         chain.append(current)
-        # If there's a reference to another message, follow it
         if current.reference and isinstance(current.reference.resolved, discord.Message):
             current = current.reference.resolved
         elif current.reference and current.reference.message_id:
