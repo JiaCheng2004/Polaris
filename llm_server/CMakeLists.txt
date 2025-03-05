@@ -41,7 +41,7 @@ find_package(Drogon REQUIRED)
 #    - models/ 目录
 #    - utils/ 目录
 file(GLOB SERVER_SOURCES "src/server/*.cpp")
-file(GLOB MODEL_SOURCES  "src/models/*.cpp")
+file(GLOB_RECURSE MODEL_SOURCES "src/models/*.cpp")
 file(GLOB UTILS_SOURCES  "src/utils/*.cpp")
 
 # -------------------------------------------------------------------------

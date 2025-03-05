@@ -17,7 +17,6 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
-# Load the message_chain cog
 async def load_extensions():
     await bot.load_extension("cogs.messages")
 

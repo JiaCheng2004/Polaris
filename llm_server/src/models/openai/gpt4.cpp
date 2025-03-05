@@ -1,4 +1,4 @@
-#include "models/openai_gpt_4.hpp"
+#include "models/openai/gpt4.hpp"
 #include "utils/logger.hpp"
 
 #include <fstream>
