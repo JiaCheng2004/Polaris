@@ -40,9 +40,9 @@ find_package(Drogon REQUIRED)
 #    - server/ 目录
 #    - models/ 目录
 #    - utils/ 目录
-file(GLOB SERVER_SOURCES "src/server/*.cpp")
+file(GLOB_RECURSE SERVER_SOURCES "src/server/*.cpp")
 file(GLOB_RECURSE MODEL_SOURCES "src/models/*.cpp")
-file(GLOB UTILS_SOURCES  "src/utils/*.cpp")
+file(GLOB_RECURSE UTILS_SOURCES  "src/utils/*.cpp")
 
 # -------------------------------------------------------------------------
 # 4) Define the executable named "llm_server" and compile the gathered source files.

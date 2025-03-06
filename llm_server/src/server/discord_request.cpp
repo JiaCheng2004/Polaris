@@ -3,7 +3,7 @@
 #include "utils/token_tracker.hpp"
 #include "utils/model_result.hpp"
 #include "utils/multipart_utils.hpp"
-#include "models/openai/gpt4.hpp"
+#include "models/openai/gpt4o.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string>
@@ -37,11 +37,11 @@ nlohmann::json handleDiscordBotLLMQuery(
     // Prepare a standard response JSON structure
     nlohmann::json response = {
         {"model",       ""},
-        {"message",     ""},
+        {"result",     ""},
         {"files",       nlohmann::json::array()},
         {"token_used",  0},
-        {"ecode",       200},
-        {"emessage",    ""},
+        {"code",       200},
+        {"message",    ""},
         {"model_info",  nlohmann::json::object()},
         {"additional",  nlohmann::json::object()}
     };
@@ -52,8 +52,8 @@ nlohmann::json handleDiscordBotLLMQuery(
     if (modelName.empty())
     {
         utils::Logger::warn("[handleDiscordBotLLMQuery] No 'model' field provided in input JSON.");
-        response["ecode"]    = 400;
-        response["emessage"] = "No model was provided.";
+        response["code"]    = 400;
+        response["message"] = "No model was provided.";
         return response;
     }
 
@@ -63,42 +63,42 @@ nlohmann::json handleDiscordBotLLMQuery(
     ModelResult modelResult;
     try
     {
-        if (modelName == "openai-gpt-4")
+        if (modelName == "gpt4o")
         {
-            utils::Logger::info("[handleDiscordBotLLMQuery] Routing to OpenAIGPT4.");
-            modelResult = OpenAIGPT4().uploadAndQuery(input, fileParts);
+            utils::Logger::info("[handleDiscordBotLLMQuery] Routing to OpenAIGPT4o.");
+            modelResult = OpenAIGPT4o().uploadAndQuery(input, fileParts);
         }
         else
         {
             // Handle unknown model
             utils::Logger::warn("[handleDiscordBotLLMQuery] Unrecognized model: " + modelName);
-            modelResult.success      = false;
-            modelResult.errorCode    = 400;
-            modelResult.errorMessage = "Unrecognized model: " + modelName;
+            modelResult.success = false;
+            modelResult.code    = 400;
+            modelResult.message = "Unrecognized model: " + modelName;
         }
     }
     catch (const std::exception &e)
     {
         // Log any exceptions
         utils::Logger::error("[handleDiscordBotLLMQuery] Exception caught: " + std::string(e.what()));
-        modelResult.success      = false;
-        modelResult.errorCode    = 500;
-        modelResult.errorMessage = "Exception: " + std::string(e.what());
+        modelResult.success = false;
+        modelResult.code    = 500;
+        modelResult.message = "Exception: " + std::string(e.what());
     }
 
     // Convert the ModelResult into our standardized JSON response
-    response["model"]      = modelResult.modelUsed;
-    response["message"]    = modelResult.message;
-    response["token_used"] = modelResult.tokenUsage;
-    response["ecode"]      = modelResult.errorCode;
+    response["model"]      = modelResult.model_used;
+    response["result"]    = modelResult.result;
+    response["token_used"] = modelResult.token_usage;
+    response["code"]      = modelResult.code;
 
     if (!modelResult.success)
     {
-        response["emessage"] = modelResult.errorMessage;
+        response["message"] = modelResult.message;
     }
 
     // If any files were returned, add them to the response
-    for (const auto &fID : modelResult.fileIds)
+    for (const auto &fID : modelResult.file_ids)
     {
         nlohmann::json f;
         f["file_id"] = fID;
@@ -109,19 +109,19 @@ nlohmann::json handleDiscordBotLLMQuery(
     if (modelResult.success)
     {
         utils::Logger::info("[handleDiscordBotLLMQuery] Model succeeded; tracking token usage: "
-                            + std::to_string(modelResult.tokenUsage));
-        utils::TokenTracker::addUsage(modelResult.tokenUsage);
+                            + std::to_string(modelResult.token_usage));
+        utils::TokenTracker::addUsage(modelResult.token_usage);
     }
     else
     {
-        utils::Logger::warn("[handleDiscordBotLLMQuery] Model call failed. ecode="
-                            + std::to_string(modelResult.errorCode)
-                            + " | " + modelResult.errorMessage);
+        utils::Logger::warn("[handleDiscordBotLLMQuery] Model call failed. code="
+                            + std::to_string(modelResult.code)
+                            + " | " + modelResult.message);
     }
 
     // Final log before returning
-    utils::Logger::info("[handleDiscordBotLLMQuery] Returning ecode="
-                        + std::to_string(response["ecode"].get<int>())
+    utils::Logger::info("[handleDiscordBotLLMQuery] Returning code="
+                        + std::to_string(response["code"].get<int>())
                         + " for model=" + modelName);
 
     return response;

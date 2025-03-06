@@ -115,6 +115,7 @@ void startServer()
     utils::Logger::setLogFile("/var/log/llm_server/server.log");
     utils::Logger::info("Logger initialized and file set to /var/log/llm_server/server.log.");
 
+    drogon::app().setClientMaxBodySize(100 * 1024 * 1024);
     // ----------------------------------------------------------------------
     // POST /api/v1/chat/completions
     // ----------------------------------------------------------------------
