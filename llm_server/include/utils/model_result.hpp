@@ -15,12 +15,12 @@ namespace models
 struct ModelResult
 {
     bool success = true;            ///< Whether the model call succeeded
-    std::string modelUsed;          ///< The model identifier (e.g., "openai-gpt-4")
-    std::string message;            ///< Main output or message returned by the model
-    int tokenUsage = 0;             ///< Number of tokens used
-    int errorCode = 200;            ///< HTTP-like error code (200 for OK)
-    std::string errorMessage;       ///< Additional error message if not successful
-    std::vector<std::string> fileIds; ///< Optional list of file IDs returned by the model
+    std::string model_used;          ///< The model identifier (e.g., "gpt4o")
+    std::string result;            ///< Main output or message returned by the model
+    int token_usage = 0;             ///< Number of tokens used
+    int code = 200;            ///< HTTP-like error code (200 for OK)
+    std::string message;       ///< Additional error message if not successful
+    std::vector<std::string> file_ids; ///< Optional list of file IDs returned by the model
 };
 
 } // namespace models

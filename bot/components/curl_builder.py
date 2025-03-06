@@ -1,28 +1,35 @@
 # components/curl_builder.py
+
 import discord
-import base64
-import json
 import os
+import json
+from typing import Optional
 
 async def build_payload_and_curl(
     messages: list[discord.Message],
     api_url: str = "http://localhost:8080/api/v1/chat/completions",
     provider: str = "openai",
-    model: str = "gpt4",
+    model: str = "gpt-4o",
     temp_dir: str = "./downloaded_attachments"
 ) -> tuple[dict, str]:
     """
     1) Build a JSON object that looks like:
        {
          "provider": "openai",
-         "model": "gpt4",
+         "model": "gpt-4o",
+         "purpose": "discord-bot",
          "messages": [
              {
                "role": "user" or "assistant",
                "content": [
-                  {"type": "text", "text": "message content or file content"},
-                  {"type": "image_url", "url": "data:image/...base64,..."},
-                  ...
+                    {"type": "text", "text": "..."},
+                    {"type": "image_file", "image_file": {"original_filename": "image.png", "uuid": "1234.png"}},
+                    ...
+               ],
+               "attachments": [
+                    {"original_filename": "filename.pdf", "uuid": "1234.pdf"},
+                    {"original_filename": "image.png",   "uuid": "1234.png"},
+                    ...
                ]
              },
              ...
@@ -30,129 +37,170 @@ async def build_payload_and_curl(
        }
 
     2) Returns a tuple of:
-       (payload_dict, curl_string_example)
-
-       Where:
-         - payload_dict can be further processed or sent via requests
-         - curl_string_example is a sample command to demonstrate how to POST
-           the payload_dict with file attachments to your server.
+       (payload_dict, curl_command_example)
     """
 
-    # This will hold the final array of message objects for the payload
-    message_json_array = []
+    messages_json = []
+    # We collect info for every file we download, so we can build the curl -F parts
+    file_infos = []
 
-    # This will hold paths to all non-image attachments (EXCEPT message.txt) 
-    # so you can attach them with `-F 'files=@...'` in the curl command.
-    non_image_file_paths = []
-
-    # Ensure a directory for downloads exists
+    # Ensure download directory exists
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Iterate over messages in the order provided
     for msg in messages:
-        # Determine the role
         role = "assistant" if msg.author.bot else "user"
 
-        # Prepare content blocks for this message
+        # Prepare "content" array
         content_blocks = []
+        # Prepare "attachments" array
+        attachments_array = []
 
-        # 1) If the message has text content (msg.content), add it
+        # 1) If the message has text content
         if msg.content.strip():
             content_blocks.append({
                 "type": "text",
                 "text": msg.content
             })
 
-        # 2) Check attachments
+        # 2) Process each attachment
         for attachment in msg.attachments:
-            # If the file is strictly named "message.txt", treat it as a text block
-            if attachment.filename == "message.txt":
+            original_filename = attachment.filename
+
+            # 1) If it's strictly "message.txt", just read it and continue
+            if original_filename == "message.txt":
                 try:
+                    # Read bytes directly from the in-memory attachment
                     file_bytes = await attachment.read()
                     file_text = file_bytes.decode("utf-8", errors="replace")
-                    # Add it as a new text block
                     content_blocks.append({
                         "type": "text",
                         "text": file_text
                     })
                 except Exception as e:
-                    print(f"Failed to read {attachment.filename}: {e}")
-                # We do NOT count "message.txt" as an uploaded file
+                    print(f"Failed to read message.txt: {e}")
+                # 2) Skip adding to attachments or file_infos
                 continue
 
-            # Otherwise, check if it’s an image
-            lower_name = attachment.filename.lower()
-            if any(lower_name.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]):
-                # It's an image -> read bytes, convert to base64 data URL
-                try:
-                    file_bytes = await attachment.read()
-                    # Attempt to use attachment.content_type if available, else default
-                    content_type = attachment.content_type or "image/png"
-                    b64_data = base64.b64encode(file_bytes).decode("utf-8")
-                    data_url = f"data:{content_type};base64,{b64_data}"
+            # Figure out the file extension (if any) from the original filename
+            # fallback to "" if none found
+            guessed_extension = os.path.splitext(original_filename)[1]
+            if not guessed_extension:
+                # Optionally guess from content_type
+                # e.g. mimetypes.guess_extension(attachment.content_type or '')
+                # but if that fails, just keep it empty
+                pass
 
-                    content_blocks.append({
-                        "type": "image_url",
-                        "url": "data_url"
-                    })
-                except Exception as e:
-                    print(f"Failed to read image {attachment.filename}: {e}")
+            # The local "uuid" is effectively: "<attachment.id>.<extension>"
+            # If there's no extension, we'll just use the ID
+            if guessed_extension:
+                local_filename = f"{attachment.id}{guessed_extension}"
             else:
-                # Non-image + not named 'message.txt' -> download it for separate file upload
-                local_path = os.path.join(temp_dir, attachment.filename)
-                try:
-                    await attachment.save(local_path)
-                    non_image_file_paths.append(local_path)
-                except Exception as e:
-                    print(f"Failed to save attachment {attachment.filename}: {e}")
+                local_filename = str(attachment.id)
 
-        # Append the structured message
-        message_json_array.append({
+            # Add to attachments array
+            attachments_array.append({
+                "original_filename": original_filename,
+                "uuid": local_filename
+            })
+
+            # Download to local temp dir
+            local_path = os.path.join(temp_dir, local_filename)
+            try:
+                await attachment.save(local_path)
+            except Exception as e:
+                print(f"Failed to save attachment {original_filename}: {e}")
+                continue  # skip adding to file_infos if save failed
+
+            # Always add to our file_infos so we can do a -F 'files=@...'
+            file_infos.append({
+                "local_path": local_path,
+                "original_filename": original_filename,
+                "uuid": local_filename
+            })
+
+            # If it's an image (by extension or content_type), add an "image_file" block
+            if is_image(guessed_extension, attachment.content_type):
+                content_blocks.append({
+                    "type": "image_file",
+                    "image_file": {
+                        "original_filename": original_filename,
+                        "uuid": local_filename
+                    }
+                })
+
+        messages_json.append({
             "role": role,
-            "content": content_blocks
+            "content": content_blocks,
+            "attachments": attachments_array
         })
 
-    # Build the final payload dict
+    # Build final payload
     payload_dict = {
         "provider": provider,
         "model": model,
-        "messages": message_json_array
+        "purpose": "discord-bot",
+        "messages": messages_json
     }
 
-    # Construct a sample curl command
-    curl_command = _build_curl_string(
-        api_url=api_url,
-        payload_dict=payload_dict,
-        file_paths=non_image_file_paths
-    )
+    # Build a sample curl command for demonstration
+    curl_cmd = _build_curl_string(api_url, payload_dict, file_infos)
 
-    return payload_dict, curl_command
+    return payload_dict, curl_cmd
+
+
+def is_image(extension: str, content_type: Optional[str]) -> bool:
+    """
+    Return True if the extension or content_type indicates an image.
+    Adjust or expand this logic as needed for your environment.
+    """
+    image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    if extension.lower() in image_exts:
+        return True
+    if content_type and content_type.startswith("image/"):
+        return True
+    return False
 
 
 def _build_curl_string(
     api_url: str,
     payload_dict: dict,
-    file_paths: list[str]
+    file_infos: list[dict]
 ) -> str:
     """
-    Builds a sample curl command:
-        curl -X POST {api_url} \
-             -F 'json={json_string}' \
-             -F 'files=@/path/to/localfile'
-             ...
+    Builds a sample multi-line curl command of the form:
+
+      curl -X POST "{api_url}" \
+           -F 'json={ ... }' \
+           -F 'files=@/path/to/local;filename=UUID' -F 'original_filename=...' -F 'uuid=...' \
+           ...
     """
-    # Convert the payload to a JSON string
-    json_str = json.dumps(payload_dict, ensure_ascii=False)
-    # Escape double quotes for safe embedding inside -F 'json="..."'
-    escaped_json = json_str.replace('"', '\\"')
 
-    parts = [
-        f'curl -X POST "{api_url}" \\',
-        f'     -F \'json="{escaped_json}"\''
-    ]
+    # Pretty-print the JSON
+    pretty_json = json.dumps(payload_dict, indent=2)
+    # Escape single quotes for safe embedding in -F 'json='
+    escaped_json = pretty_json.replace("'", "'\"'\"'")
 
-    # Add each file with `-F 'files=@local_path'`
-    for fp in file_paths:
-        parts.append(f'     -F \'files=@{fp}\'')
-    
-    return " \\\n".join(parts)
+    lines = []
+    lines.append(f'curl -X POST "{api_url}" \\')
+    lines.append(f"     -F 'json={escaped_json}' \\")
+
+    total_files = len(file_infos)
+    for i, info in enumerate(file_infos):
+        local_path = info["local_path"]
+        original_filename = info["original_filename"]
+        uuid = info["uuid"]
+
+        line_parts = [
+            f"     -F 'files=@{local_path};filename={uuid}'",
+            f"-F 'original_filename={original_filename}'",
+            f"-F 'uuid={uuid}'"
+        ]
+        # Join them on spaces for a single line
+        line = " ".join(line_parts)
+
+        # If not the last file, append backslash
+        if i < total_files - 1:
+            line += " \\"
+        lines.append(line)
+
+    return "\n".join(lines)

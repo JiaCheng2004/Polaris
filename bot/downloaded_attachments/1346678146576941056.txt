@@ -1,0 +1,1 @@
+Mock message.txt content
