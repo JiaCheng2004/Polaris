@@ -1,6 +1,6 @@
 FROM postgrest/postgrest:latest
+ENV TZ=America/Los_Angeles
 
-# Copy config (required)
 COPY postgrest.conf /etc/postgrest.conf
 
 # Copy certs if you have them; otherwise, comment out temporarily

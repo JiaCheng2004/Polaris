@@ -1,37 +1,6 @@
+
 {
-    "openai":{
-        "gpt-3.5-turbo": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "gpt-4": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "gpt-4.5-preview": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "gpt-4o-mini": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "gpt-4o": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o3-mini-low": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o3-mini-medium": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o3-mini-high": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o1-low": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o1-medium": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        },
-        "o1-high": {
-            "assistant_id": "https://platform.openai.com/docs/api-reference/assistants/createAssistant"
-        }
-    }
+    "server": "llm_server",
+    "version": "1.0.0",
+    "debug": true
 }

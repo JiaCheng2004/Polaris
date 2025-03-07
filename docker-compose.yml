@@ -9,12 +9,15 @@ services:
     volumes:
       - ./llm_server/config/config.json:/app/llm_server/config/config.json
     environment:
+      - POSTGREST_BASE_URL=http://postgrest:8000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - XAI_API_KEY=${XAI_API_KEY}
       - ZHIPU_API_KEY=${ZHIPU_API_KEY}
       - LLAMA_API_KEY=${LLAMA_API_KEY}
+      - POSTGREST_JWT_SECRET=${POSTGREST_JWT_SECRET}
     depends_on:
       - database
     networks:
@@ -26,7 +29,7 @@ services:
     container_name: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./database/001_db_schema.sql:/docker-entrypoint-initdb.d/001_db_schema.sql:ro
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -44,8 +47,11 @@ services:
       - ./postgrest/postgrest.conf:/etc/postgrest.conf:ro
       - ./postgrest/server.crt:/etc/ssl/server.crt:ro
       - ./postgrest/server.key:/etc/ssl/server.key:ro
+    environment:
+      - PGRST_DB_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      - PGRST_JWT_SECRET=${POSTGREST_JWT_SECRET}
     ports:
-      - "443:443"
+      - "8000:8000"
     depends_on:
       - database
     networks:
@@ -103,10 +109,23 @@ services:
   grafana:
     image: grafana/grafana
     container_name: grafana
+    depends_on:
+      - database
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=database:5432
+      - GF_DATABASE_NAME=${POSTGRES_DB}
+      - GF_DATABASE_USER=${POSTGRES_USER}
+      - GF_DATABASE_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
+      - grafana_data:/var/lib/grafana
       - ./grafana.yml:/etc/grafana/provisioning/datasources/grafana.yml:ro
     ports:
       - "3000:3000"
+    networks:
+      - internal_net
     restart: unless-stopped
 
 networks:
@@ -114,3 +133,4 @@ networks:
 
 volumes:
   db_data:
+  grafana_data:

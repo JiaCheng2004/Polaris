@@ -1,55 +1,45 @@
+# docker/Dockerfile
+
+# Use Ubuntu 24.04 as the base image
 FROM ubuntu:24.04
 
-# Disable interactive prompts (e.g. tzdata)
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Los_Angeles
-ENV APP_NAME="llm_server"
 
-# [1] Install system dependencies
-RUN apt-get update && apt-get install -y \
-    tzdata \
-    cmake \
-    g++ \
-    make \
-    git \
-    libssl-dev \
-    build-essential \
-    libboost-all-dev \
-    nlohmann-json3-dev \
-    libcurl4-openssl-dev \
-    libjsoncpp-dev \
-    sqlite3 \
-    libsqlite3-dev \
-    uuid-dev \
-    zlib1g-dev \
-  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
-  && echo $TZ > /etc/timezone \
-  && rm -rf /var/lib/apt/lists/*
+# Update and install system dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        python3 \
+        python3-venv \
+        python3-pip \
+        curl \
+        build-essential \
+        ca-certificates \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
-# [2] Build & install Drogon from source (with submodules)
-RUN git clone --recursive --branch v1.9.9 \
-      https://github.com/drogonframework/drogon.git /tmp/drogon \
- && cd /tmp/drogon \
- && mkdir build && cd build \
- && cmake -DCMAKE_INSTALL_PREFIX=/usr .. \
- && make -j$(nproc) \
- && make install \
- && rm -rf /tmp/drogon
+# Set the container timezone properly
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
 
-# [3] Create folder + log file
-RUN mkdir -p /var/log/${APP_NAME} \
-  && touch /var/log/${APP_NAME}/server.log \
-  && chmod 666 /var/log/${APP_NAME}/server.log
-
-# [4] Workdir & copy sources
+# Create a working directory
 WORKDIR /app
+
+# Copy the entire project into the container
 COPY . /app
 
-# [5] Build your project
-RUN mkdir -p build && cd build \
- && cmake .. \
- && make -j$(nproc)
+# Create a Python virtual environment
+RUN python3 -m venv /app/venv
 
-# [6] Expose & run
+# Install Python dependencies in the virtual environment
+RUN /app/venv/bin/pip install --upgrade pip && \
+    /app/venv/bin/pip install -r /app/requirements.txt
+
+# Expose port 8080 for the server
 EXPOSE 8080
-CMD ["/app/build/llm_server"]
+
+# Set the default command to run your FastAPI server
+# using Uvicorn on port 8080
+CMD ["/app/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

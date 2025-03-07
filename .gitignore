@@ -1,10 +1,38 @@
-llm_server/test/*
-.env
+# -------------------------
+# OS and Editor Directories
+# -------------------------
+.DS_Store
 .vscode/
-test.py
+
+# -------------------------
+# Python / Build Artifacts
+# -------------------------
+__pycache__/
+
+# -------------------------
+# Environment & Configuration
+# -------------------------
+*.env
+.env
 .env.local
+config.json
+
+# -------------------------
+# Certificates & Keys
+# -------------------------
 *.key
 *.crt
-*.sql
-config.json
-__pycache__/
+*.pem
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+
+# -------------------------
+# Tests
+# -------------------------
+test.py
+llm_server/test/*
+**/test/
+**/tests/
