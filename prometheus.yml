@@ -1,13 +1,10 @@
 global:
-  # How frequently to scrape metrics from all targets
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'llm_server'
-    # If your LLM server exposes metrics at /metrics, set metrics_path here
-    metrics_path: /metrics
+    metrics_path: /v1/metrics
     static_configs:
       - targets:
-          # The hostname:port must match the Docker Compose service name + container port
           - llm_server:8080
