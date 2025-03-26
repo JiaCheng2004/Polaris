@@ -1,52 +1,157 @@
--- Ensure we can generate UUIDs
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS vector;    -- for vector columns (pgvector)
 
--- Drop tables if they exist (optional if you only want to run once):
--- (In production, you'd use proper migrations instead of drops)
+--------------------------------------------------------------------------------
+-- Cleanup (for development/testing only)
+--------------------------------------------------------------------------------
+DROP TABLE IF EXISTS attachments CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS vector_store CASCADE;
 DROP TABLE IF EXISTS threads CASCADE;
 
--- threads table
+--------------------------------------------------------------------------------
+-- Functions to generate prefixed UUIDs
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION generate_prefixed_uuid(prefix text) 
+RETURNS text AS $$
+BEGIN
+  RETURN prefix || '-' || gen_random_uuid()::text;
+END;
+$$ LANGUAGE plpgsql;
+
+--------------------------------------------------------------------------------
+-- Create threads table
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS threads (
-    thread_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    thread_id    TEXT PRIMARY KEY DEFAULT generate_prefixed_uuid('thread'),
     model        VARCHAR(255) NOT NULL,
     provider     VARCHAR(255) NOT NULL,
     tokens_spent BIGINT NOT NULL DEFAULT 0,
+    cost         DECIMAL(12, 2) NOT NULL DEFAULT 0.00,  -- monetary cost
+    purpose      VARCHAR(255) NOT NULL,                 -- e.g., "discord bot", "web app", etc.
+    author       JSONB NOT NULL,                        -- JSON data describing the user(s)
     created_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- messages table
+--------------------------------------------------------------------------------
+-- Create messages table
+--------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS messages (
-    message_id  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    thread_id   UUID NOT NULL,
-    role        VARCHAR(50) NOT NULL,  -- user | assistant | system
-    content     JSONB NOT NULL,        -- flexible JSON for text blocks
-    attachments TEXT[] DEFAULT '{}',   -- array of file IDs (strings)
+    message_id  TEXT PRIMARY KEY DEFAULT generate_prefixed_uuid('message'),
+    thread_id   TEXT NOT NULL,
+    role        VARCHAR(50) NOT NULL,   -- e.g. user | assistant | system
+    content     JSONB NOT NULL,         -- flexible JSON for text blocks
+    purpose     VARCHAR(255) NOT NULL,  -- e.g., "reply", "summary", "annotation"
+    author      JSONB NOT NULL,         -- JSON representing who/what authored the message
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT fk_thread
+    CONSTRAINT fk_messages_thread
       FOREIGN KEY(thread_id) 
       REFERENCES threads(thread_id) 
       ON DELETE CASCADE
 );
 
--- Create "anonymous" role to support PostgREST
-CREATE ROLE anonymous NOLOGIN;
+--------------------------------------------------------------------------------
+-- Create attachments table
+--------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS attachments (
+    file_id      TEXT PRIMARY KEY DEFAULT generate_prefixed_uuid('attachment'),
+    message_id   TEXT NOT NULL,
+    author       JSONB NOT NULL,                -- JSON describing who uploaded or generated it
+    filename     TEXT NOT NULL,                 -- file name
+    type         TEXT NOT NULL,                 -- MIME type (e.g. application/pdf, image/png)
+    size         INT  NOT NULL,                 -- file size in bytes
+    token_count  INT  NOT NULL DEFAULT 0,       -- tokens extracted (if applicable)
+    content      TEXT,                          -- potentially long string
+    metadata     JSONB NOT NULL DEFAULT '{}',    -- extra metadata
+    content_hash TEXT NOT NULL,                 -- hash for integrity checks
+    purpose      VARCHAR(255) NOT NULL,         -- e.g. "reference", "attachment", "embedded-image"
+    parse_tool   JSONB NOT NULL DEFAULT '{}',    -- e.g. {"type": "api", "name": "gemini"}
+    created_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
--- Grant usage on schema to anonymous
-GRANT USAGE ON SCHEMA public TO anonymous;
+    CONSTRAINT fk_attachments_message
+      FOREIGN KEY(message_id)
+      REFERENCES messages(message_id)
+      ON DELETE CASCADE
+);
 
--- Optionally grant read-only privileges to anonymous
--- GRANT SELECT ON threads, messages TO anonymous;
+--------------------------------------------------------------------------------
+-- Create a vector store table for storing context/embeddings at the thread level
+--------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS vector_store (
+    vector_id   TEXT PRIMARY KEY DEFAULT generate_prefixed_uuid('vector'),
+    thread_id   TEXT NOT NULL,
+    embedding   VECTOR(3072) NOT NULL,  -- adjust dimension to match your model's embedding size
+    metadata    JSONB NOT NULL DEFAULT '{}',
+    embed_tool  JSONB NOT NULL DEFAULT '{}',    -- e.g. {"type": "api", "name": "gemini"} 
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
--- Create a dedicated role (NOLOGIN means it can't directly log in via normal DB clients)
-CREATE ROLE api NOLOGIN;
+    CONSTRAINT fk_vector_store_thread
+      FOREIGN KEY(thread_id)
+      REFERENCES threads(thread_id)
+      ON DELETE CASCADE
+);
 
--- Grant usage on the public schema
+--------------------------------------------------------------------------------
+-- Indexes to speed up lookups
+--------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_messages_thread_id         ON messages (thread_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_message_id     ON attachments (message_id);
+CREATE INDEX IF NOT EXISTS idx_vector_store_thread_id     ON vector_store (thread_id);
+
+--------------------------------------------------------------------------------
+-- Timestamp triggers to automatically update 'updated_at' on update
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION set_updated_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_threads_updated
+BEFORE UPDATE ON threads
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_timestamp();
+
+CREATE TRIGGER trg_messages_updated
+BEFORE UPDATE ON messages
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_timestamp();
+
+CREATE TRIGGER trg_attachments_updated
+BEFORE UPDATE ON attachments
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_timestamp();
+
+CREATE TRIGGER trg_vector_store_updated
+BEFORE UPDATE ON vector_store
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_timestamp();
+
+--------------------------------------------------------------------------------
+-- Role and permission setup
+--------------------------------------------------------------------------------
+
+-- Create a dedicated "api" role for application access with CRUD
+DO $$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles
+      WHERE rolname = 'api'
+   ) THEN
+      CREATE ROLE api NOLOGIN;
+   END IF;
+END;
+$$;
+
 GRANT USAGE ON SCHEMA public TO api;
+-- Grant full CRUD privileges on tables to api
+GRANT SELECT, INSERT, UPDATE, DELETE ON threads, messages, attachments, vector_store TO api;
 
--- Grant the necessary table privileges
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE threads TO api;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE messages TO api;

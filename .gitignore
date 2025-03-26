@@ -1,38 +1,81 @@
-# -------------------------
-# OS and Editor Directories
-# -------------------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
 .vscode/
-
-# -------------------------
-# Python / Build Artifacts
-# -------------------------
+*.swp
+*.swo
 __pycache__/
-
-# -------------------------
-# Environment & Configuration
-# -------------------------
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 *.env
 .env
 .env.local
+.env.development
+.env.test
+.env.production
 config.json
-
-# -------------------------
-# Certificates & Keys
-# -------------------------
+!example.config.json
+!default.config.json
 *.key
 *.crt
 *.pem
-
-# -------------------------
-# Logs
-# -------------------------
+*.pfx
+*.p12
+*.cer
+**/certs/
+**/certificates/
 *.log
-
-# -------------------------
-# Tests
-# -------------------------
-test.py
+logs/
+log/
+tmp/
+temp/
+*.tmp
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+!database/001_db_schema.sql
+pgdata/
+data/
+bot/downloaded_attachments/*
+!bot/downloaded_attachments/.gitkeep
+llm_server/models/*
+!llm_server/models/.gitkeep
 llm_server/test/*
+vector_store/
+embeddings/
+test.py
 **/test/
 **/tests/
+**/testing/
+**/testings/
+.coverage
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.docker/
+docker-compose.override.yml

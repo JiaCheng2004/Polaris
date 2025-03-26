@@ -25,7 +25,9 @@ services:
     restart: unless-stopped
 
   database:
-    image: postgres:17.3
+    build:
+      context: database
+      dockerfile: Dockerfile.pgvector
     container_name: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -56,6 +58,20 @@ services:
       - database
     networks:
       - internal_net
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "5050:80"
+    networks:
+      - internal_net
+    depends_on:
+      - database
     restart: unless-stopped
 
   lavalink:

@@ -19,3 +19,6 @@ langchain_deepseek
 prometheus-fastapi-instrumentator
 psutil
 pyjwt
+google-generativeai
+google
+mimetypes

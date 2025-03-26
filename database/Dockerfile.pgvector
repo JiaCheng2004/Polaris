@@ -1,0 +1,12 @@
+FROM postgres:17.3
+ENV TZ=America/Los_Angeles
+
+RUN apt-get update && \
+    apt-get install -y build-essential postgresql-server-dev-17 git && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/pgvector/pgvector.git /tmp/pgvector && \
+    cd /tmp/pgvector && \
+    make && \
+    make install && \
+    rm -rf /tmp/pgvector
