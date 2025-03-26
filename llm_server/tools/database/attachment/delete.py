@@ -1,19 +1,16 @@
-# tools/database/message/delete.py
+# tools/database/attachment/delete.py
 
 import requests
 from typing import Dict, Any, Optional, List
 from ..auth.token import generate_token
 from tools.config.load import POSTGREST_BASE_URL
 
-def delete_message(message_id: str) -> bool:
+def delete_attachment(file_id: str) -> bool:
     """
-    Delete a message from the database.
-    
-    Note: Due to cascade delete constraints in the database,
-    this will also delete all associated attachments for this message.
+    Delete an attachment from the database.
     
     Args:
-        message_id (str): The UUID of the message to delete
+        file_id (str): The UUID of the attachment to delete
         
     Returns:
         bool: True if successfully deleted, False otherwise
@@ -30,9 +27,9 @@ def delete_message(message_id: str) -> bool:
         "Content-Type": "application/json"
     }
     
-    # Send DELETE request to remove the message
+    # Send DELETE request to remove the attachment
     response = requests.delete(
-        f"{POSTGREST_BASE_URL}/messages?message_id=eq.{message_id}",
+        f"{POSTGREST_BASE_URL}/attachments?file_id=eq.{file_id}",
         headers=headers
     )
     
@@ -41,21 +38,21 @@ def delete_message(message_id: str) -> bool:
     if response.status_code == 204:
         return True
     elif response.status_code == 404:
-        # Message not found, consider it already deleted
+        # Attachment not found, consider it already deleted
         return False
     else:
-        error_message = f"Failed to delete message: {response.status_code} - {response.text}"
+        error_message = f"Failed to delete attachment: {response.status_code} - {response.text}"
         raise Exception(error_message)
 
-def delete_thread_messages(thread_id: str) -> bool:
+def delete_message_attachments(message_id: str) -> bool:
     """
-    Delete all messages belonging to a specific thread.
+    Delete all attachments belonging to a specific message.
     
     Args:
-        thread_id (str): The UUID of the thread whose messages should be deleted
+        message_id (str): The UUID of the message whose attachments should be deleted
         
     Returns:
-        bool: True if successfully deleted, False if no messages were found
+        bool: True if successfully deleted, False if no attachments were found
         
     Raises:
         Exception: If the API request fails unexpectedly
@@ -69,9 +66,9 @@ def delete_thread_messages(thread_id: str) -> bool:
         "Content-Type": "application/json"
     }
     
-    # Send DELETE request to remove all messages for the thread
+    # Send DELETE request to remove all attachments for the message
     response = requests.delete(
-        f"{POSTGREST_BASE_URL}/messages?thread_id=eq.{thread_id}",
+        f"{POSTGREST_BASE_URL}/attachments?message_id=eq.{message_id}",
         headers=headers
     )
     
@@ -80,8 +77,8 @@ def delete_thread_messages(thread_id: str) -> bool:
     if response.status_code == 204:
         return True
     elif response.status_code == 404:
-        # No messages found for this thread
+        # No attachments found for this message
         return False
     else:
-        error_message = f"Failed to delete thread messages: {response.status_code} - {response.text}"
+        error_message = f"Failed to delete message attachments: {response.status_code} - {response.text}"
         raise Exception(error_message) 

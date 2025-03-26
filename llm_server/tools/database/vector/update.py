@@ -1,30 +1,31 @@
-# tools/database/message/update.py
+# tools/database/vector/update.py
 
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from ..auth.token import generate_token
 from tools.config.load import POSTGREST_BASE_URL
 
-def update_message(
-    message_id: str, 
+def update_vector(
+    vector_id: str, 
     update_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Update an existing message in the database.
+    Update an existing vector in the database.
     
     Args:
-        message_id (str): The UUID of the message to update
+        vector_id (str): The UUID of the vector to update
         update_data (Dict[str, Any]): Dictionary containing the fields to update
             Possible fields:
-            - content (Dict): JSON data containing the message content
-            - purpose (str): The purpose of the message
-            - role (str): The role of the message sender
+            - embedding (List[float]): The vector embedding array
+            - content (str): The text content that was embedded
+            - metadata (Dict): Additional metadata
+            - namespace (str): Namespace for vector grouping
             
     Returns:
-        Dict[str, Any]: The updated message data
+        Dict[str, Any]: The updated vector data
         
     Raises:
-        Exception: If the message is not found or the API request fails
+        Exception: If the vector is not found or the API request fails
     """
     # Generate auth token for PostgREST
     token = generate_token()
@@ -36,9 +37,9 @@ def update_message(
         "Prefer": "return=representation"  # Return the updated resource
     }
     
-    # Send PATCH request to update the message
+    # Send PATCH request to update the vector
     response = requests.patch(
-        f"{POSTGREST_BASE_URL}/messages?message_id=eq.{message_id}",
+        f"{POSTGREST_BASE_URL}/vectors?vector_id=eq.{vector_id}",
         headers=headers,
         json=update_data
     )
@@ -49,7 +50,7 @@ def update_message(
         if results:
             return results[0]
         else:
-            raise Exception(f"Message not found with ID: {message_id}")
+            raise Exception(f"Vector not found with ID: {vector_id}")
     else:
-        error_message = f"Failed to update message: {response.status_code} - {response.text}"
+        error_message = f"Failed to update vector: {response.status_code} - {response.text}"
         raise Exception(error_message) 
