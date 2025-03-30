@@ -79,3 +79,4 @@ coverage.xml
 *.cover
 .docker/
 docker-compose.override.yml
+**/uploads/*
