@@ -8,6 +8,7 @@ services:
       - "8080:8080"
     volumes:
       - ./llm_server/config/config.json:/app/llm_server/config/config.json
+      - ./llm_server/uploads:/app/uploads
     environment:
       - POSTGREST_BASE_URL=http://postgrest:8000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -17,6 +18,10 @@ services:
       - XAI_API_KEY=${XAI_API_KEY}
       - ZHIPU_API_KEY=${ZHIPU_API_KEY}
       - LLAMA_API_KEY=${LLAMA_API_KEY}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      - VOLCENGINE_ACCESS_KEY_ID=${VOLCENGINE_ACCESS_KEY_ID}
+      - VOLCENGINE_SECRET_ACCESS_KEY=${VOLCENGINE_SECRET_ACCESS_KEY}
+      - FEATHERLESS_API_KEY=${FEATHERLESS_API_KEY}
       - POSTGREST_JWT_SECRET=${POSTGREST_JWT_SECRET}
     depends_on:
       - database

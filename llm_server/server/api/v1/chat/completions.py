@@ -1,7 +1,7 @@
 # server/api/v1/chat/completions.py
 
 """
-FastAPI route to handle /api/v1/chat/completions with DeepSeek model logic.
+FastAPI route to handle /api/v1/chat/completions with model routing.
 
 Supports either:
  - multipart/form-data (with 'json' form field),
@@ -11,16 +11,17 @@ Supports either:
 import json
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request, UploadFile, Depends
 from fastapi.responses import JSONResponse
 
-# Import your DeepSeek chat logic
+# Model imports using standard pattern
 from models.deepseek.deepseek_chat import create_deepseek_chat_completion
 from models.deepseek.deepseek_reasoner import create_deepseek_reasoner_completion
+# More model imports can be added as they become available
 
 router = APIRouter()
 
-@router.post("/completions")
+@router.post("")
 async def create_chat_completion(request: Request):
     """
     POST /api/v1/chat/completions
@@ -73,34 +74,33 @@ async def create_chat_completion(request: Request):
                 detail="Request body must be valid JSON if not multipart."
             )
 
-    # Now your 'payload' holds the parsed JSON from either path.
-    # 'files' is a list of any UploadFile objects if multipart was used.
-    # ------------------------------------------------------------
-
-    # Extract key fields from the payload
-    purpose = payload.get("purpose")
+    # Process the request based on provider and model
     provider = payload.get("provider")
     model = payload.get("model")
-
-    # Example check for 'discord-bot' usage
-    if purpose == "discord-bot":
-        if provider == "deepseek":
-            if model == "deepseek-chat":
-                result = create_deepseek_chat_completion(payload, files)
-            elif model == "deepseek-reasoner":
-                result = create_deepseek_reasoner_completion(payload, files)
-            return JSONResponse(result)
-        elif model == "openai":
-            raise HTTPException(status_code=501, detail="OpenAI not implemented.")
-        elif model == "gemini":
-            raise HTTPException(status_code=501, detail="Gemini not implemented.")
+    
+    # Route to appropriate model handler
+    if provider == "deepseek":
+        if model == "deepseek-chat":
+            result = create_deepseek_chat_completion(payload, files)
+        elif model == "deepseek-reasoner":
+            result = create_deepseek_reasoner_completion(payload, files)
         else:
             raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported model '{model}' for purpose '{purpose}'."
+                status_code=400, 
+                detail=f"Unsupported model '{model}' for provider '{provider}'."
             )
+        return JSONResponse(result)
+    # Add more providers here as they become available
+    # elif provider == "openai":
+    #     # from models.openai.gpt import create_openai_chat_completion
+    #     # result = create_openai_chat_completion(payload, files)
+    #     raise HTTPException(status_code=501, detail="OpenAI not implemented.")
+    # elif provider == "anthropic":
+    #     # from models.anthropic.claude import create_anthropic_chat_completion
+    #     # result = create_anthropic_chat_completion(payload, files)
+    #     raise HTTPException(status_code=501, detail="Anthropic not implemented.")
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported or missing 'purpose': '{purpose}'."
+            detail=f"Unsupported provider: '{provider}'."
         )

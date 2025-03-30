@@ -2,5 +2,7 @@
 {
     "server": "llm_server",
     "version": "1.0.0",
-    "debug": true
+    "debug": true,
+    "default_chunk_size": 1024,
+    "default_chunk_overlap": 20
 }

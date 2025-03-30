@@ -1,15 +1,18 @@
-# server/api/v1/matrics.py
+# server/api/v1/metrics.py
 
 from fastapi import APIRouter
+from tools.matrics import get_current_metrics
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 async def get_metrics():
     """
-    Return any basic metrics or usage data here.
+    Return server and API usage metrics.
     """
-    # This will be exposed at /v1/matrices/
+    # Retrieve metrics from the tools.matrics module
+    current_metrics = get_current_metrics()
+    
     return {
-        "metrics": "Placeholder metrics data"
+        "metrics": current_metrics
     }

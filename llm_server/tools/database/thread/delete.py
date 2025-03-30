@@ -10,8 +10,8 @@ def delete_thread(thread_id: str) -> bool:
     Delete a thread from the database.
     
     Note: Due to cascade delete constraints in the database,
-    this will also delete all associated messages, attachments,
-    and vector store entries for this thread.
+    this will also delete all associated messages and vectors
+    for this thread.
     
     Args:
         thread_id (str): The UUID of the thread to delete

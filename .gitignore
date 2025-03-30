@@ -59,8 +59,8 @@ temp/
 !database/001_db_schema.sql
 pgdata/
 data/
-bot/downloaded_attachments/*
-!bot/downloaded_attachments/.gitkeep
+bot/downloaded_files/*
+!bot/downloaded_files/.gitkeep
 llm_server/models/*
 !llm_server/models/.gitkeep
 llm_server/test/*

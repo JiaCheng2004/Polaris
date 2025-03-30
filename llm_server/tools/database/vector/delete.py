@@ -29,7 +29,7 @@ def delete_vector(vector_id: str) -> bool:
     
     # Send DELETE request to remove the vector
     response = requests.delete(
-        f"{POSTGREST_BASE_URL}/vectors?vector_id=eq.{vector_id}",
+        f"{POSTGREST_BASE_URL}/vector_store?vector_id=eq.{vector_id}",
         headers=headers
     )
     
@@ -71,9 +71,9 @@ def delete_thread_vectors(
     }
     
     # Build the URL with filters
-    url = f"{POSTGREST_BASE_URL}/vectors?thread_id=eq.{thread_id}"
+    url = f"{POSTGREST_BASE_URL}/vector_store?thread_id=eq.{thread_id}"
     if namespace:
-        url += f"&namespace=eq.{namespace}"
+        url += f"&metadata->>'namespace'=eq.{namespace}"
     
     # Send DELETE request to remove vectors for the thread
     response = requests.delete(url, headers=headers)
@@ -113,7 +113,7 @@ def delete_message_vectors(message_id: str) -> bool:
     
     # Send DELETE request to remove vectors for the message
     response = requests.delete(
-        f"{POSTGREST_BASE_URL}/vectors?message_id=eq.{message_id}",
+        f"{POSTGREST_BASE_URL}/vector_store?metadata->>'message_id'=eq.{message_id}",
         headers=headers
     )
     
