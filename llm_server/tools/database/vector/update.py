@@ -39,7 +39,7 @@ def update_vector(
     
     # Send PATCH request to update the vector
     response = requests.patch(
-        f"{POSTGREST_BASE_URL}/vectors?vector_id=eq.{vector_id}",
+        f"{POSTGREST_BASE_URL}/vector_store?vector_id=eq.{vector_id}",
         headers=headers,
         json=update_data
     )

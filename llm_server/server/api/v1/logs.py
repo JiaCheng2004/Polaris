@@ -4,10 +4,12 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 async def get_logs():
     """
-    Endpoint to retrieve logs.
+    Return logs or provide information about logging.
     """
-    # Return logs or log summaries as needed
-    return {"logs": "Placeholder log data"}
+    # This will be exposed at /v1/logs/ 
+    return {
+        "logs": "Placeholder logs data"
+    }

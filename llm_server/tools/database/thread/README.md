@@ -88,7 +88,7 @@ updated_thread = increment_thread_usage(
 ### Deleting Threads
 
 ```python
-# Delete a thread (and all associated messages/attachments/vectors)
+# Delete a thread (and all associated messages/vectors)
 success = delete_thread(thread_id="123e4567-e89b-12d3-a456-426614174000")
 if success:
     print("Thread deleted successfully")

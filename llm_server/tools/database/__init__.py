@@ -2,6 +2,6 @@
 
 from . import thread
 from . import message
-from . import attachment
+from . import file
 from . import vector
 from . import auth

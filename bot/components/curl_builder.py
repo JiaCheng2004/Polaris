@@ -10,7 +10,7 @@ async def build_payload_and_curl(
     api_url: str = "http://localhost:8080/api/v1/chat/completions",
     provider: str = "openai",
     model: str = "gpt-4o",
-    temp_dir: str = "./downloaded_attachments"
+    temp_dir: str = "./downloaded_files"
 ) -> tuple[dict, str]:
     """
     1) Build a JSON object that looks like:
@@ -26,7 +26,7 @@ async def build_payload_and_curl(
                     {"type": "image_file", "image_file": {"original_filename": "image.png", "uuid": "1234.png"}},
                     ...
                ],
-               "attachments": [
+               "files": [
                     {"original_filename": "filename.pdf", "uuid": "1234.pdf"},
                     {"original_filename": "image.png",   "uuid": "1234.png"},
                     ...
@@ -52,8 +52,8 @@ async def build_payload_and_curl(
 
         # Prepare "content" array
         content_blocks = []
-        # Prepare "attachments" array
-        attachments_array = []
+        # Prepare "files" array
+        files_array = []
 
         # 1) If the message has text content
         if msg.content.strip():
@@ -62,15 +62,15 @@ async def build_payload_and_curl(
                 "text": msg.content
             })
 
-        # 2) Process each attachment
-        for attachment in msg.attachments:
-            original_filename = attachment.filename
+        # 2) Process each file
+        for file in msg.attachments:  # Note: Discord.py still uses 'attachments'
+            original_filename = file.filename
 
             # 1) If it's strictly "message.txt", just read it and continue
             if original_filename == "message.txt":
                 try:
-                    # Read bytes directly from the in-memory attachment
-                    file_bytes = await attachment.read()
+                    # Read bytes directly from the in-memory file
+                    file_bytes = await file.read()
                     file_text = file_bytes.decode("utf-8", errors="replace")
                     content_blocks.append({
                         "type": "text",
@@ -78,27 +78,27 @@ async def build_payload_and_curl(
                     })
                 except Exception as e:
                     print(f"Failed to read message.txt: {e}")
-                # 2) Skip adding to attachments or file_infos
-                continue
+                    # 2) Skip adding to files or file_infos
+                    continue
 
             # Figure out the file extension (if any) from the original filename
             # fallback to "" if none found
             guessed_extension = os.path.splitext(original_filename)[1]
             if not guessed_extension:
                 # Optionally guess from content_type
-                # e.g. mimetypes.guess_extension(attachment.content_type or '')
+                # e.g. mimetypes.guess_extension(file.content_type or '')
                 # but if that fails, just keep it empty
                 pass
 
-            # The local "uuid" is effectively: "<attachment.id>.<extension>"
+            # The local "uuid" is effectively: "<file.id>.<extension>"
             # If there's no extension, we'll just use the ID
             if guessed_extension:
-                local_filename = f"{attachment.id}{guessed_extension}"
+                local_filename = f"{file.id}{guessed_extension}"
             else:
-                local_filename = str(attachment.id)
+                local_filename = str(file.id)
 
-            # Add to attachments array
-            attachments_array.append({
+            # Add to files array
+            files_array.append({
                 "original_filename": original_filename,
                 "uuid": local_filename
             })
@@ -106,9 +106,9 @@ async def build_payload_and_curl(
             # Download to local temp dir
             local_path = os.path.join(temp_dir, local_filename)
             try:
-                await attachment.save(local_path)
+                await file.save(local_path)
             except Exception as e:
-                print(f"Failed to save attachment {original_filename}: {e}")
+                print(f"Failed to save file {original_filename}: {e}")
                 continue  # skip adding to file_infos if save failed
 
             # Always add to our file_infos so we can do a -F 'files=@...'
@@ -119,7 +119,7 @@ async def build_payload_and_curl(
             })
 
             # If it's an image (by extension or content_type), add an "image_file" block
-            if is_image(guessed_extension, attachment.content_type):
+            if is_image(guessed_extension, file.content_type):
                 content_blocks.append({
                     "type": "image_file",
                     "image_file": {
@@ -131,7 +131,7 @@ async def build_payload_and_curl(
         messages_json.append({
             "role": role,
             "content": content_blocks,
-            "attachments": attachments_array
+            "files": files_array
         })
 
     # Build final payload

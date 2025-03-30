@@ -38,7 +38,7 @@ def _human_readable_bytes(num_bytes: float) -> str:
         num_bytes /= 1024
     return f"{num_bytes:.2f} TB"  # in case it's huge
 
-@router.get("/")
+@router.get("")
 async def get_status(request: Request):
     """
     Returns extended server status:

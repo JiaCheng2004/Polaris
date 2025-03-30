@@ -1,4 +1,4 @@
-FROM postgres:17.3
+FROM postgres:17.4
 ENV TZ=America/Los_Angeles
 
 RUN apt-get update && \
@@ -10,3 +10,5 @@ RUN git clone https://github.com/pgvector/pgvector.git /tmp/pgvector && \
     make && \
     make install && \
     rm -rf /tmp/pgvector
+
+COPY 001_db_schema.sql /docker-entrypoint-initdb.d/

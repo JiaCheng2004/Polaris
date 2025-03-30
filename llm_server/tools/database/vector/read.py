@@ -5,6 +5,7 @@ import json
 from typing import Dict, Any, List, Optional
 from ..auth.token import generate_token
 from tools.config.load import POSTGREST_BASE_URL
+from tools.logger import logger
 
 def get_vector(vector_id: str) -> Dict[str, Any]:
     """
@@ -19,6 +20,8 @@ def get_vector(vector_id: str) -> Dict[str, Any]:
     Raises:
         Exception: If the vector is not found or the API request fails
     """
+    logger.debug(f"Getting vector with ID: {vector_id}")
+    
     # Generate auth token for PostgREST
     token = generate_token()
     
@@ -29,21 +32,29 @@ def get_vector(vector_id: str) -> Dict[str, Any]:
     }
     
     # Send GET request to retrieve the vector
-    response = requests.get(
-        f"{POSTGREST_BASE_URL}/vectors?vector_id=eq.{vector_id}",
-        headers=headers
-    )
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        results = response.json()
-        if results:
-            return results[0]
+    try:
+        response = requests.get(
+            f"{POSTGREST_BASE_URL}/vector_store?vector_id=eq.{vector_id}",
+            headers=headers
+        )
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            results = response.json()
+            if results:
+                logger.debug(f"Successfully retrieved vector: {vector_id}")
+                return results[0]
+            else:
+                error_message = f"Vector not found with ID: {vector_id}"
+                logger.warning(error_message)
+                raise Exception(error_message)
         else:
-            raise Exception(f"Vector not found with ID: {vector_id}")
-    else:
-        error_message = f"Failed to retrieve vector: {response.status_code} - {response.text}"
-        raise Exception(error_message)
+            error_message = f"Failed to retrieve vector: {response.status_code} - {response.text}"
+            logger.error(error_message)
+            raise Exception(error_message)
+    except Exception as e:
+        logger.error(f"Exception getting vector {vector_id}: {str(e)}")
+        raise
 
 def list_vectors(
     thread_id: Optional[str] = None,
@@ -68,6 +79,8 @@ def list_vectors(
     Raises:
         Exception: If the API request fails
     """
+    logger.debug(f"Listing vectors for thread: {thread_id}, message: {message_id}, namespace: {namespace}")
+    
     # Generate auth token for PostgREST
     token = generate_token()
     
@@ -78,36 +91,52 @@ def list_vectors(
     }
     
     # Build the base URL
-    url = f"{POSTGREST_BASE_URL}/vectors"
+    url = f"{POSTGREST_BASE_URL}/vector_store"
     
     # Add query parameters
-    params = {
-        "limit": limit,
-        "offset": offset,
-        "order": "created_at.desc"
-    }
+    params = {}
+    query_parts = []
     
     # Add filter for thread_id if provided
     if thread_id:
-        params["thread_id"] = f"eq.{thread_id}"
+        query_parts.append(f"thread_id=eq.{thread_id}")
     
-    # Add filter for message_id if provided
+    # Add filter for message_id if provided (in metadata)
     if message_id:
-        params["message_id"] = f"eq.{message_id}"
+        query_parts.append(f"metadata->>'message_id'=eq.{message_id}")
     
-    # Add filter for namespace if provided
+    # Add filter for namespace if provided (in metadata)
     if namespace:
-        params["namespace"] = f"eq.{namespace}"
+        query_parts.append(f"metadata->>'namespace'=eq.{namespace}")
+    
+    # Construct the URL with filters
+    if query_parts:
+        url = f"{url}?{query_parts[0]}"
+        for part in query_parts[1:]:
+            url = f"{url}&{part}"
+    
+    # Add pagination and ordering
+    params["limit"] = limit
+    params["offset"] = offset
+    params["order"] = "created_at.desc"
     
     # Send GET request to retrieve vectors
-    response = requests.get(url, headers=headers, params=params)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        return response.json()
-    else:
-        error_message = f"Failed to list vectors: {response.status_code} - {response.text}"
-        raise Exception(error_message)
+    try:
+        logger.debug(f"Sending list vectors request to: {url}")
+        response = requests.get(url, headers=headers, params=params)
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            results = response.json()
+            logger.info(f"Found {len(results)} vectors")
+            return results
+        else:
+            error_message = f"Failed to list vectors: {response.status_code} - {response.text}"
+            logger.error(error_message)
+            raise Exception(error_message)
+    except Exception as e:
+        logger.error(f"Exception listing vectors: {str(e)}")
+        raise
 
 def search_vectors(
     query_embedding: List[float],
@@ -135,6 +164,13 @@ def search_vectors(
     Raises:
         Exception: If the API request fails
     """
+    logger.debug(f"Searching vectors for thread: {thread_id}, namespace: {namespace}")
+    
+    # If no thread_id provided, return empty list
+    if not thread_id:
+        logger.warning("No thread_id provided for vector search")
+        return []
+        
     # Generate auth token for PostgREST
     token = generate_token()
     
@@ -144,25 +180,141 @@ def search_vectors(
         "Content-Type": "application/json"
     }
     
-    # Prepare the request parameters for the search_vector RPC function
-    search_params = {
-        "query_embedding": query_embedding,
-        "namespace": namespace,
-        "similarity_threshold": similarity_threshold,
-        "match_count": limit,
-        "thread_id": thread_id
-    }
-    
     # Send POST request to the RPC function for vector search
-    response = requests.post(
-        f"{POSTGREST_BASE_URL}/rpc/search_vectors",
-        headers=headers,
-        json=search_params
-    )
+    try:
+        logger.debug(f"Sending search vectors request to: {POSTGREST_BASE_URL}/rpc/search_vectors")
+        
+        # In PostgREST, function parameters need to match exactly in the body
+        # Ensure parameter names match the PostgreSQL function definition
+        response = requests.post(
+            f"{POSTGREST_BASE_URL}/rpc/search_vectors",
+            headers=headers,
+            json={
+                "query_embedding": query_embedding,
+                "namespace": namespace,
+                "thread_id_param": thread_id,
+                "similarity_threshold": similarity_threshold,
+                "match_count": limit
+            }
+        )
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            results = response.json()
+            logger.info(f"Found {len(results)} similar vectors")
+            return results
+        else:
+            error_message = f"Failed to search vectors: {response.status_code} - {response.text}"
+            logger.error(error_message)
+            
+            # Look for specific parameter mismatch errors
+            if response.status_code == 404 and "Could not find the function" in response.text:
+                logger.error("PostgreSQL function parameter mismatch detected. Check that parameter names and order match the database function definition.")
+                
+            # We'll continue to the fallbacks
+    except Exception as e:
+        logger.error(f"Exception searching vectors: {str(e)}")
+
+    # First fallback: Try using get_thread_vectors function
+    try:
+        logger.info(f"Trying get_thread_vectors fallback for thread: {thread_id}")
+        
+        # In PostgREST, function parameters need to match exactly in the body
+        # Ensure parameter names match the PostgreSQL function definition
+        response = requests.post(
+            f"{POSTGREST_BASE_URL}/rpc/get_thread_vectors",
+            headers=headers,
+            json={
+                "thread_id_param": thread_id,
+                "namespace_param": namespace,
+                "limit_param": limit * 3  # Get more vectors for better selection
+            }
+        )
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            vectors = response.json()
+            if not vectors:
+                logger.info("No vectors found using get_thread_vectors")
+                return []
+                
+            # We need to compute similarity manually
+            from numpy import dot
+            from numpy.linalg import norm
+            
+            def cosine_similarity(a, b):
+                return dot(a, b) / (norm(a) * norm(b))
+            
+            # Calculate similarity for each vector
+            results_with_scores = []
+            for vector in vectors:
+                if "embedding" in vector and vector["embedding"]:
+                    try:
+                        similarity = cosine_similarity(query_embedding, vector["embedding"])
+                        if similarity >= similarity_threshold:
+                            # Add similarity score to the vector object
+                            vector_copy = vector.copy()
+                            vector_copy["similarity"] = float(similarity)
+                            results_with_scores.append(vector_copy)
+                    except Exception as calc_error:
+                        logger.warning(f"Error calculating similarity: {str(calc_error)}")
+            
+            # Sort by similarity score (descending)
+            results_with_scores.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+            
+            # Limit results
+            limited_results = results_with_scores[:limit]
+            
+            logger.info(f"Found {len(limited_results)} similar vectors using get_thread_vectors")
+            return limited_results
+        else:
+            logger.error(f"Failed get_thread_vectors: {response.status_code} - {response.text}")
+            
+            # Look for specific parameter mismatch errors
+            if response.status_code == 404 and "Could not find the function" in response.text:
+                logger.error("PostgreSQL function parameter mismatch detected. Check that parameter names and order match the database function definition.")
+    except Exception as gtv_error:
+        logger.error(f"Exception in get_thread_vectors fallback: {str(gtv_error)}")
     
-    # Check if the request was successful
-    if response.status_code == 200:
-        return response.json()
-    else:
-        error_message = f"Failed to search vectors: {response.status_code} - {response.text}"
-        raise Exception(error_message) 
+    # Second fallback: Try to get vectors directly using list_vectors
+    try:
+        logger.info(f"Trying list_vectors fallback for thread: {thread_id}")
+        vectors = list_vectors(thread_id=thread_id, namespace=namespace, limit=100)
+        
+        if not vectors:
+            logger.info("No vectors found for thread in list_vectors fallback")
+            return []
+            
+        # We need to compute similarity manually
+        from numpy import dot
+        from numpy.linalg import norm
+        
+        def cosine_similarity(a, b):
+            return dot(a, b) / (norm(a) * norm(b))
+        
+        # Calculate similarity for each vector
+        results_with_scores = []
+        for vector in vectors:
+            if "embedding" in vector and vector["embedding"]:
+                try:
+                    similarity = cosine_similarity(query_embedding, vector["embedding"])
+                    if similarity >= similarity_threshold:
+                        # Add similarity score to the vector object
+                        vector_copy = vector.copy()
+                        vector_copy["similarity"] = float(similarity)
+                        results_with_scores.append(vector_copy)
+                except Exception as calc_error:
+                    logger.warning(f"Error calculating similarity: {str(calc_error)}")
+        
+        # Sort by similarity score (descending)
+        results_with_scores.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+        
+        # Limit results
+        limited_results = results_with_scores[:limit]
+        
+        logger.info(f"Found {len(limited_results)} similar vectors using list_vectors fallback")
+        return limited_results
+    except Exception as fallback_error:
+        logger.error(f"All fallbacks failed: {str(fallback_error)}")
+        # Return empty list rather than failing completely
+        return [] 
