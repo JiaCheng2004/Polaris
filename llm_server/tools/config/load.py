@@ -15,6 +15,10 @@ DEBUG = CONFIG["debug"]
 DEFAULT_CHUNK_SIZE = CONFIG["default_chunk_size"]
 DEFAULT_CHUNK_OVERLAP = CONFIG["default_chunk_overlap"]
 
+P_A = CONFIG["P_A"]
+P_B = CONFIG["P_B"]
+P_C = CONFIG["P_C"]
+
 # Environmental variables:
 
 POSTGREST_BASE_URL = os.getenv("POSTGREST_BASE_URL")

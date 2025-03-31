@@ -3,7 +3,7 @@
 import logging
 
 logger = logging.getLogger("llm_server_logger")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # You can add formatting, handlers, etc., here
 console_handler = logging.StreamHandler()
