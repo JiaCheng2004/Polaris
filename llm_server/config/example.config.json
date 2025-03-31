@@ -3,6 +3,9 @@
     "server": "llm_server",
     "version": "1.0.0",
     "debug": true,
-    "default_chunk_size": 1024,
-    "default_chunk_overlap": 20
+    "default_chunk_size": 2048,
+    "default_chunk_overlap": 256,
+    "P_A": 3,
+    "P_B": 2,
+    "P_C": 1
 }

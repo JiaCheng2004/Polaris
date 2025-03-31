@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 
-from tools.database.file import create_file, find_existing_file_by_hash, update_file_by_content_hash, find_files_by_content_hash
+from tools.database.file import create_file, find_existing_file_by_hash, update_file_by_content_hash, find_files_by_content_hash, get_file
 from tools.parse.parser import Parse
 from tools.logger import logger
 

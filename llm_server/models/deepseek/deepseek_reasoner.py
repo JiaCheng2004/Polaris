@@ -600,7 +600,55 @@ def process_attachments_for_vectorization(
 
 def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
     """
-    Split text into overlapping chunks.
+    Split text into overlapping chunks using LangChain's RecursiveCharacterTextSplitter.
+    
+    Args:
+        text: The text to split
+        chunk_size: Maximum size of each chunk (in characters)
+        chunk_overlap: Overlap between chunks (in characters)
+    
+    Returns:
+        List[str]: List of text chunks
+    """
+    try:
+        # Import langchain text splitter
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        
+        logger.info(f"Using LangChain's RecursiveCharacterTextSplitter with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+        
+        # Create text splitter with appropriate parameters
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            is_separator_regex=False,
+            separators=["\n\n", "\n", " ", ""]
+        )
+        
+        # Split text
+        chunks = text_splitter.split_text(text)
+        
+        # Log chunk information
+        logger.info(f"Split text into {len(chunks)} chunks")
+        chunk_lengths = [len(chunk) for chunk in chunks]
+        if chunk_lengths:
+            logger.debug(f"Chunk lengths - min: {min(chunk_lengths)}, max: {max(chunk_lengths)}, avg: {sum(chunk_lengths)/len(chunk_lengths):.1f}")
+        
+        return chunks
+    except ImportError as e:
+        # Fallback to original implementation if LangChain is not available
+        logger.warning(f"LangChain import error: {str(e)}. Falling back to basic chunking method.")
+        return _chunk_text_basic(text, chunk_size, chunk_overlap)
+    except Exception as e:
+        # Fallback if there are any other errors
+        logger.error(f"Error using LangChain text splitter: {str(e)}. Falling back to basic chunking method.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return _chunk_text_basic(text, chunk_size, chunk_overlap)
+
+def _chunk_text_basic(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    """
+    Basic fallback method to split text into overlapping chunks.
     
     Args:
         text: The text to split
@@ -610,6 +658,7 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
     Returns:
         List[str]: List of text chunks
     """
+    logger.info("Using basic chunking method")
     chunks = []
     start = 0
     text_length = len(text)
@@ -617,6 +666,18 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
     while start < text_length:
         # Calculate end position with respect to text length
         end = min(start + chunk_size, text_length)
+        
+        # Try to end at a paragraph or sentence if possible
+        if end < text_length:
+            # Look for paragraph breaks first
+            paragraph_end = text.rfind("\n\n", start, end)
+            if paragraph_end != -1 and paragraph_end > start + chunk_size // 2:  # Ensure meaningful chunk size
+                end = paragraph_end + 2  # Include the newlines
+            else:
+                # Look for sentence breaks
+                sentence_end = text.rfind(". ", start, end)
+                if sentence_end != -1 and sentence_end > start + chunk_size // 3:  # Ensure meaningful chunk size
+                    end = sentence_end + 2  # Include the period and space
         
         # Extract chunk
         chunk = text[start:end]
@@ -628,6 +689,12 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         # Break if we've reached the end
         if start >= text_length:
             break
+    
+    # Log chunk information
+    logger.info(f"Split text into {len(chunks)} chunks using basic method")
+    chunk_lengths = [len(chunk) for chunk in chunks]
+    if chunk_lengths:
+        logger.debug(f"Chunk lengths - min: {min(chunk_lengths)}, max: {max(chunk_lengths)}, avg: {sum(chunk_lengths)/len(chunk_lengths):.1f}")
     
     return chunks
 
@@ -682,6 +749,13 @@ def prepare_context_for_llm(thread_id: str, query_message: Dict[str, Any]) -> Tu
     # Retrieve relevant local context using embeddings
     local_context_text = retrieve_relevant_context(thread_id, query_text)
     
+    # Log the original context components before any modification
+    logger.debug("============ ORIGINAL CONTEXT COMPONENTS ============")
+    logger.debug(f"Query Text (first 500 chars): {query_text[:500]}")
+    logger.debug(f"Query Context (first 500 chars): {query_context_text[:500]}")
+    logger.debug(f"Local Context (first 500 chars): {local_context_text[:500]}")
+    logger.debug("===================================================")
+    
     # Ensure everything fits within token limits
     query_text, query_context_text, local_context_text = build_llm_context(
         query_text=query_text,
@@ -691,6 +765,13 @@ def prepare_context_for_llm(thread_id: str, query_message: Dict[str, Any]) -> Tu
         provider="deepseek",
         model="deepseek-reasoner"
     )
+    
+    # Log the final context components after token fitting
+    logger.debug("============ FINAL CONTEXT COMPONENTS AFTER TOKEN FITTING ============")
+    logger.debug(f"Final Query Text (first 500 chars): {query_text[:500]}")
+    logger.debug(f"Final Query Context (first 500 chars): {query_context_text[:500]}")
+    logger.debug(f"Final Local Context (first 500 chars): {local_context_text[:500]}")
+    logger.debug("===================================================================")
     
     return query_text, query_context_text, local_context_text
 
@@ -740,7 +821,7 @@ def retrieve_relevant_context(thread_id: str, query_text: str) -> str:
             query_embedding=embedding_list,
             namespace="files",
             thread_id=thread_id,
-            similarity_threshold=0.7,
+            similarity_threshold=0.5,
             limit=top_k
         )
         
@@ -802,11 +883,21 @@ def build_llm_context(
     query_context_tokens, _, _ = token_counter(query_context, provider, model)
     local_context_tokens, _, _ = token_counter(local_context, provider, model)
     
+    # Log token counts for each component
+    logger.debug("============ TOKEN COUNTS FOR CONTEXT COMPONENTS ============")
+    logger.debug(f"Query Text: {query_text_tokens} tokens")
+    logger.debug(f"Query Context: {query_context_tokens} tokens")
+    logger.debug(f"Local Context: {local_context_tokens} tokens")
+    logger.debug(f"Total: {query_text_tokens + query_context_tokens + local_context_tokens} tokens (max: {max_tokens})")
+    logger.debug("===========================================================")
+    
     # Quick check if everything fits
     total_tokens = query_text_tokens + query_context_tokens + local_context_tokens
     if total_tokens <= max_tokens:
         logger.info(f"All content fits within token limit ({total_tokens}/{max_tokens})")
         return query_text, query_context, local_context
+    
+    logger.warning(f"Total tokens {total_tokens} exceeds limit {max_tokens}. Need to reduce content.")
     
     # If query alone exceeds the limit, summarize it
     if query_text_tokens > max_tokens:
@@ -814,12 +905,13 @@ def build_llm_context(
         result = summarize_context(query_text, max_tokens, provider, model)
         if result["status"] == 200:
             query_text = result["content"]
+            logger.debug(f"Summarized query from {query_text_tokens} to {token_counter(query_text, provider, model)[0]} tokens")
             return query_text, "", ""
     
     # Weighted distribution
-    p_A = 3  # Query priority
+    p_A = 2  # Query priority (lowered from 3 to 2)
     p_B = 2  # Query context priority
-    p_C = 1  # Local context priority
+    p_C = 2  # Local context priority (increased from 1 to 2)
     W = p_A + p_B + p_C
     
     # Calculate capacity slices
@@ -827,48 +919,63 @@ def build_llm_context(
     c_B = (p_B / W) * max_tokens
     c_C = (p_C / W) * max_tokens
     
+    logger.debug(f"Token allocation - Query: {int(c_A)}, Query Context: {int(c_B)}, Local Context: {int(c_C)}")
+    
     # Try to fit query fully
     if query_text_tokens <= c_A:
         final_query = query_text
         leftover = c_A - query_text_tokens
         c_B += leftover
+        logger.debug(f"Query fits within allocation. Leftover {int(leftover)} tokens added to Query Context (now {int(c_B)})")
     else:
         # Summarize query
         logger.info(f"Query exceeds its allocation, summarizing ({query_text_tokens}/{int(c_A)})")
         result = summarize_context(query_text, int(c_A), provider, model)
         if result["status"] == 200:
             final_query = result["content"]
+            logger.debug(f"Summarized query from {query_text_tokens} to {token_counter(final_query, provider, model)[0]} tokens")
         else:
             # Fallback if summarization fails
             final_query = query_text[:int(len(query_text) * (c_A / query_text_tokens))]
+            logger.warning(f"Summarization failed, truncated query to {token_counter(final_query, provider, model)[0]} tokens")
     
     # Try to fit query context fully
     if query_context_tokens <= c_B:
         final_query_context = query_context
         leftover = c_B - query_context_tokens
         c_C += leftover
+        logger.debug(f"Query context fits within allocation. Leftover {int(leftover)} tokens added to Local Context (now {int(c_C)})")
     else:
         # Summarize query context
         logger.info(f"Query context exceeds its allocation, summarizing ({query_context_tokens}/{int(c_B)})")
         result = summarize_context(query_context, int(c_B), provider, model)
         if result["status"] == 200:
             final_query_context = result["content"]
+            logger.debug(f"Summarized query context from {query_context_tokens} to {token_counter(final_query_context, provider, model)[0]} tokens")
         else:
             # Fallback if summarization fails
             final_query_context = query_context[:int(len(query_context) * (c_B / query_context_tokens))]
+            logger.warning(f"Summarization failed, truncated query context to {token_counter(final_query_context, provider, model)[0]} tokens")
     
     # Fit local context
     if local_context_tokens <= c_C:
         final_local_context = local_context
+        logger.debug(f"Local context fits within allocation ({local_context_tokens}/{int(c_C)})")
     else:
         # Summarize local context
         logger.info(f"Local context exceeds its allocation, summarizing ({local_context_tokens}/{int(c_C)})")
         result = summarize_context(local_context, int(c_C), provider, model)
         if result["status"] == 200:
             final_local_context = result["content"]
+            logger.debug(f"Summarized local context from {local_context_tokens} to {token_counter(final_local_context, provider, model)[0]} tokens")
         else:
             # Fallback if summarization fails
             final_local_context = local_context[:int(len(local_context) * (c_C / local_context_tokens))]
+            logger.warning(f"Summarization failed, truncated local context to {token_counter(final_local_context, provider, model)[0]} tokens")
+    
+    # Final token check
+    final_total_tokens = token_counter(final_query, provider, model)[0] + token_counter(final_query_context, provider, model)[0] + token_counter(final_local_context, provider, model)[0]
+    logger.info(f"Final context size after adjustments: {final_total_tokens}/{max_tokens} tokens")
     
     logger.info("Context building complete")
     return final_query, final_query_context, final_local_context
@@ -916,6 +1023,23 @@ def generate_llm_response(
     if query_context_text:
         user_prompt += "\n\n[QUERY CONTEXT]\n" + query_context_text
     
+    # Log detailed message construction
+    logger.debug("---------- DETAILED MESSAGE CONSTRUCTION ----------")
+    logger.debug(f"SYSTEM MESSAGE:")
+    logger.debug(f"Base system prompt: 'You are a helpful assistant. Use the information below to answer.'")
+    if local_context_text:
+        logger.debug(f"Added local context of {len(local_context_text)} chars with marker '[LOCAL DOCUMENT CONTEXT]'")
+    else:
+        logger.debug("No local context added to system message")
+    
+    logger.debug(f"USER MESSAGE:")
+    logger.debug(f"Base query: '{query_text[:200]}...' ({len(query_text)} chars)")
+    if query_context_text:
+        logger.debug(f"Added query context of {len(query_context_text)} chars with marker '[QUERY CONTEXT]'")
+    else:
+        logger.debug("No query context added to user message")
+    logger.debug("---------------------------------------------------")
+    
     # Log prompt details (lengths only, not content)
     logger.debug(f"System prompt length: {len(system_prompt)} chars")
     logger.debug(f"User prompt length: {len(user_prompt)} chars")
@@ -929,24 +1053,27 @@ def generate_llm_response(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 4000
+            "temperature": 0.6,
+            "max_tokens": 8000
         }
         
-        # Log the request data (with truncated content for privacy)
-        safe_request_data = {
-            "model": request_data["model"],
-            "temperature": request_data["temperature"],
-            "max_tokens": request_data["max_tokens"],
-            "messages": [
-                {
-                    "role": msg["role"],
-                    "content": f"{msg['content'][:100]}..." if len(msg["content"]) > 100 else msg["content"]
-                }
-                for msg in request_data["messages"]
-            ]
-        }
-        logger.info(f"Sending DeepSeek API request: {json.dumps(safe_request_data)}")
+        # Log detailed message structure with content
+        logger.debug("---------- COMPLETE MESSAGE STRUCTURE SENT TO API ----------")
+        for i, msg in enumerate(request_data["messages"]):
+            role = msg["role"]
+            content = msg["content"]
+            logger.debug(f"Message {i+1} - Role: {role}")
+            # Split content into chunks for more readable logs
+            if len(content) > 2000:
+                chunks = [content[i:i+2000] for i in range(0, len(content), 2000)]
+                for j, chunk in enumerate(chunks):
+                    logger.debug(f"Message {i+1} Content (Part {j+1}/{len(chunks)}): {chunk}")
+            else:
+                logger.debug(f"Message {i+1} Content: {content}")
+        logger.debug("----------------------------------------------------------")
+        
+        # Add a high-level log message for quick scanning
+        logger.info(f"Sending DeepSeek API request for model: {request_data['model']}, temperature: {request_data['temperature']}, max_tokens: {request_data['max_tokens']}")
         
         # Set up headers with auth token
         headers = {
