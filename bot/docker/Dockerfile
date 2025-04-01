@@ -1,26 +1,16 @@
-FROM ubuntu:24.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=America/Los_Angeles
-ENV APP_NAME="bot"
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        curl \
-        python3 \
-        python3-pip \
-        python3-venv \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN python3 -m venv /opt/venv \
- && /opt/venv/bin/pip install --upgrade pip
-
-ENV PATH="/opt/venv/bin:$PATH"
+FROM python:3.11-slim
 
 WORKDIR /app
 
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the bot code
 COPY . .
 
-RUN pip install -r requirements.txt
+# Create the downloads directory if it doesn't exist
+RUN mkdir -p downloaded_files
 
-CMD ["python", "main.py"]
+# Run the bot
+CMD ["python", "main.py"] 
