@@ -1,346 +1,503 @@
 # models/deepseek/deepseek_chat.py
+"""
+DeepSeek Chat integration module.
 
-import json
-import os
-import shutil
+This module implements the DeepSeek Chat API with the model-agnostic document toolkit.
+"""
+
 import uuid
+import json
+import requests
+import traceback
 from typing import Any, Dict, List, Optional
+
+# Import logger
+from tools.logger import logger
 from tools.config.load import DEEPSEEK_API_KEY
 
-# Database imports
-from tools.database.thread.create import create_thread
-from tools.database.thread.update import update_thread
-from tools.database.thread.read import get_thread, list_threads
-from tools.database.thread.delete import delete_thread
-from tools.database.message.create import create_message
-from tools.database.message.update import update_message
-from tools.database.message.read import get_message, list_messages, get_thread_conversation
-from tools.database.message.delete import delete_message
-from tools.database.file import create_file, find_existing_file_by_hash, update_file_by_content_hash
-from tools.database.vector.create import create_vector
-from tools.database.vector.read import search_vectors
+# Import document toolkit functions
+from tools.docs.thread_utils import handle_thread_management
+from tools.docs.message_utils import process_incoming_messages, get_most_recent_user_query, store_assistant_response
+from tools.docs.context_utils import prepare_context_for_llm, retrieve_relevant_context, build_llm_context
 
-# Tool imports
-from tools.embed.text import embed_text
-from tools.parse.parser import Parse
+# Import search functionality
+from tools.search import unified_search
+from tools.llm.search_indicator import detect_search_needs
 
-# LangChain imports
-from langchain.prompts import PromptTemplate
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain.schema import Document
-from langchain_deepseek import ChatDeepSeek
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
+# DeepSeek API endpoint
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
-def _join_text_chunks(content_blocks: List[dict]) -> str:
+def generate_deepseek_chat_response(
+    query_text: str,
+    query_context_text: str,
+    local_context_text: str,
+    model_name: str,
+    temperature: float = 0.7,
+    max_output_tokens: int = 8000
+) -> str:
     """
-    Combine JSON content blocks (e.g. [{type: 'text', text: '...'}])
-    into a single text string. Customize as needed (line breaks, spacing, etc.).
+    Generate a response from the DeepSeek Chat API.
+    
+    Args:
+        query_text: The user query
+        query_context_text: Context from query's attachments
+        local_context_text: Retrieved context from vector store
+        model_name: The model name (should be "deepseek-chat")
+        temperature: Temperature for response generation
+        max_output_tokens: Maximum tokens to generate in the response
+        
+    Returns:
+        str: The generated response
     """
-    # Example: join with newlines
-    text_chunks = []
-    for block in content_blocks:
-        # block is expected to have keys: {"type": "text", "text": "..."}
-        if block.get("type") == "text":
-            text_chunks.append(block.get("text", ""))
-    return "\n".join(text_chunks)
-
-def _convert_to_langchain_messages(payload_messages: List[dict]) -> List[BaseMessage]:
-    """
-    Convert the user-provided messages into LangChain messages for the LLM.
-    Each message is a dict with:
-      {
-        "role": "system" | "user" | "assistant",
-        "content": [ { "type":"text", "text": "..." }, ... ],
-        "attachments": []
-      }
-    """
-    converted = []
-    for msg in payload_messages:
-        role = msg.get("role")
-        # Join the text portions into a single string for the LLM
-        text_str = _join_text_chunks(msg.get("content", []))
-
-        if role == "system":
-            converted.append(SystemMessage(content=text_str))
-        elif role == "assistant":
-            converted.append(AIMessage(content=text_str))
+    logger.info("Generating DeepSeek Chat response")
+    
+    # Check if API key is available
+    if not DEEPSEEK_API_KEY:
+        error_msg = "DeepSeek API key is not configured. Please set the DEEPSEEK_API_KEY environment variable."
+        logger.error(error_msg)
+        return f"I apologize, but I'm unable to process your request at the moment. {error_msg}"
+    
+    # Validate API key format
+    if len(DEEPSEEK_API_KEY.strip()) < 10:  # Simple length check
+        error_msg = "DeepSeek API key appears to be invalid (too short)."
+        logger.error(error_msg)
+        return f"I apologize, but I'm unable to process your request due to an API configuration issue. Please contact support."
+    
+    # Build system prompt with context
+    system_prompt = "You are a helpful assistant. Use the information below to answer."
+    
+    if local_context_text:
+        system_prompt += "\n\n[LOCAL DOCUMENT CONTEXT]\n" + local_context_text
+    
+    # Combine query and its context
+    user_prompt = query_text
+    if query_context_text:
+        user_prompt += "\n\n[QUERY CONTEXT]\n" + query_context_text
+    
+    # Log prompt details
+    logger.debug(f"System prompt length: {len(system_prompt)} chars")
+    logger.debug(f"User prompt length: {len(user_prompt)} chars")
+    
+    # Generate response using DeepSeek API
+    try:
+        # Prepare request data
+        request_data = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_output_tokens
+        }
+        
+        # Set up headers with auth token
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Make API request
+        logger.info(f"Sending request to DeepSeek API at {DEEPSEEK_API_URL}")
+        response = requests.post(
+            DEEPSEEK_API_URL,
+            headers=headers,
+            json=request_data
+        )
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            response_json = response.json()
+            if "choices" in response_json and response_json["choices"]:
+                response_text = response_json["choices"][0]["message"]["content"]
+                if response_text:
+                    logger.info("Successfully generated response")
+                    return response_text
+                else:
+                    logger.warning("Empty response text from API")
+                    return "I apologize, but I received an empty response. Please try again with a more specific query."
+            else:
+                logger.warning(f"Unexpected API response structure: {response_json}")
+                return "I apologize, but I received an unexpected response format. Please try again later."
         else:
-            # treat everything else as user/human
-            converted.append(HumanMessage(content=text_str))
-
-    return converted
-
-def _setup_temp_directory(thread_id: str) -> str:
-    """
-    Create a temporary directory for file attachments
-    
-    Args:
-        thread_id: The ID of the thread
-        
-    Returns:
-        str: Path to the temporary directory
-    """
-    temp_dir = f"/tmp/{thread_id}"
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-    os.makedirs(temp_dir, exist_ok=True)
-    return temp_dir
-
-def _process_files(
-    files: List[Any], 
-    thread_id: str, 
-    message_id: str, 
-    author: Dict[str, Any]
-) -> List[Dict[str, Any]]:
-    """
-    Process files - store locally, parse content, and create vectors
-    
-    Args:
-        files: List of file objects
-        thread_id: The ID of the thread
-        message_id: The ID of the message
-        author: JSON data describing who uploaded the files
-    
-    Returns:
-        List[Dict[str, Any]]: List of processed file data
-    """
-    if not files:
-        return []
-    
-    # Setup temporary directory
-    temp_dir = _setup_temp_directory(thread_id)
-    
-    # Initialize the parser
-    parser = Parse()
-    file_data = []
-    
-    for file in files:
-        # Save file to temporary directory
-        file_path = os.path.join(temp_dir, file.filename)
-        with open(file_path, "wb") as f:
-            f.write(file.read())
-        
-        # Parse file content
-        parse_result = parser.parse(file_path)
-        
-        if parse_result["status"] == 200:
-            content = parse_result["content"]
-            parse_tool = {"type": "parser", "tools": parse_result["tools_used"]}
-            file_size = os.path.getsize(file_path)
-            file_type = file.content_type
+            error_message = f"API error: {response.status_code} - {response.text}"
+            logger.error(error_message)
             
-            # Create file in database
-            file_record = create_file(
-                message_id=message_id,
-                filename=file.filename,
-                file_type=file_type,
-                size=file_size,
-                content=content,
-                author=author,
-                purpose="reference",
-                token_count=0,  # Could calculate token count if needed
-                metadata={},
-                parse_tool=parse_tool
-            )
-            
-            # Generate embedding for content
-            embedding = embed_text(content)
-            
-            if embedding:
-                # Create vector in database for retrieval
-                vector = create_vector(
-                    thread_id=thread_id,
-                    message_id=message_id,
-                    embedding=embedding,
-                    content=content,
-                    metadata={"filename": file.filename, "file_type": file_type},
-                    namespace="files",
-                    embed_tool={"type": "gemini", "model": "gemini-embedding-exp-03-07"}
-                )
+            # Handle specific error codes
+            if response.status_code == 401:
+                return "I apologize, but there seems to be an authentication issue. Please check API key configuration."
+            elif response.status_code == 429:
+                return "I apologize, but the service is currently rate limited. Please try again after a short while."
+            else:
+                return f"I apologize, but I encountered an error processing your request. Please try again later."
                 
-                file_data.append({
-                    "file": file_record,
-                    "vector": vector
-                })
-    
-    return file_data
+    except Exception as e:
+        logger.error(f"Error generating response: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"I apologize, but I encountered an error processing your request. Please try again later."
 
-def _retrieve_relevant_contexts(thread_id: str, query: str) -> List[str]:
+def create_deepseek_chat_completion(payload: Dict[str, Any], files: Optional[List[Any]] = None) -> Dict[str, Any]:
     """
-    Retrieve relevant contexts from the vector store
-    
-    Args:
-        thread_id: The ID of the thread
-        query: The query to search for
-        
-    Returns:
-        List[str]: List of relevant contexts
-    """
-    # Generate embedding for query
-    query_embedding = embed_text(query)
-    
-    if not query_embedding:
-        return []
-    
-    # Search for similar vectors
-    similar_vectors = search_vectors(
-        query_embedding=query_embedding,
-        namespace="files",
-        thread_id=thread_id,
-        similarity_threshold=0.7,
-        limit=5
-    )
-    
-    # Extract content from similar vectors
-    contexts = [vector.get("content", "") for vector in similar_vectors]
-    return contexts
-
-def create_deepseek_chat_completion(payload: dict, files: List[Any]) -> dict:
-    """
-    Main function with RAG capabilities to handle chat completions with DeepSeek.
+    Main function to handle chat completions with DeepSeek Chat.
     
     Implements:
     1) Thread management (create new thread or use existing)
     2) Process files and store in vector database
     3) Retrieval of relevant documents for context
-    4) LLM RAG-based response generation
+    4) Context management to fit into model's token limit
+    5) LLM response generation
     
     Args:
-        payload: The parsed JSON payload
-        files: List of uploaded files
+        payload: The parsed JSON payload containing thread info and messages
+        files: List of uploaded files (if any)
         
     Returns:
         Dict containing model response and metadata
     """
-    # Extract fields from payload
-    provider = payload.get("provider", "deepseek")
-    model_name = payload.get("model", "deepseek-chat")
-    messages = payload.get("messages", [])
-    thread_id = payload.get("thread_id")
-    purpose = payload.get("purpose", "chat")
+    logger.info("Starting DeepSeek Chat completion")
     
-    # Define default author
-    author = payload.get("author", {"name": "user", "id": "anonymous"})
-    
-    # Check if thread exists or create new one
-    existing_thread = None
-    if thread_id:
+    try:
+        # Extract fields from payload
+        provider = payload.get("provider", "deepseek")
+        model_name = payload.get("model", "deepseek-chat")
+        messages = payload.get("messages", [])
+        thread_id = payload.get("thread_id")
+        purpose = payload.get("purpose", "chat")
+        author = payload.get("author", {"type": "user", "user-id": "anonymous", "name": "User"})
+        
+        # Validate payload
+        if not messages:
+            logger.warning("No messages provided in payload")
+            return {"error": "No messages provided in request payload"}
+        
+        logger.debug(f"Payload contains {len(messages)} messages")
+        
+        # Handle thread management
         try:
-            existing_thread = get_thread(thread_id)
-        except Exception:
-            existing_thread = None
-    
-    if not existing_thread:
-        # Create new thread
-        thread_data = create_thread(
-            model=model_name,
-            provider=provider,
-            purpose=purpose,
-            author=author,
-            tokens_spent=0
-        )
-        thread_id = thread_data[0]["thread_id"]
-    else:
-        thread_id = existing_thread["thread_id"]
-    
-    # Store incoming messages
-    stored_messages = []
-    for msg in messages:
-        # Convert list of content blocks to proper JSON structure
-        content_blocks = msg.get("content", [])
-        content_json = {"blocks": content_blocks}
+            thread_id = handle_thread_management(thread_id, model_name, provider, purpose, author)
+            logger.info(f"Using thread ID: {thread_id}")
+        except Exception as thread_e:
+            logger.error(f"Thread management error: {str(thread_e)}")
+            return {"error": f"Error in thread management: {str(thread_e)}"}
         
-        msg_data = create_message(
-            thread_id=thread_id,
-            role=msg.get("role", "user"),
-            content=content_json,
-            purpose="chat",
-            author=author
-        )
-        stored_messages.append(msg_data)
-    
-    # Process the last message (assumed to be the user's query)
-    latest_message = stored_messages[-1] if stored_messages else None
-    latest_message_id = latest_message["message_id"] if latest_message else None
-    
-    # Process files if any and store in vector store
-    if files and latest_message_id:
-        file_data = _process_files(
-            files=files,
-            thread_id=thread_id,
-            message_id=latest_message_id,
-            author=author
-        )
-    
-    # Get user query from the latest message
-    user_query = _join_text_chunks(messages[-1].get("content", [])) if messages else ""
-    
-    # Setup DeepSeek LLM 
-    llm = ChatDeepSeek(
-        model=model_name,
-        temperature=0.2,
-        max_tokens=None,
-        timeout=None,
-        max_retries=2,
-        api_key=DEEPSEEK_API_KEY
-    )
-    
-    # Retrieve relevant contexts if any
-    contexts = _retrieve_relevant_contexts(thread_id, user_query)
-    
-    if contexts:
-        # Create RAG chain with retrieved contexts
-        context_str = "\n\n".join(contexts)
-        
-        # Prompt template for answering with context
-        rag_prompt = PromptTemplate.from_template(
-            """You are a helpful assistant that provides accurate information based on the context given.
+        # Store incoming messages and process attachments
+        try:
+            # DeepSeek-specific configuration
+            embedding_model = {"type": "embed", "model": "gemini-embedding-exp-03-07"}
             
-            Context:
-            {context}
+            processed_messages = process_incoming_messages(
+                thread_id=thread_id, 
+                messages=messages, 
+                author=author, 
+                embedding_model=embedding_model
+            )
+            logger.info(f"Processed {len(processed_messages)} messages")
+        except Exception as msg_e:
+            logger.error(f"Error processing messages: {str(msg_e)}")
+            return {"error": f"Error processing messages: {str(msg_e)}"}
+        
+        # Find the most recent user query
+        query_message = get_most_recent_user_query(processed_messages)
+        if not query_message:
+            logger.error("No user query found in messages")
+            return {"error": "No user query found in messages"}
+        
+        logger.info(f"Found user query in message ID: {query_message.get('message_id', 'unknown')}")
+        
+        # Prepare context for LLM
+        try:
+            # DeepSeek Chat-specific context configuration
+            query_text, query_context_text, local_context_text = prepare_context_for_llm(
+                thread_id=thread_id,
+                query_message=query_message,
+                max_tokens=64000,  # DeepSeek Chat context window size
+                provider="deepseek",
+                model="deepseek-chat",
+                use_summarization=True
+            )
+            logger.debug(f"Prepared context - Query: {len(query_text)} chars, Query Context: {len(query_context_text)} chars, Local Context: {len(local_context_text)} chars")
+        except Exception as context_e:
+            logger.error(f"Error preparing context: {str(context_e)}")
+            query_text = query_message.get("content", {}).get("text", "")
+            query_context_text = ""
+            local_context_text = ""
+            logger.info("Using fallback context (query text only)")
+        
+        # Generate response from LLM
+        try:
+            response = generate_deepseek_chat_response(
+                query_text=query_text,
+                query_context_text=query_context_text,
+                local_context_text=local_context_text,
+                model_name=model_name
+            )
+            logger.debug(f"Generated response: {len(response)} chars")
+        except Exception as llm_e:
+            logger.error(f"Error generating response: {str(llm_e)}")
+            response = f"I apologize, but I encountered an error processing your request: {str(llm_e)}"
+        
+        # Store assistant's response
+        try:
+            # DeepSeek-specific vectorization configuration
+            embedding_model = {"type": "embed", "model": "gemini-embedding-exp-03-07"}
             
-            Question: {question}
+            response_message = store_assistant_response(
+                thread_id=thread_id, 
+                content=response, 
+                user_author=author,
+                embedding_model=embedding_model
+            )
+            logger.info(f"Stored assistant response as message ID: {response_message.get('message_id', 'unknown')}")
+        except Exception as store_e:
+            logger.error(f"Error storing assistant response: {str(store_e)}")
+            # Create a basic response object with minimal info if we couldn't store in DB
+            response_message = {
+                "message_id": f"temp-{uuid.uuid4()}",
+                "thread_id": thread_id,
+                "tokens_spent": 0,
+                "cost": 0.0
+            }
+        
+        # Return the final response
+        return {
+            "thread_id": thread_id,
+            "message_id": response_message.get("message_id", f"temp-{uuid.uuid4()}"),
+            "content": response,
+            "tokens_spent": response_message.get("tokens_spent", 0),
+            "cost": response_message.get("cost", 0.0)
+        }
+    
+    except Exception as e:
+        # Catch-all for any unexpected errors
+        logger.error(f"Unexpected error in deepseek_chat_completion: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "error": "An unexpected error occurred processing your request",
+            "content": "I apologize, but I encountered an unexpected error processing your request. Please try again later."
+        }
+
+def create_deepseek_reasoner_completion(payload: Dict[str, Any], files: Optional[List[Any]] = None) -> Dict[str, Any]:
+    """
+    Main function to handle chat completions with DeepSeek Reasoner.
+    
+    Implements:
+    1) Thread management (create new thread or use existing)
+    2) Process files and store in vector database
+    3) Analysis of search needs for external information
+    4) Retrieval of relevant documents for context
+    5) Context management to fit into model's token limit
+    6) LLM response generation
+    
+    Args:
+        payload: The parsed JSON payload containing thread info and messages
+        files: List of uploaded files (if any)
+        
+    Returns:
+        Dict containing model response and metadata
+    """
+    logger.info("Starting DeepSeek Reasoner completion")
+    
+    try:
+        # Extract fields from payload
+        provider = payload.get("provider", "deepseek")
+        model_name = payload.get("model", "deepseek-reasoner")
+        messages = payload.get("messages", [])
+        thread_id = payload.get("thread_id")
+        purpose = payload.get("purpose", "chat")
+        author = payload.get("author", {"type": "user", "user-id": "anonymous", "name": "User"})
+        
+        # Validate payload
+        if not messages:
+            logger.warning("No messages provided in payload")
+            return {"error": "No messages provided in request payload"}
+        
+        logger.debug(f"Payload contains {len(messages)} messages")
+        
+        # Handle thread management
+        try:
+            thread_id = handle_thread_management(thread_id, model_name, provider, purpose, author)
+            logger.info(f"Using thread ID: {thread_id}")
+        except Exception as thread_e:
+            logger.error(f"Thread management error: {str(thread_e)}")
+            return {"error": f"Error in thread management: {str(thread_e)}"}
+        
+        # Store incoming messages and process attachments
+        try:
+            # DeepSeek-specific configuration
+            embedding_model = {"type": "embed", "model": "gemini-embedding-exp-03-07"}
             
-            Answer the question based on the context provided. If the context doesn't contain relevant information,
-            use your general knowledge but clearly indicate when you're doing so.
-            """
-        )
+            processed_messages = process_incoming_messages(
+                thread_id=thread_id, 
+                messages=messages, 
+                author=author, 
+                embedding_model=embedding_model
+            )
+            logger.info(f"Processed {len(processed_messages)} messages")
+        except Exception as msg_e:
+            logger.error(f"Error processing messages: {str(msg_e)}")
+            return {"error": f"Error processing messages: {str(msg_e)}"}
         
-        # Create documents from contexts
-        docs = [Document(page_content=context) for context in contexts]
+        # Find the most recent user query
+        query_message = get_most_recent_user_query(processed_messages)
+        if not query_message:
+            logger.error("No user query found in messages")
+            return {"error": "No user query found in messages"}
         
-        # Create answer chain
-        answer_chain = create_stuff_documents_chain(llm, rag_prompt)
+        logger.info(f"Found user query in message ID: {query_message.get('message_id', 'unknown')}")
         
-        # Generate answer
-        answer = answer_chain.invoke({
-            "question": user_query,
-            "context": docs
-        })
+        # Extract query text from the message
+        query_text = ""
+        if query_message.get("content", {}).get("type") == "text":
+            query_text = query_message.get("content", {}).get("text", "")
         
-        response_content = answer["answer"]
-    else:
-        # No context available, use regular conversation flow
-        conversation_msgs = _convert_to_langchain_messages(messages)
-        ai_message = llm.invoke(conversation_msgs)
-        response_content = ai_message.content
+        # Get attachments content
+        query_attachments = []
+        file_ids = query_message.get("file_ids", [])
+        
+        for file_id in file_ids:
+            try:
+                from tools.database.file import get_file
+                file_data = get_file(file_id)
+                if file_data and "content" in file_data:
+                    query_attachments.append(f"[File: {file_data.get('filename', file_id)}]\n{file_data['content']}")
+            except Exception as e:
+                logger.error(f"Error retrieving file {file_id}: {str(e)}")
+        
+        query_context_text = "\n\n".join(query_attachments) if query_attachments else ""
+        
+        # Check if search is needed using search indicator
+        search_results_text = ""
+        try:
+            search_needs = detect_search_needs(query_text)
+            logger.info(f"Search indicator results: {search_needs}")
+            
+            # Modified condition: Check for tool key OR web_search key
+            if (search_needs and 
+                (search_needs.get("tool") or search_needs.get("web_search") or 
+                search_needs.get("videos") or search_needs.get("web_scrap"))):
+                
+                logger.info("Search is needed based on query analysis")
+                
+                # Get the search query - use web_search value if available, otherwise use original query
+                search_query = search_needs.get("web_search", query_text)
+                logger.info(f"Performing search with query: {search_query}")
+                
+                search_results_text = unified_search(search_query)
+                
+                # Check if search was successful and returned content
+                if search_results_text:
+                    logger.info(f"Retrieved search results: {len(search_results_text)} chars")
+                    logger.debug(f"Search results preview: {search_results_text[:500]}...")
+                    
+                    # Check if the results actually contain data or just the "No results found" message
+                    if len(search_results_text) > 100 and "No results found" not in search_results_text:
+                        # Add search results to query context
+                        if query_context_text:
+                            query_context_text += "\n\n" + search_results_text
+                        else:
+                            query_context_text = search_results_text
+                        
+                        logger.info("Successfully integrated search results into context")
+                    else:
+                        logger.warning(f"Search results too short or contain 'No results': {search_results_text}")
+                        if query_context_text:
+                            query_context_text += "\n\nNote: Searched for information but no relevant results were found."
+                else:
+                    logger.warning("Search returned empty results")
+                    if query_context_text:
+                        query_context_text += "\n\nNote: Attempted to search for information but no results were found."
+            else:
+                logger.info("No search needed based on query analysis")
+        except Exception as search_e:
+            logger.error(f"Error during search processing: {str(search_e)}")
+            logger.error(f"Search error traceback: {traceback.format_exc()}")
+            # Proceed without search results, but add a note about the failure
+            if query_context_text:
+                query_context_text += "\n\nNote: Attempted to search for additional information but encountered an error."
+            # Continue without search results
+        
+        # Retrieve local context from vector store
+        local_context_text = ""
+        try:
+            local_context_text = retrieve_relevant_context(
+                thread_id=thread_id, 
+                query_text=query_text,
+                namespace="files"
+            )
+            logger.info(f"Retrieved local context: {len(local_context_text)} chars")
+        except Exception as context_e:
+            logger.error(f"Error retrieving local context: {str(context_e)}")
+            # Proceed without local context
+        
+        # Ensure everything fits within token limits
+        try:
+            # DeepSeek Reasoner context window size
+            max_tokens = 64000
+            
+            query_text, query_context_text, local_context_text = build_llm_context(
+                query_text=query_text,
+                query_context=query_context_text,
+                local_context=local_context_text,
+                max_tokens=max_tokens,
+                provider="deepseek",
+                model="deepseek-reasoner",
+                use_summarization=True
+            )
+            logger.info("Successfully built context for LLM")
+        except Exception as token_e:
+            logger.error(f"Error building LLM context: {str(token_e)}")
+            logger.error(f"Context error traceback: {traceback.format_exc()}")
+            # Use what we have so far and proceed
+        
+        # Generate response from LLM
+        try:
+            response = generate_deepseek_chat_response(
+                query_text=query_text,
+                query_context_text=query_context_text,
+                local_context_text=local_context_text,
+                model_name=model_name
+            )
+            logger.debug(f"Generated response: {len(response)} chars")
+        except Exception as llm_e:
+            logger.error(f"Error generating response: {str(llm_e)}")
+            response = f"I apologize, but I encountered an error processing your request: {str(llm_e)}"
+        
+        # Store assistant's response
+        try:
+            # DeepSeek-specific vectorization configuration
+            embedding_model = {"type": "embed", "model": "gemini-embedding-exp-03-07"}
+            
+            response_message = store_assistant_response(
+                thread_id=thread_id, 
+                content=response, 
+                user_author=author,
+                embedding_model=embedding_model
+            )
+            logger.info(f"Stored assistant response as message ID: {response_message.get('message_id', 'unknown')}")
+        except Exception as store_e:
+            logger.error(f"Error storing assistant response: {str(store_e)}")
+            # Create a basic response object with minimal info if we couldn't store in DB
+            response_message = {
+                "message_id": f"temp-{uuid.uuid4()}",
+                "thread_id": thread_id,
+                "tokens_spent": 0,
+                "cost": 0.0
+            }
+        
+        # Return the final response
+        return {
+            "thread_id": thread_id,
+            "message_id": response_message.get("message_id", f"temp-{uuid.uuid4()}"),
+            "content": response,
+            "tokens_spent": response_message.get("tokens_spent", 0),
+            "cost": response_message.get("cost", 0.0)
+        }
     
-    # Store the assistant response
-    assistant_content_blocks = [{"type": "text", "text": response_content}]
-    assistant_content = {"blocks": assistant_content_blocks}
-    
-    created_msg = create_message(
-        thread_id=thread_id,
-        role="assistant",
-        content=assistant_content,
-        purpose="chat",
-        author={"name": "assistant", "id": model_name}
-    )
-    
-    # Return response with thread info
-    return {
-        "thread_id": thread_id,
-        "assistant_message": created_msg,
-        "context_used": bool(contexts)
-    }
+    except Exception as e:
+        # Catch-all for any unexpected errors
+        logger.error(f"Unexpected error in deepseek_reasoner_completion: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "error": "An unexpected error occurred processing your request",
+            "content": "I apologize, but I encountered an unexpected error processing your request. Please try again later."
+        }

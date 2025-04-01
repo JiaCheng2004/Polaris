@@ -24,3 +24,6 @@ google-genai
 together
 deepseek_tokenizer
 tiktoken
+langchain-linkup
+firecrawl-py
+youtube-transcript-api

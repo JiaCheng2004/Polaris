@@ -6,7 +6,7 @@ from google.genai.types import HttpOptions
 from tools.config.load import GOOGLE_API_KEY
 from tools.tokenizer import token_counter
 
-MAX_TOKEN_LIMIT = 1_000_000
+MAX_TOKEN_LIMIT = 1000000
 
 class Summarizer:
     def __init__(self):

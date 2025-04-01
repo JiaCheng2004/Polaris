@@ -7,5 +7,6 @@
     "default_chunk_overlap": 256,
     "P_A": 3,
     "P_B": 2,
-    "P_C": 1
+    "P_C": 1,
+    "search_preference": "tavily"
 }
