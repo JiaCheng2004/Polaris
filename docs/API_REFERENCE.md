@@ -1,7 +1,7 @@
 # Polaris API Reference
 
 > **Version:** 2.0
-> **Status:** Draft specification — no endpoints are implemented yet. This document describes the *target* HTTP surface defined by `BLUEPRINT.md` §6, §8, and §9. It is the contract that implementations must satisfy.
+> **Status:** Mixed. The Phase 1 HTTP surface is implemented: `GET /health`, `GET /ready`, `GET /v1/models`, `POST /v1/chat/completions`, and `GET /v1/usage`. The remaining sections describe the target later-phase endpoints and behavior from `BLUEPRINT.md`.
 > **Authority:** Per `BLUEPRINT.md` §18, every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
 
 ---
@@ -35,8 +35,8 @@
 - **Character encoding:** UTF-8.
 - **Timestamps:** Unix seconds (integer) in JSON bodies; ISO-8601 (`RFC 3339`) in log lines.
 - **Request IDs:** every response carries an `X-Request-ID` header. Clients may supply their own — the server propagates it if present, generates one otherwise.
-- **Failover marker:** responses served from a fallback provider carry an `X-Polaris-Fallback: <provider/model>` header indicating which fallback answered.
-- **OpenAI compatibility:** chat, embeddings, images, voice, and models endpoints are wire-compatible with the OpenAI SDK. Pointing an existing OpenAI client at `http://<polaris>/v1` should "just work" for these endpoints.
+- **Failover marker:** when failover is implemented in a later phase, responses served from a fallback provider carry an `X-Polaris-Fallback: <provider/model>` header indicating which fallback answered.
+- **OpenAI compatibility:** where an endpoint is implemented, Polaris follows the OpenAI wire shape where possible. In the current Phase 1 build, that applies to chat and models.
 
 ---
 
@@ -862,11 +862,11 @@ Response body:
   "status": "ready",
   "store": "ok",
   "cache": "ok",
-  "providers": 7
+  "providers": 2
 }
 ```
 
-On failure returns `503 Service Unavailable` with the same body shape, where failing components carry an error string instead of `"ok"`. **No auth.**
+`providers` is the number of registered providers in the current runtime build. On failure returns `503 Service Unavailable` with the same body shape, where failing components carry an error string instead of `"ok"`. **No auth.**
 
 ---
 
@@ -874,7 +874,7 @@ On failure returns `503 Service Unavailable` with the same body shape, where fai
 
 ### `GET /metrics`
 
-Prometheus text-format metrics. **No auth.** Exposed only when `observability.metrics.enabled: true` in `polaris.yaml`.
+Planned for a later phase. Prometheus text-format metrics will be exposed when `observability.metrics.enabled: true` and the metrics subsystem is implemented.
 
 Metric catalog (`BLUEPRINT.md` §13.2):
 
@@ -894,25 +894,25 @@ Metric catalog (`BLUEPRINT.md` §13.2):
 
 ## 16. Full Endpoint Map
 
-| Method | Path | Modality | Auth | Section |
-|---|---|---|---|---|
-| `POST` | `/v1/chat/completions` | chat | required | [§6](#6-chat) |
-| `POST` | `/v1/embeddings` | embed | required | [§7](#7-embeddings) |
-| `POST` | `/v1/images/generations` | image | required | [§8](#8-images) |
-| `POST` | `/v1/images/edits` | image | required | [§8](#8-images) |
-| `POST` | `/v1/video/generations` | video | required | [§9](#9-video) |
-| `GET` | `/v1/video/generations/:id` | video | required | [§9](#9-video) |
-| `DELETE` | `/v1/video/generations/:id` | video | required | [§9](#9-video) |
-| `POST` | `/v1/audio/speech` | voice (TTS) | required | [§10](#10-voice--tts--stt) |
-| `POST` | `/v1/audio/transcriptions` | voice (STT) | required | [§10](#10-voice--tts--stt) |
-| `GET` | `/v1/models` | — | required | [§11](#11-models) |
-| `GET` | `/v1/usage` | — | required | [§12](#12-usage) |
-| `POST` | `/v1/keys` | — | admin | [§13](#13-api-keys-admin) |
-| `GET` | `/v1/keys` | — | admin | [§13](#13-api-keys-admin) |
-| `DELETE` | `/v1/keys/:id` | — | admin | [§13](#13-api-keys-admin) |
-| `GET` | `/health` | — | none | [§14](#14-health--readiness) |
-| `GET` | `/ready` | — | none | [§14](#14-health--readiness) |
-| `GET` | `/metrics` | — | none | [§15](#15-metrics) |
+| Method | Path | Modality | Auth | Status | Section |
+|---|---|---|---|---|---|
+| `POST` | `/v1/chat/completions` | chat | required | implemented | [§6](#6-chat) |
+| `POST` | `/v1/embeddings` | embed | required | planned | [§7](#7-embeddings) |
+| `POST` | `/v1/images/generations` | image | required | planned | [§8](#8-images) |
+| `POST` | `/v1/images/edits` | image | required | planned | [§8](#8-images) |
+| `POST` | `/v1/video/generations` | video | required | planned | [§9](#9-video) |
+| `GET` | `/v1/video/generations/:id` | video | required | planned | [§9](#9-video) |
+| `DELETE` | `/v1/video/generations/:id` | video | required | planned | [§9](#9-video) |
+| `POST` | `/v1/audio/speech` | voice (TTS) | required | planned | [§10](#10-voice--tts--stt) |
+| `POST` | `/v1/audio/transcriptions` | voice (STT) | required | planned | [§10](#10-voice--tts--stt) |
+| `GET` | `/v1/models` | — | required | implemented | [§11](#11-models) |
+| `GET` | `/v1/usage` | — | required | implemented | [§12](#12-usage) |
+| `POST` | `/v1/keys` | — | admin | planned | [§13](#13-api-keys-admin) |
+| `GET` | `/v1/keys` | — | admin | planned | [§13](#13-api-keys-admin) |
+| `DELETE` | `/v1/keys/:id` | — | admin | planned | [§13](#13-api-keys-admin) |
+| `GET` | `/health` | — | none | implemented | [§14](#14-health--readiness) |
+| `GET` | `/ready` | — | none | implemented | [§14](#14-health--readiness) |
+| `GET` | `/metrics` | — | none | planned | [§15](#15-metrics) |
 
 ---
 

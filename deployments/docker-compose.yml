@@ -3,7 +3,6 @@ services:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
-    container_name: polaris
     ports:
       - "8080:8080"
     volumes:
@@ -28,7 +27,6 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    container_name: polaris-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-polaris}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polaris}
@@ -44,7 +42,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: polaris-redis
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data

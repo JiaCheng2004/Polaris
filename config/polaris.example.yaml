@@ -50,12 +50,12 @@ providers:
     models:
       gpt-4o:
         modality: chat
-        capabilities: [vision, function_calling, streaming, audio_input, audio_output]
+        capabilities: [vision, function_calling, streaming, json_mode, audio_input, audio_output]
         context_window: 128000
         max_output_tokens: 16384
       gpt-4o-mini:
         modality: chat
-        capabilities: [vision, function_calling, streaming]
+        capabilities: [vision, function_calling, streaming, json_mode]
         context_window: 128000
         max_output_tokens: 16384
       gpt-image-1:
@@ -96,12 +96,12 @@ providers:
     models:
       claude-opus-4-6:
         modality: chat
-        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        capabilities: [vision, function_calling, streaming, json_mode, pdf, extended_thinking]
         context_window: 200000
         max_output_tokens: 32000
       claude-sonnet-4-6:
         modality: chat
-        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        capabilities: [vision, function_calling, streaming, json_mode, pdf, extended_thinking]
         context_window: 200000
         max_output_tokens: 16000
 

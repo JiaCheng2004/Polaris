@@ -1,0 +1,19 @@
+services:
+  polaris:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    ports:
+      - "${POLARIS_PORT:-8080}:8080"
+    volumes:
+      - ../config/polaris.yaml:/etc/polaris/polaris.yaml:ro
+      - polarisdata:/var/lib/polaris
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      POLARIS_STORE_DSN: /var/lib/polaris/polaris.db
+    command: ["--config", "/etc/polaris/polaris.yaml"]
+    restart: unless-stopped
+
+volumes:
+  polarisdata:

@@ -7,12 +7,12 @@ The project is being rebuilt as Polaris v2. The old Python monolith and Discord-
 ## Status
 
 - Architecture: finalized
-- Repository bootstrap: initialized
-- Current implementation phase: Phase 1
-- Implemented code: placeholder scaffold only
+- Repository bootstrap: complete
+- Current implementation phase: Phase 1 complete
+- Implemented code: runtime kernel, OpenAI and Anthropic chat routing, usage logging, and Phase 1 HTTP surface
 - Source of truth: `BLUEPRINT.md`
 
-That means the repo now reflects the target monorepo shape, deployment topology, config surface, and documentation set, but the actual gateway behavior still needs to be implemented phase by phase.
+The repository now contains the full Phase 1 foundation from the blueprint: bootable server wiring, config loading and validation, SQLite storage, in-memory rate limiting, static auth, model registry, OpenAI and Anthropic chat adapters, usage logging, and the Phase 1 endpoints.
 
 ## What Polaris Is
 
@@ -85,18 +85,42 @@ scripts/                  helper entrypoints such as migration tooling
 tests/                    integration and e2e placeholders
 ```
 
-Some directories currently contain minimal placeholders so the repo shape is committed early without pretending the implementation already exists.
+Future-phase directories still contain placeholders where Phase 2+ provider or modality work has not started yet.
 
 ## Getting Started
 
-### Local scaffold verification
+### Developer commands
+
+The stable command surface for this repo is the `Makefile`. Treat it as the Go-repo equivalent of `npm run ...`.
+
+```bash
+make dev
+make build
+make test
+make lint
+make stack-up STACK=local
+make stack-logs STACK=local
+make stack-down STACK=local
+```
+
+The underlying implementation may change in later phases, but these command names should remain the main developer entrypoints.
+
+For container workflows:
+
+- `STACK=local`: current Phase 1 local runtime
+- `STACK=prod`: production-shaped Compose stack
+- `STACK=dev`: production-shaped stack plus Prometheus, Grafana, and pgAdmin
+
+This keeps the developer command surface stable while letting the underlying stack evolve phase by phase.
+
+### Phase 1 verification
 
 ```bash
 make build
 make test
 ```
 
-At this stage, that validates the repo bootstrap and minimal package structure. It does not mean the Polaris gateway is feature-complete yet.
+At this stage, that validates the implemented Phase 1 foundation. Later phases are still pending.
 
 ### Local single-binary development
 
@@ -111,17 +135,42 @@ Use the local config:
 - SQLite store
 - in-memory cache
 - permissive `auth.mode: none`
-- Phase 1 chat-provider references
+- OpenAI and Anthropic Phase 1 chat-provider references
 
 ### Docker and Compose
 
 Deployment assets live under [`deployments/`](./deployments).
 
 - [`deployments/Dockerfile`](./deployments/Dockerfile): target container image
+- [`deployments/docker-compose.local.yml`](./deployments/docker-compose.local.yml): current Phase 1 local stack using `config/polaris.yaml` with SQLite and in-memory cache
 - [`deployments/docker-compose.yml`](./deployments/docker-compose.yml): production-shaped placeholder stack with Polaris, PostgreSQL, and Redis
 - [`deployments/docker-compose.dev.yml`](./deployments/docker-compose.dev.yml): development stack with Prometheus, Grafana, and pgAdmin added
 
-These files are aligned to the target architecture and should be treated as bootstrap placeholders until the gateway implementation is further along.
+For the current local runtime, use the dedicated wrapper script:
+
+```bash
+cp .env.example .env
+./scripts/stack.sh up local
+./scripts/stack.sh logs local
+./scripts/stack.sh down local
+```
+
+Equivalent Make targets are available:
+
+```bash
+make stack-up STACK=local
+make stack-logs STACK=local
+make stack-down STACK=local
+```
+
+The production and dev Compose files are also addressable through the same interface:
+
+```bash
+make stack-config STACK=prod
+make stack-config STACK=dev
+```
+
+For local Compose usage, `.env.example` is the starting point for a developer `.env` file.
 
 ## Configuration
 

@@ -3,7 +3,6 @@ services:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
-    container_name: polaris-dev
     ports:
       - "8080:8080"
     volumes:
@@ -28,7 +27,6 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    container_name: polaris-dev-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-polaris}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polaris}
@@ -44,7 +42,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: polaris-dev-redis
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data
@@ -57,7 +54,6 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.2.1
-    container_name: polaris-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -69,7 +65,6 @@ services:
 
   grafana:
     image: grafana/grafana:11.6.0
-    container_name: polaris-grafana
     ports:
       - "3000:3000"
     environment:
@@ -86,7 +81,6 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:9.2
-    container_name: polaris-pgadmin
     ports:
       - "5050:80"
     environment:
