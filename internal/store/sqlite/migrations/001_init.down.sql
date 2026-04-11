@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS request_logs;
+DROP TABLE IF EXISTS api_keys;

@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Polaris Postgres",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "polaris",
+      "Username": "polaris",
+      "SSLMode": "prefer"
+    }
+  }
+}

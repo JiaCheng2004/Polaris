@@ -1,0 +1,257 @@
+# Polaris full reference config.
+# Copy this file and tailor it for a real deployment. Secrets must stay in the
+# environment and should never be committed here as literals.
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 120s
+  shutdown_timeout: 15s
+
+auth:
+  mode: static
+  static_keys:
+    - name: default
+      key_hash: "sha256:replace-me"
+      rate_limit: 100/min
+      allowed_models: ["*"]
+  admin_key_hash: "sha256:replace-me"
+
+store:
+  driver: postgres
+  dsn: ${DATABASE_URL}
+  max_connections: 20
+  log_retention_days: 90
+  log_buffer_size: 1000
+  log_flush_interval: 5s
+
+cache:
+  driver: redis
+  rate_limit:
+    enabled: true
+    default: 60/min
+    window: sliding
+  response_cache:
+    enabled: false
+    ttl: 24h
+    max_entries_per_model: 100
+    similarity_threshold: 0.95
+
+providers:
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    timeout: 60s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      gpt-4o:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, audio_input, audio_output]
+        context_window: 128000
+        max_output_tokens: 16384
+      gpt-4o-mini:
+        modality: chat
+        capabilities: [vision, function_calling, streaming]
+        context_window: 128000
+        max_output_tokens: 16384
+      gpt-image-1:
+        modality: image
+        capabilities: [generation, editing]
+        output_formats: [png, webp]
+      dall-e-3:
+        modality: image
+        capabilities: [generation]
+        output_formats: [png]
+      tts-1:
+        modality: voice
+        capabilities: [tts]
+        voices: [alloy, echo, fable, onyx, nova, shimmer]
+      tts-1-hd:
+        modality: voice
+        capabilities: [tts]
+        voices: [alloy, echo, fable, onyx, nova, shimmer]
+      whisper-1:
+        modality: voice
+        capabilities: [stt]
+        formats: [mp3, mp4, mpeg, mpga, m4a, wav, webm]
+      text-embedding-3-small:
+        modality: embed
+        dimensions: 1536
+      text-embedding-3-large:
+        modality: embed
+        dimensions: 3072
+
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    base_url: https://api.anthropic.com
+    timeout: 120s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      claude-opus-4-6:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        context_window: 200000
+        max_output_tokens: 32000
+      claude-sonnet-4-6:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        context_window: 200000
+        max_output_tokens: 16000
+
+  google:
+    api_key: ${GOOGLE_API_KEY}
+    base_url: https://generativelanguage.googleapis.com
+    timeout: 60s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      gemini-2.5-pro:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, audio_input, video_input]
+        context_window: 1048576
+      gemini-2.5-flash:
+        modality: chat
+        capabilities: [vision, function_calling, streaming]
+        context_window: 1048576
+      gemini-2.5-flash-lite:
+        modality: chat
+        capabilities: [vision, streaming]
+        context_window: 1048576
+      nano-banana-2:
+        modality: image
+        capabilities: [generation, editing]
+        output_formats: [png, jpeg]
+      nano-banana-pro:
+        modality: image
+        capabilities: [generation, editing, multi_reference]
+        output_formats: [png, jpeg]
+      gemini-embedding:
+        modality: embed
+        dimensions: 768
+
+  deepseek:
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com/v1
+    timeout: 120s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      deepseek-chat:
+        modality: chat
+        capabilities: [function_calling, streaming]
+        context_window: 64000
+      deepseek-reasoner:
+        modality: chat
+        capabilities: [streaming, reasoning]
+        context_window: 64000
+
+  bytedance:
+    access_key: ${VOLCENGINE_ACCESS_KEY_ID}
+    secret_key: ${VOLCENGINE_SECRET_ACCESS_KEY}
+    timeout: 120s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 2s
+    models:
+      doubao-pro-256k:
+        modality: chat
+        capabilities: [function_calling, streaming]
+        context_window: 256000
+        endpoint: https://ark.cn-beijing.volces.com/api/v3
+      doubao-tts:
+        modality: voice
+        capabilities: [tts, voice_cloning]
+        endpoint: https://openspeech.bytedance.com/api/v1/tts
+      seedance-2.0:
+        modality: video
+        capabilities: [text_to_video, image_to_video, reference_images, native_audio]
+        max_duration: 15
+        resolutions: [720p, 1080p]
+        endpoint: https://ark.cn-beijing.volces.com/api/v3
+      seedance-2.0-fast:
+        modality: video
+        capabilities: [text_to_video, image_to_video, reference_images, native_audio]
+        max_duration: 15
+        resolutions: [720p]
+        endpoint: https://ark.cn-beijing.volces.com/api/v3
+      seedream-4.5:
+        modality: image
+        capabilities: [generation, editing, multi_reference]
+        output_formats: [png, jpeg]
+        endpoint: https://ark.cn-beijing.volces.com/api/v3
+
+  xai:
+    api_key: ${XAI_API_KEY}
+    base_url: https://api.x.ai/v1
+    timeout: 60s
+    models:
+      grok-3:
+        modality: chat
+        capabilities: [vision, function_calling, streaming]
+        context_window: 131072
+
+  qwen:
+    api_key: ${DASHSCOPE_API_KEY}
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    timeout: 60s
+    models:
+      qwen-max:
+        modality: chat
+        capabilities: [vision, function_calling, streaming]
+        context_window: 131072
+      qwen3.5-flash:
+        modality: chat
+        capabilities: [function_calling, streaming]
+        context_window: 1000000
+      qwen-image-2.0:
+        modality: image
+        capabilities: [generation, editing]
+        output_formats: [png]
+
+  ollama:
+    base_url: http://localhost:11434
+    timeout: 300s
+    models:
+      llama3:
+        modality: chat
+        capabilities: [streaming]
+        context_window: 8192
+
+routing:
+  fallbacks:
+    - from: anthropic/claude-sonnet-4-6
+      to: [openai/gpt-4o, deepseek/deepseek-chat]
+      on: [rate_limit, timeout, server_error]
+    - from: openai/gpt-4o
+      to: [anthropic/claude-sonnet-4-6, deepseek/deepseek-chat]
+      on: [rate_limit, timeout, server_error]
+  aliases:
+    default-chat: openai/gpt-4o
+    budget-chat: deepseek/deepseek-chat
+    premium-chat: anthropic/claude-opus-4-6
+    default-image: google/nano-banana-pro
+    default-video: bytedance/seedance-2.0
+    fast-video: bytedance/seedance-2.0-fast
+    default-voice-tts: openai/tts-1
+    default-voice-stt: openai/whisper-1
+    default-embed: openai/text-embedding-3-small
+
+observability:
+  metrics:
+    enabled: true
+    path: /metrics
+  logging:
+    level: info
+    format: json

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.2"
+
+      - name: Run gofmt check
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run tests
+        run: go test -race ./...
+
+      - name: Build binary
+        run: go build ./cmd/polaris
+
+      - name: Validate Docker build
+        run: docker build -f deployments/Dockerfile .

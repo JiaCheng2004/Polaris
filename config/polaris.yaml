@@ -1,0 +1,96 @@
+# Polaris local development config.
+# This file is intended for single-binary, zero-dependency startup while
+# Phase 1 is being implemented.
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 120s
+  shutdown_timeout: 15s
+
+auth:
+  mode: none
+  static_keys: []
+  admin_key_hash: ""
+
+store:
+  driver: sqlite
+  dsn: ./polaris.db
+  max_connections: 1
+  log_retention_days: 30
+  log_buffer_size: 1000
+  log_flush_interval: 5s
+
+cache:
+  driver: memory
+  rate_limit:
+    enabled: true
+    default: 60/min
+    window: sliding
+  response_cache:
+    enabled: false
+    ttl: 24h
+    max_entries_per_model: 100
+    similarity_threshold: 0.95
+
+providers:
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    timeout: 60s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      gpt-4o:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, audio_input, audio_output]
+        context_window: 128000
+        max_output_tokens: 16384
+      gpt-4o-mini:
+        modality: chat
+        capabilities: [vision, function_calling, streaming]
+        context_window: 128000
+        max_output_tokens: 16384
+
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    base_url: https://api.anthropic.com
+    timeout: 120s
+    retry:
+      max_attempts: 3
+      backoff: exponential
+      initial_delay: 1s
+    models:
+      claude-opus-4-6:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        context_window: 200000
+        max_output_tokens: 32000
+      claude-sonnet-4-6:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, pdf, extended_thinking]
+        context_window: 200000
+        max_output_tokens: 16000
+
+routing:
+  fallbacks:
+    - from: anthropic/claude-sonnet-4-6
+      to: [openai/gpt-4o]
+      on: [rate_limit, timeout, server_error]
+    - from: openai/gpt-4o
+      to: [anthropic/claude-sonnet-4-6]
+      on: [rate_limit, timeout, server_error]
+  aliases:
+    default-chat: openai/gpt-4o
+    premium-chat: anthropic/claude-opus-4-6
+
+observability:
+  metrics:
+    enabled: true
+    path: /metrics
+  logging:
+    level: info
+    format: json
