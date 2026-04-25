@@ -9,7 +9,7 @@ GOLANGCI_LINT ?= go run $(GOLANGCI_LINT_MODULE)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test lint migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in load-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test lint migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in load-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -28,6 +28,7 @@ help:
 	@printf "  make live-smoke-strict  Run strict live smoke for release-blocking models\n"
 	@printf "  make live-smoke-opt-in  Run live smoke including opt-in models\n"
 	@printf "  make load-check     Run env-gated load validation with SQLite + memory cache\n"
+	@printf "  make contract-check Validate OpenAPI route coverage and golden HTTP fixtures\n"
 	@printf "  make release-check  Run the current repo-local release validation gate\n"
 	@printf "  make stack-up       Start Docker stack STACK=%s\n" "$(STACK)"
 	@printf "  make stack-down     Stop Docker stack STACK=%s\n" "$(STACK)"
@@ -80,6 +81,9 @@ live-smoke-opt-in:
 load-check:
 	POLARIS_LOAD_CHECK=1 go test -count=1 -timeout $(LOAD_CHECK_TIMEOUT) ./tests/e2e -run TestLoadCheckMatrix
 
+contract-check:
+	go test -count=1 ./tests/contract
+
 fmt-check:
 	test -z "$$(gofmt -l .)"
 
@@ -91,6 +95,7 @@ release-check:
 	$(MAKE) lint
 	$(MAKE) panic-scan
 	$(MAKE) verify-models CONFIG=$(CONFIG)
+	$(MAKE) contract-check
 	go test -race ./...
 	$(MAKE) build
 	$(MAKE) stack-validate STACK=local

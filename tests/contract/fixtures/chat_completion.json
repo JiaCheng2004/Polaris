@@ -1,0 +1,22 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "contract ok",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1744329600,
+  "id": "chatcmpl-contract",
+  "model": "openai/gpt-4o",
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 3,
+    "prompt_tokens": 4,
+    "source": "provider_reported",
+    "total_tokens": 7
+  }
+}

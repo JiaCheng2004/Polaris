@@ -117,7 +117,10 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 	v1.POST("/audio/sessions", audioHandler.Create)
 
 	control := v1.Group("")
-	control.Use(middleware.ControlPlaneAdmin(deps.Runtime))
+	control.Use(
+		middleware.ControlPlaneEnabled(deps.Runtime),
+		middleware.ControlPlaneAdmin(deps.Runtime),
+	)
 	control.POST("/projects", controlPlaneHandler.CreateProject)
 	control.GET("/projects", controlPlaneHandler.ListProjects)
 	control.POST("/virtual_keys", controlPlaneHandler.CreateVirtualKey)

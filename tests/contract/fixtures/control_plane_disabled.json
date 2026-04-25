@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "control_plane_disabled",
+    "message": "Control-plane management endpoints are disabled.",
+    "type": "invalid_request_error"
+  }
+}

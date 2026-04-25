@@ -230,7 +230,7 @@ Preferred auth mode for production is `virtual_keys`. In that mode:
 
 - bearer tokens are Polaris virtual keys stored in the database
 - `auth.bootstrap_admin_key_hash` is required when `auth.mode: virtual_keys`
-- the bootstrap admin key can manage control-plane endpoints, but it is not valid for inference endpoints
+- the bootstrap admin key can manage control-plane endpoints only when `control_plane.enabled: true`, but it is not valid for inference endpoints
 - project policies gate models, modalities, toolsets, and MCP bindings
 - hard budgets can block requests once the current budget window is already exceeded
 
@@ -243,7 +243,7 @@ Preferred auth mode for embedding Polaris behind another platform is `external`.
 
 `auth.mode: multi-user` remains as a compatibility path for older database-backed key rows and the legacy `/v1/keys` surface.
 
-When `control_plane.enabled` is true, Polaris exposes:
+When `control_plane.enabled` is true, Polaris exposes the database-backed control-plane management routes:
 
 - `/v1/projects`
 - `/v1/virtual_keys`
@@ -254,6 +254,8 @@ When `control_plane.enabled` is true, Polaris exposes:
 - `/v1/mcp/bindings`
 
 `/v1/keys` remains implemented as a compatibility facade. In `virtual_keys` mode it issues Polaris virtual keys with the legacy response shape; in `multi-user` mode it still uses the older `api_keys` rows.
+
+When `control_plane.enabled` is false, those management routes return `404 invalid_request_error / control_plane_disabled` even for admin callers. The `/mcp/:binding_id` broker surface is separate and remains governed by `mcp.enabled`, auth, and project/key policy.
 
 When `tools.enabled` is true, local tool implementations registered in `tools.local` can be attached to toolsets and exposed through MCP bindings. Polaris does not upload arbitrary code; it only executes implementations already registered in the runtime.
 
@@ -451,4 +453,4 @@ Use these during the `v2.1.0` release close-out:
 
 `make release-check` uses `stack-validate`, not `stack-config`, so shared CI logs do not print environment-expanded Compose configuration. Run `stack-config` only when you intentionally need a local rendered config.
 
-The live-smoke targets default `LIVE_SMOKE_TIMEOUT` to `45m`; override it only when running a deliberately smaller provider slice. Provider quota, billing, and entitlement failures are real validation results for release-blocking provider paths, but the default open-source contributor gate does not require a production Postgres/Redis load environment.
+The live-smoke targets default `LIVE_SMOKE_TIMEOUT` to `45m`; override it only when running a deliberately smaller provider slice. Provider credential, quota, billing, and entitlement failures are manual blockers for claiming live-provider proof on the affected provider paths, but they are not repo-local implementation blockers. The default open-source contributor gate does not require a production Postgres/Redis load environment.

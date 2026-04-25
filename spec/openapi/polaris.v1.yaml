@@ -1,0 +1,290 @@
+openapi: 3.1.0
+info:
+  title: Polaris API
+  version: 2.1.0
+  summary: Machine-readable contract for the Polaris HTTP gateway.
+  description: |
+    This file is the CI-checkable public HTTP contract for Polaris.
+    docs/API_REFERENCE.md remains the human-readable companion.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: health
+  - name: mcp
+  - name: gateway
+  - name: control-plane
+paths:
+  /health:
+    get: {operationId: healthLiveness, tags: [health], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
+  /ready:
+    get: {operationId: healthReadiness, tags: [health], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
+  /metrics:
+    get: {operationId: prometheusMetrics, tags: [health], responses: {"200": {description: Prometheus metrics, content: {text/plain: {schema: {type: string}}}}}}
+
+  /mcp/{binding_id}:
+    get: {operationId: mcpGetBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: mcpPostBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    put: {operationId: mcpPutBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    patch: {operationId: mcpPatchBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    head: {operationId: mcpHeadBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {description: OK}, default: {description: Error}}}
+    options: {operationId: mcpOptionsBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {description: OK}, default: {description: Error}}}
+    delete: {operationId: mcpDeleteBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    trace: {operationId: mcpTraceBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /mcp/{binding_id}/{path}:
+    get: {operationId: mcpGetBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: mcpPostBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    put: {operationId: mcpPutBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    patch: {operationId: mcpPatchBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    head: {operationId: mcpHeadBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {description: OK}, default: {description: Error}}}
+    options: {operationId: mcpOptionsBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {description: OK}, default: {description: Error}}}
+    delete: {operationId: mcpDeleteBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    trace: {operationId: mcpTraceBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/models:
+    get: {operationId: listModels, tags: [gateway], responses: {"200": {description: Model list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/usage:
+    get: {operationId: getUsage, tags: [gateway], responses: {"200": {description: Usage report, content: {application/json: {schema: {$ref: "#/components/schemas/UsageReport"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/chat/completions:
+    post: {operationId: createChatCompletion, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Chat completion, content: {application/json: {schema: {$ref: "#/components/schemas/ChatCompletion"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/responses:
+    post: {operationId: createResponse, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/messages:
+    post: {operationId: createMessage, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/embeddings:
+    post: {operationId: createEmbedding, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/tokens/count:
+    post: {operationId: countTokens, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/translations:
+    post: {operationId: createTranslation, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/images/generations:
+    post: {operationId: createImageGeneration, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/images/edits:
+    post: {operationId: createImageEdit, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/Multipart"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/video/generations:
+    post: {operationId: createVideoGeneration, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Video job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/video/generations/{id}:
+    get: {operationId: getVideoGeneration, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Video status, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: cancelVideoGeneration, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/video/generations/{id}/content:
+    get: {operationId: getVideoContent, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Binary video content}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/audio/speech:
+    post: {operationId: createSpeech, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Audio bytes}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/transcriptions:
+    post: {operationId: createTranscription, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/Multipart"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/transcriptions/stream:
+    post: {operationId: createStreamingTranscriptionSession, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Streaming transcription session, content: {application/json: {schema: {$ref: "#/components/schemas/SessionDescriptor"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/transcriptions/stream/{id}/ws:
+    get: {operationId: streamingTranscriptionWebSocket, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"101": {description: WebSocket upgrade}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/sessions:
+    post: {operationId: createAudioSession, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Audio session, content: {application/json: {schema: {$ref: "#/components/schemas/SessionDescriptor"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/sessions/{id}/ws:
+    get: {operationId: audioSessionWebSocket, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"101": {description: WebSocket upgrade}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/interpreting/sessions:
+    post: {operationId: createInterpretingSession, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Interpreting session, content: {application/json: {schema: {$ref: "#/components/schemas/SessionDescriptor"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/interpreting/sessions/{id}/ws:
+    get: {operationId: interpretingWebSocket, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"101": {description: WebSocket upgrade}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/notes:
+    post: {operationId: createAudioNote, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Audio note job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/notes/{id}:
+    get: {operationId: getAudioNote, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: deleteAudioNote, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/podcasts:
+    post: {operationId: createPodcast, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Podcast job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/podcasts/{id}:
+    get: {operationId: getPodcast, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: cancelPodcast, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/audio/podcasts/{id}/content:
+    get: {operationId: getPodcastContent, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Podcast audio content}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/music/generations:
+    post: {operationId: createMusicGeneration, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/edits:
+    post: {operationId: createMusicEdit, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/Multipart"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/stems:
+    post: {operationId: createMusicStems, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/lyrics:
+    post: {operationId: createLyrics, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/plans:
+    post: {operationId: createMusicPlan, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/jobs/{id}:
+    get: {operationId: getMusicJob, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Music job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: cancelMusicJob, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/music/jobs/{id}/content:
+    get: {operationId: getMusicJobContent, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Music content}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/voices:
+    get: {operationId: listVoices, tags: [gateway], responses: {"200": {description: Voice list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/{id}:
+    get: {operationId: getVoice, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: deleteVoiceProviderSide, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/{id}/archive:
+    post: {operationId: archiveVoice, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/{id}/unarchive:
+    post: {operationId: unarchiveVoice, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/{id}/retrain:
+    post: {operationId: retrainVoice, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/{id}/activate:
+    post: {operationId: activateVoice, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/clones:
+    post: {operationId: createVoiceClone, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/voices/designs:
+    post: {operationId: createVoiceDesign, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+
+  /v1/keys:
+    get: {operationId: listLegacyKeys, tags: [control-plane], responses: {"200": {description: Key list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createLegacyKey, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/keys/{id}:
+    delete: {operationId: deleteLegacyKey, tags: [control-plane], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/projects:
+    get: {operationId: listProjects, tags: [control-plane], responses: {"200": {description: Project list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createProject, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Project, content: {application/json: {schema: {$ref: "#/components/schemas/Project"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/virtual_keys:
+    get: {operationId: listVirtualKeys, tags: [control-plane], responses: {"200": {description: Virtual key list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createVirtualKey, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/virtual_keys/{id}:
+    delete: {operationId: deleteVirtualKey, tags: [control-plane], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/policies:
+    get: {operationId: listPolicies, tags: [control-plane], responses: {"200": {description: Policy list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createPolicy, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/budgets:
+    get: {operationId: listBudgets, tags: [control-plane], responses: {"200": {description: Budget list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createBudget, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/tools:
+    get: {operationId: listTools, tags: [control-plane], responses: {"200": {description: Tool list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createTool, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/toolsets:
+    get: {operationId: listToolsets, tags: [control-plane], responses: {"200": {description: Toolset list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createToolset, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/mcp/bindings:
+    get: {operationId: listMCPBindings, tags: [control-plane], responses: {"200": {description: MCP binding list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createMCPBinding, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+    BindingID:
+      name: binding_id
+      in: path
+      required: true
+      schema: {type: string}
+    WildcardPath:
+      name: path
+      in: path
+      required: true
+      schema: {type: string}
+  requestBodies:
+    JSON:
+      required: true
+      content:
+        application/json:
+          schema: {type: object}
+    Multipart:
+      required: true
+      content:
+        multipart/form-data:
+          schema: {type: object}
+  responses:
+    JSONOK:
+      description: JSON response
+      content:
+        application/json:
+          schema: {type: object}
+    Error:
+      description: Polaris error envelope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [message, type]
+          additionalProperties: false
+          properties:
+            message: {type: string}
+            type: {type: string}
+            code: {type: string}
+            param: {type: string}
+    Usage:
+      type: object
+      required: [prompt_tokens, completion_tokens, total_tokens]
+      properties:
+        prompt_tokens: {type: integer}
+        completion_tokens: {type: integer}
+        total_tokens: {type: integer}
+        source:
+          type: string
+          enum: [provider_reported, estimated, unavailable]
+    Routing:
+      type: object
+      properties:
+        providers: {type: array, items: {type: string}}
+        exclude_providers: {type: array, items: {type: string}}
+        prefer_cost: {type: string}
+        prefer_latency: {type: string}
+    ListResponse:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items: {}
+    ChatCompletion:
+      type: object
+      required: [id, object, created, model, choices, usage]
+      properties:
+        id: {type: string}
+        object: {type: string}
+        created: {type: integer}
+        model: {type: string}
+        choices: {type: array, items: {type: object}}
+        usage:
+          $ref: "#/components/schemas/Usage"
+    AsyncJob:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string}
+        job_id: {type: string}
+        status: {type: string}
+        model: {type: string}
+        provider: {type: string}
+    SessionDescriptor:
+      type: object
+      required: [id, client_secret]
+      properties:
+        id: {type: string}
+        client_secret: {type: string}
+        websocket_url: {type: string}
+        expires_at: {type: string}
+    Project:
+      type: object
+      required: [id, name, created_at]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        description: {type: string}
+        created_at: {type: string}
+        archived_at: {type: string}
+    UsageReport:
+      type: object
+      required: [total_requests, total_tokens, total_cost]
+      properties:
+        total_requests: {type: integer}
+        total_tokens: {type: integer}
+        total_cost: {type: number}

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "budget_exceeded",
+    "message": "Project hard budget has been exceeded.",
+    "type": "budget_exceeded"
+  }
+}

@@ -33,6 +33,21 @@ func ControlPlaneAdmin(runtime *gwruntime.Holder) gin.HandlerFunc {
 	}
 }
 
+func ControlPlaneEnabled(runtime *gwruntime.Holder) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		snapshot := RuntimeSnapshot(c, runtime)
+		if snapshot == nil || snapshot.Config == nil {
+			httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "runtime_unavailable", "", "Runtime configuration is unavailable."))
+			return
+		}
+		if !snapshot.Config.ControlPlane.Enabled {
+			httputil.WriteError(c, httputil.NewError(http.StatusNotFound, "invalid_request_error", "control_plane_disabled", "", "Control-plane management endpoints are disabled."))
+			return
+		}
+		c.Next()
+	}
+}
+
 func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.Recorder, auditLogger *store.AsyncAuditLogger, logger *slog.Logger) gin.HandlerFunc {
 	if logger == nil {
 		logger = slog.Default()
@@ -125,7 +140,7 @@ func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.R
 					CreatedAt:    time.Now().UTC(),
 				})
 			}
-			httputil.WriteError(c, httputil.NewError(http.StatusForbidden, "permission_error", "budget_exceeded", "", "Project hard budget has been exceeded."))
+			httputil.WriteError(c, httputil.NewError(http.StatusTooManyRequests, "budget_exceeded", "budget_exceeded", "", "Project hard budget has been exceeded."))
 			return
 		}
 		c.Next()

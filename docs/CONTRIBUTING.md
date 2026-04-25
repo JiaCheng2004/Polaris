@@ -6,7 +6,7 @@ Read these files before making non-trivial changes:
 
 1. `BLUEPRINT.md`
 2. `CLAUDE.md`
-3. `docs/API_REFERENCE.md` if your work touches HTTP behavior
+3. `docs/API_REFERENCE.md` and `spec/openapi/polaris.v1.yaml` if your work touches HTTP behavior
 
 The blueprint is the source of truth. If a local file disagrees with it, the blueprint wins.
 
@@ -30,7 +30,7 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 ## PR Expectations
 
 - Keep PRs narrow.
-- If you change an endpoint, update `docs/API_REFERENCE.md` in the same PR.
+- If you change an endpoint, update `docs/API_REFERENCE.md`, `spec/openapi/polaris.v1.yaml`, and relevant contract fixtures in the same PR.
 - If you change config schema, update `docs/CONFIGURATION.md`.
 - If you add or change a provider, update `docs/PROVIDERS.md`.
 - If you change the SDK surface, update `README.md`.
@@ -39,6 +39,7 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 ## Testing Expectations
 
 - Use `go test -race ./...` as the default test baseline.
+- Use `make contract-check` after endpoint, route, error envelope, or stable response-shape changes.
 - Use `make release-check` for the repo-local close-out gate.
 - Use `make stack-validate STACK=<name>` for CI-safe Compose validation; reserve `make stack-config STACK=<name>` for local rendered-config debugging.
 - Use `make live-smoke` for the env-gated real-provider matrix when working on shipped provider paths.

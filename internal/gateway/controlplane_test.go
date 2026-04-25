@@ -96,6 +96,105 @@ func TestVirtualKeyControlPlaneAndLocalMCP(t *testing.T) {
 	}
 }
 
+func TestControlPlaneDisabledHidesManagementEndpoints(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Auth.Mode = config.AuthModeVirtualKeys
+	cfg.Auth.BootstrapAdminKeyHash = middleware.HashAPIKey("bootstrap-secret")
+	cfg.ControlPlane.Enabled = false
+
+	sqliteStore := testSQLiteStore(t)
+	registry, warnings, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no registry warnings, got %v", warnings)
+	}
+
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    sqliteStore,
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewBufferString(`{"name":"Acme"}`))
+	req.Header.Set("Authorization", "Bearer bootstrap-secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected disabled control plane 404, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !bytes.Contains(res.Body.Bytes(), []byte(`"control_plane_disabled"`)) {
+		t.Fatalf("expected control_plane_disabled error, got %s", res.Body.String())
+	}
+}
+
+func TestControlPlaneEnabledRequiresAdmin(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Auth.Mode = config.AuthModeVirtualKeys
+	cfg.Auth.BootstrapAdminKeyHash = middleware.HashAPIKey("bootstrap-secret")
+	cfg.ControlPlane.Enabled = true
+
+	sqliteStore := testSQLiteStore(t)
+	project := store.Project{
+		ID:        "proj_user",
+		Name:      "User Test",
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := sqliteStore.CreateProject(context.Background(), project); err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+	userRaw := "vk-user-secret"
+	if err := sqliteStore.CreateVirtualKey(context.Background(), store.VirtualKey{
+		ID:            "vk_user",
+		ProjectID:     project.ID,
+		Name:          "user-key",
+		KeyHash:       middleware.HashAPIKey(userRaw),
+		KeyPrefix:     "polaris-",
+		AllowedModels: []string{"*"},
+		CreatedAt:     time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateVirtualKey() error = %v", err)
+	}
+
+	registry, warnings, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no registry warnings, got %v", warnings)
+	}
+
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    sqliteStore,
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", bytes.NewBufferString(`{"name":"Acme"}`))
+	req.Header.Set("Authorization", "Bearer "+userRaw)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected non-admin control plane 403, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !bytes.Contains(res.Body.Bytes(), []byte(`"admin_required"`)) {
+		t.Fatalf("expected admin_required error, got %s", res.Body.String())
+	}
+}
+
 func TestVirtualKeyHardBudgetBlocksInferenceRequest(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Auth.Mode = config.AuthModeVirtualKeys
@@ -170,10 +269,11 @@ func TestVirtualKeyHardBudgetBlocksInferenceRequest(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+virtualKeyRaw)
 	res := httptest.NewRecorder()
 	engine.ServeHTTP(res, req)
-	if res.Code != http.StatusForbidden {
-		t.Fatalf("expected budget denial 403, got %d body=%s", res.Code, res.Body.String())
+	if res.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected budget denial 429, got %d body=%s", res.Code, res.Body.String())
 	}
-	if !bytes.Contains(res.Body.Bytes(), []byte(`"budget_exceeded"`)) {
+	if !bytes.Contains(res.Body.Bytes(), []byte(`"type":"budget_exceeded"`)) ||
+		!bytes.Contains(res.Body.Bytes(), []byte(`"code":"budget_exceeded"`)) {
 		t.Fatalf("expected budget_exceeded error, got %s", res.Body.String())
 	}
 }

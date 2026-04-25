@@ -1,7 +1,7 @@
 # Polaris API Reference
 
 > **Version:** 2.1.0
-> **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. The current repo state is a `v2.1.0` close-out candidate; final release is blocked on worktree consolidation and the final open-source readiness pass. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
+> **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. The current repo state is a `v2.1.0` close-out candidate; worktree consolidation and source-of-truth alignment are complete, and final release readiness is gated by repo-local validation plus live-provider proof where credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
 > **Authority:** Per `BLUEPRINT.md` §18, every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
 
 ---
@@ -41,6 +41,7 @@
 - **Failover marker:** responses served from a fallback provider carry an `X-Polaris-Fallback: <provider/model>` header indicating which fallback answered.
 - **Cache marker:** cache-aware synchronous endpoints may carry `X-Polaris-Cache: hit`, `miss`, or `bypass`.
 - **OpenAI compatibility:** where an endpoint is implemented, Polaris follows the OpenAI wire shape where possible. In the current build, that applies to chat, models, and the OpenAI-style administrative error envelope.
+- **Machine-readable contract:** [`spec/openapi/polaris.v1.yaml`](../spec/openapi/polaris.v1.yaml) is the OpenAPI companion for this human reference. Endpoint changes must keep the implementation, this file, the OpenAPI spec, and contract fixtures in sync.
 
 ---
 
@@ -102,7 +103,7 @@ Example claims before base64url encoding:
 }
 ```
 
-Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, `/v1/mcp/bindings`) require admin access:
+Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, `/v1/mcp/bindings`) require `control_plane.enabled: true` and admin access:
 
 - in `auth.mode: virtual_keys`, use either the configured bootstrap admin key or a virtual key with `is_admin: true`
 - in `auth.mode: external`, set `is_admin: true` in the signed claims from the trusted upstream platform
@@ -124,7 +125,7 @@ Per `BLUEPRINT.md` §19:
 | Missing or invalid external auth headers | 401 | `authentication_error` | `missing_external_auth` / `invalid_external_auth_signature` / `external_auth_timestamp_expired` / `external_auth_claims_expired` |
 | Key valid but not permitted to use the requested model | 403 | `permission_error` | `model_not_allowed` |
 | Key valid but not permitted to use the requested modality/toolset/MCP binding | 403 | `permission_error` | `modality_not_allowed` / `toolset_not_allowed` / `mcp_binding_not_allowed` |
-| Hard budget already exceeded for the current project | 403 | `permission_error` | `budget_exceeded` |
+| Hard budget already exceeded for the current project | 429 | `budget_exceeded` | `budget_exceeded` |
 | Admin endpoint called without admin key | 403 | `permission_error` | `admin_required` |
 
 ---
@@ -221,6 +222,7 @@ Fields:
 | `permission_error` | 403 | Key is valid but not permitted to use the requested model or admin endpoint. |
 | `model_not_found` | 404 | Alias or `provider/model` is not registered. |
 | `rate_limit_error` | 429 | Request would exceed the key's rate limit. Response carries `Retry-After` and `X-RateLimit-Remaining`. |
+| `budget_exceeded` | 429 | Project hard budget has already been exceeded for this request window. |
 | `provider_error` | 502 | Upstream provider returned an error or malformed response. |
 | `timeout_error` | 504 | Upstream provider exceeded the configured timeout. |
 | `internal_error` | 500 | Unhandled server-side error. The `X-Request-ID` should accompany any bug report. |
@@ -1894,7 +1896,7 @@ curl "http://localhost:8080/v1/usage?from=2026-04-01T00:00:00Z&group_by=model" \
 
 ## 14. Control Plane & API Keys
 
-The control-plane surface is implemented and admin-only. Use it in `auth.mode: virtual_keys`; `/v1/keys` remains available as a compatibility facade.
+The control-plane management surface is implemented, admin-only, and exposed only when `control_plane.enabled: true`. Use it in `auth.mode: virtual_keys` or `auth.mode: external`; `/v1/keys` remains available as a compatibility facade.
 
 ### `POST /v1/projects`, `GET /v1/projects`
 
@@ -1988,7 +1990,7 @@ Budgets attach request or estimated-cost limits to a project.
 - `limit_requests` optional
 - `window` optional, defaults to `monthly`
 
-Hard budgets can block requests with `403 permission_error / budget_exceeded` once the current window has already exceeded the configured limit. Soft budgets are recorded but not enforced.
+Hard budgets can block requests with `429 budget_exceeded / budget_exceeded` once the current window has already exceeded the configured limit. Soft budgets are recorded but not enforced.
 
 ### `POST /v1/tools`, `GET /v1/tools`
 
@@ -2044,6 +2046,7 @@ Legacy key request fields:
 | 400 | `invalid_request_error` | Missing required fields, invalid `rate_limit`, bad budget mode, unknown tool/toolset, bad MCP binding kind. |
 | 401 | `authentication_error` | Missing or invalid bootstrap admin / admin key. |
 | 403 | `permission_error / admin_required` | Caller is not a control-plane admin. |
+| 404 | `invalid_request_error / control_plane_disabled` | Control-plane management endpoints are disabled by config. |
 | 404 | `invalid_request_error / key_not_found` or `binding_not_found` | Revoking a missing virtual key or using an unknown MCP binding. |
 
 ---

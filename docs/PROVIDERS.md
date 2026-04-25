@@ -4,7 +4,7 @@ This file is the operator-facing companion to `BLUEPRINT.md` §7 and §11. It re
 
 Provider/model metadata is sourced from the embedded matrix in `internal/provider/catalog/models.yaml`. Docs describe that matrix-driven implementation; they are not the source of truth for model IDs, family IDs, aliases, or verification classes.
 
-Release rule for `v2.1.0`: every provider path described here as shipped and release-blocking must pass the strict live-smoke matrix before the release tag is cut when credentials are available, and the repo-local open-source gate must pass before release completion is claimed. Production Postgres/Redis load testing is optional operator proof for service deployments. The live-smoke harness now derives `strict`, `opt_in`, and `skipped` coverage from the embedded provider model matrix. Opt-in provider paths do not block the tag unless they are explicitly included with `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` or a provider-specific opt-in env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1`.
+Release rule for `v2.1.0`: every provider path described here as shipped and release-blocking must pass the strict live-smoke matrix before live-provider proof is claimed when credentials, quota, and plan access are available, and the repo-local open-source gate must pass before release completion is claimed. Production Postgres/Redis load testing is optional operator proof for service deployments. The live-smoke harness now derives `strict`, `opt_in`, and `skipped` coverage from the embedded provider model matrix. Opt-in provider paths do not block the tag unless they are explicitly included with `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` or a provider-specific opt-in env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1`.
 
 ## Phase 1
 

@@ -13,7 +13,7 @@ The project is being rebuilt as Polaris v2. The old Python monolith and Discord-
 - Current platform foundation work: virtual-key control plane, MCP/tool runtime, OTLP tracing, and the next conversation surfaces (`/v1/responses`, `/v1/messages`, `/v1/tokens/count`) are implemented in the runtime and docs, including SSE streaming for `responses` and `messages` plus native token counting for Anthropic and Gemini chat models
 - Current ByteDance speech coverage: TTS 2.0, file STT 2.0, streaming STT 2.0, realtime audio sessions, simultaneous interpretation 2.0, machine translation, voice catalog and voice assets, audio notes, and podcast generation are implemented and live-validated in the provider smoke matrix
 - Current provider-family hardening: the shared OpenAI-compatible adapter base is now in the runtime, the OpenAI catalog includes `gpt-5.5` and `gpt-image-2`, the chat-first families OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, and NVIDIA are wired through the same provider-common path, Amazon Bedrock is in the runtime through native Converse/ConverseStream plus Titan embedding adapters, NVIDIA now includes embeddings on the same official `/v1/embeddings` path, and Replicate is in the runtime through a native Predictions-based async video adapter plus an embedded YAML provider model matrix
-- Release status: `v2.1.0` close-out is blocked on worktree consolidation and the final open-source readiness pass, not on more provider expansion. The repo-local gate, strict live-smoke matrix, reduced local load check, and targeted OpenAI Realtime concurrency check have passed in the current close-out record. Production Postgres/Redis load testing remains optional operator validation for service deployments, not a default open-source release blocker. Live-smoke coverage is matrix-driven: `strict` models are release-blocking, `opt_in` models run only when explicitly enabled, and `skipped` models stay outside the default matrix.
+- Release status: `v2.1.0` close-out is in final open-source readiness validation. Worktree consolidation and source-of-truth alignment are complete; the repo-local gate, strict live-smoke matrix, reduced local load check, and targeted OpenAI Realtime concurrency check have passed in the current close-out record. Production Postgres/Redis load testing remains optional operator validation for service deployments, not a default open-source release blocker. Live-smoke coverage is matrix-driven: `strict` models are release-blocking when credentials, quota, and plan access are available; `opt_in` models run only when explicitly enabled; `skipped` models stay outside the default matrix.
 - Source of truth: `BLUEPRINT.md`
 
 The repository now contains the full Phase 1 foundation from the blueprint: bootable server wiring, config loading and validation, SQLite storage, in-memory rate limiting, static auth, model registry, OpenAI and Anthropic chat adapters, usage logging, and the Phase 1 endpoints.
@@ -120,7 +120,7 @@ Phase 3 completed scope:
 - implemented: MiniMax generation, cover-edit, and lyrics adapters as the `v2.1.0` release-blocking music path
 - implemented in preview: ElevenLabs generation, streaming generation, composition plans, and stems adapters
 - implemented: exact-match caching for synchronous music generation, edit, stems, lyrics, and plan calls
-- next: release-readiness consolidation, worktree organization, optional ElevenLabs preview smoke, optional operator Postgres/Redis load validation, and the final `v2.1.0` release tag
+- next: final open-source readiness validation, optional ElevenLabs preview smoke, optional operator Postgres/Redis load validation, and the final `v2.1.0` release tag
 
 ## Repository Layout
 
@@ -138,6 +138,7 @@ pkg/client/               public Go SDK
 config/                   local and reference YAML config
 deployments/              Docker, Compose, Grafana, Prometheus, pgAdmin
 docs/                     API, configuration, provider, and contributor docs
+spec/openapi/             machine-readable public HTTP contracts
 scripts/                  helper entrypoints such as migration tooling
 tests/                    integration, e2e, live-smoke, and load-check validation
 ```
@@ -154,6 +155,7 @@ The stable command surface for this repo is the `Makefile`. Treat it as the Go-r
 make dev
 make build
 make test
+make contract-check
 make release-check
 make live-smoke
 make lint
@@ -164,7 +166,7 @@ make stack-down STACK=local
 
 The underlying implementation may change in later phases, but these command names should remain the main developer entrypoints.
 
-`make release-check` is the current repo-local release gate. `make live-smoke` runs the env-gated real-provider smoke matrix and becomes a release blocker when `POLARIS_LIVE_SMOKE_STRICT=1`. ElevenLabs music smoke is preview-only for `v2.1.0` and runs only when `POLARIS_LIVE_SMOKE_ELEVENLABS=1` is also set.
+`make contract-check` validates the machine-readable OpenAPI contract against registered Gin routes plus golden HTTP/SSE fixtures for stable response shapes. `make release-check` is the current repo-local release gate and includes `contract-check`. `make live-smoke` runs the env-gated real-provider smoke matrix and becomes a release-proof gate when `POLARIS_LIVE_SMOKE_STRICT=1` and the required provider credentials, quota, and plan access are available. ElevenLabs music smoke is preview-only for `v2.1.0` and runs only when `POLARIS_LIVE_SMOKE_ELEVENLABS=1` is also set.
 
 `make release-check` validates Compose files through the quiet `stack-validate` path so shared CI logs do not render environment-expanded service configuration. Use `make stack-config STACK=<name>` only when you intentionally need to inspect the fully rendered Compose config locally.
 
@@ -181,10 +183,11 @@ This keeps the developer command surface stable while letting the underlying sta
 ```bash
 make build
 make test
+make contract-check
 make release-check
 ```
 
-That is the default repo-local validation baseline for the `v2.1.0` close-out candidate. Release completion also records the env-gated strict live smoke matrix and reduced local load validation when credentials are available. Production Postgres/Redis load validation is optional operator proof for service deployments, not a default contributor requirement.
+That is the default repo-local validation baseline for the `v2.1.0` close-out candidate. Release completion also records the env-gated strict live smoke matrix and reduced local load validation when credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments, not a default contributor requirement.
 
 ### Local single-binary development
 
@@ -329,6 +332,7 @@ Secrets must always come from environment variables via `${VAR_NAME}` references
 - [`spec/phase_3_image_voice_embeddings/README.md`](./spec/phase_3_image_voice_embeddings/README.md): Phase 3 ABZ package
 - [`CLAUDE.md`](./CLAUDE.md): repo-local agent workflow companion
 - [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md): target HTTP contract
+- [`spec/openapi/polaris.v1.yaml`](./spec/openapi/polaris.v1.yaml): machine-readable HTTP contract checked by `make contract-check`
 - [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md): local, static, external, virtual-key, and compatibility auth modes
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md): config guidance
 - [`docs/PROVIDERS.md`](./docs/PROVIDERS.md): provider-specific auth and quirks
@@ -359,7 +363,7 @@ What remains in scope for Polaris:
 - Read `BLUEPRINT.md` before changing architecture, config, APIs, or providers.
 - Do not add dependencies outside the approved stack.
 - Keep provider work isolated to one provider per PR.
-- Update `docs/API_REFERENCE.md` in the same PR as any endpoint change.
+- Update `docs/API_REFERENCE.md`, `spec/openapi/polaris.v1.yaml`, and contract fixtures in the same PR as any endpoint change.
 - Keep secrets out of the repo.
 
 ## License
