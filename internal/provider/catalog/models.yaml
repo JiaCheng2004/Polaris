@@ -1,0 +1,1378 @@
+models:
+  - provider: anthropic
+    model_id: claude-opus-4-7
+    display_name: Claude Opus 4.7
+    aliases: ["Claude Opus 4.7"]
+    family_id: claude-opus-4-7
+    family_display_name: Claude Opus 4.7
+    family_aliases: ["Claude Opus 4.7"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, extended_thinking, pdf]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.anthropic.com/en/docs/about-claude/models/all-models
+    last_verified: "2026-04-22"
+  - provider: anthropic
+    model_id: claude-opus-4-6
+    display_name: Claude Opus 4.6
+    aliases: ["Claude Opus 4.6"]
+    family_id: claude-opus-4-6
+    family_display_name: Claude Opus 4.6
+    family_aliases: ["Claude Opus 4.6"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, extended_thinking, pdf]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.anthropic.com/en/docs/about-claude/models/all-models
+    last_verified: "2026-04-22"
+  - provider: anthropic
+    model_id: claude-sonnet-4-6
+    display_name: Claude Sonnet 4.6
+    aliases: ["Claude Sonnet 4.6"]
+    family_id: claude-sonnet-4-6
+    family_display_name: Claude Sonnet 4.6
+    family_aliases: ["Claude Sonnet 4.6"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, extended_thinking, pdf]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.anthropic.com/en/docs/about-claude/models/all-models
+    last_verified: "2026-04-22"
+
+  - provider: bedrock
+    model_id: "amazon.nova-2-lite-v1:0"
+    display_name: Nova 2.0 Lite on Bedrock
+    aliases: ["Nova 2.0 Lite", "Amazon Nova 2.0 Lite"]
+    family_id: amazon-nova-2-lite
+    family_display_name: Nova 2.0 Lite
+    family_aliases: ["Nova 2.0 Lite", "Amazon Nova 2.0 Lite"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    cost_tier: balanced
+    latency_tier: balanced
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html
+    last_verified: "2026-04-22"
+  - provider: bedrock
+    model_id: amazon.nova-2-lite-omni-v1
+    display_name: Nova 2.0 Omni on Bedrock
+    aliases: ["Nova 2.0 Omni", "Amazon Nova 2.0 Omni"]
+    family_id: amazon-nova-2-omni
+    family_display_name: Nova 2.0 Omni
+    family_aliases: ["Nova 2.0 Omni", "Amazon Nova 2.0 Omni"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    cost_tier: premium
+    latency_tier: balanced
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.aws.amazon.com/bedrock/latest/userguide/service-tiers-inference.html
+    last_verified: "2026-04-22"
+  - provider: bedrock
+    model_id: "amazon.nova-2-pro-preview-20251202-v1:0"
+    display_name: Nova 2.0 Pro Preview on Bedrock
+    aliases: ["Nova 2.0 Pro Preview", "Amazon Nova 2.0 Pro Preview"]
+    family_id: amazon-nova-2-pro-preview
+    family_display_name: Nova 2.0 Pro Preview
+    family_aliases: ["Nova 2.0 Pro Preview", "Amazon Nova 2.0 Pro Preview"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: preview
+    verification_class: opt_in
+    doc_url: https://docs.aws.amazon.com/bedrock/latest/userguide/service-tiers-inference.html
+    last_verified: "2026-04-22"
+  - provider: bedrock
+    model_id: "amazon.titan-embed-text-v2:0"
+    display_name: Titan Text Embeddings V2 on Bedrock
+    aliases: ["Titan Text Embeddings V2", "Amazon Titan Text Embeddings V2"]
+    family_id: amazon-titan-embed-text-v2
+    family_display_name: Titan Text Embeddings V2
+    family_aliases: ["Titan Text Embeddings V2", "Amazon Titan Text Embeddings V2"]
+    family_priority: 10
+    modality: embed
+    capabilities: []
+    cost_tier: balanced
+    latency_tier: fast
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html
+    last_verified: "2026-04-22"
+
+  - provider: deepseek
+    model_id: deepseek-chat
+    display_name: DeepSeek Chat
+    aliases: []
+    family_id: deepseek-chat
+    family_display_name: DeepSeek Chat
+    family_aliases: ["DeepSeek Chat"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, json_mode]
+    status: ga
+    verification_class: strict
+    doc_url: https://api-docs.deepseek.com/
+    last_verified: "2026-04-22"
+  - provider: deepseek
+    model_id: deepseek-reasoner
+    display_name: DeepSeek Reasoner
+    aliases: []
+    family_id: deepseek-reasoner
+    family_display_name: DeepSeek Reasoner
+    family_aliases: ["DeepSeek Reasoner"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, json_mode, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://api-docs.deepseek.com/
+    last_verified: "2026-04-22"
+
+  - provider: featherless
+    model_id: meta-llama/Meta-Llama-3.1-8B-Instruct
+    display_name: Meta-Llama-3.1-8B-Instruct on Featherless
+    aliases: []
+    family_id: meta-llama-3.1-8b-instruct
+    family_display_name: Meta-Llama-3.1-8B-Instruct
+    family_aliases: ["Meta-Llama-3.1-8B-Instruct"]
+    family_priority: 30
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://featherless.ai/docs/api-overview-and-common-options
+    last_verified: "2026-04-22"
+
+  - provider: fireworks
+    model_id: accounts/fireworks/models/llama-v3p1-8b-instruct
+    display_name: Llama v3.1 8B Instruct on Fireworks
+    aliases: []
+    family_id: llama-v3.1-8b-instruct
+    family_display_name: Llama v3.1 8B Instruct
+    family_aliases: ["Llama v3.1 8B Instruct"]
+    family_priority: 20
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.fireworks.ai/tools-sdks/openai-compatibility
+    last_verified: "2026-04-22"
+
+  - provider: glm
+    model_id: glm-5.1
+    display_name: GLM-5.1
+    aliases: ["GLM-5.1"]
+    family_id: glm-5.1
+    family_display_name: GLM-5.1
+    family_aliases: ["GLM-5.1"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8
+    last_verified: "2026-04-22"
+  - provider: glm
+    model_id: glm-5
+    display_name: GLM-5
+    aliases: ["GLM-5"]
+    family_id: glm-5
+    family_display_name: GLM-5
+    family_aliases: ["GLM-5"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8
+    last_verified: "2026-04-22"
+  - provider: glm
+    model_id: glm-5-turbo
+    display_name: GLM-5-Turbo
+    aliases: ["GLM-5-Turbo"]
+    family_id: glm-5-turbo
+    family_display_name: GLM-5-Turbo
+    family_aliases: ["GLM-5-Turbo"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8
+    last_verified: "2026-04-22"
+  - provider: glm
+    model_id: glm-5v-turbo
+    display_name: GLM-5V Turbo
+    aliases: ["GLM 5V Turbo"]
+    family_id: glm-5v-turbo
+    family_display_name: GLM 5V Turbo
+    family_aliases: ["GLM 5V Turbo"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8
+    last_verified: "2026-04-22"
+
+  - provider: google
+    model_id: gemini-3-pro-preview
+    display_name: Gemini 3 Pro Preview
+    aliases: ["Gemini 3 Pro Preview"]
+    family_id: gemini-3-pro-preview
+    family_display_name: Gemini 3 Pro Preview
+    family_aliases: ["Gemini 3 Pro Preview"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    status: preview
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/models
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: gemini-3-flash-preview
+    display_name: Gemini 3 Flash
+    aliases: ["Gemini 3 Flash"]
+    family_id: gemini-3-flash
+    family_display_name: Gemini 3 Flash
+    family_aliases: ["Gemini 3 Flash"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    status: preview
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/models
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: gemini-2.5-pro
+    display_name: Gemini 2.5 Pro
+    aliases: []
+    family_id: gemini-2.5-pro
+    family_display_name: Gemini 2.5 Pro
+    family_aliases: ["Gemini 2.5 Pro"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode]
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/models
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: gemini-2.5-flash
+    display_name: Gemini 2.5 Flash
+    aliases: []
+    family_id: gemini-2.5-flash
+    family_display_name: Gemini 2.5 Flash
+    family_aliases: ["Gemini 2.5 Flash"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode]
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/models
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: gemini-2.5-flash-lite
+    display_name: Gemini 2.5 Flash Lite
+    aliases: []
+    family_id: gemini-2.5-flash-lite
+    family_display_name: Gemini 2.5 Flash Lite
+    family_aliases: ["Gemini 2.5 Flash Lite"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode]
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/models
+    last_verified: "2026-04-22"
+
+  - provider: groq
+    model_id: llama-3.3-70b-versatile
+    display_name: Llama 3.3 70B Versatile on Groq
+    aliases: []
+    family_id: llama-3.3-70b-versatile
+    family_display_name: Llama 3.3 70B Versatile
+    family_aliases: ["Llama 3.3 70B Versatile"]
+    family_priority: 20
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://console.groq.com/docs/openai
+    last_verified: "2026-04-22"
+
+  - provider: mistral
+    model_id: mistral-small-latest
+    display_name: Mistral Small 4
+    aliases: ["Mistral Small 4"]
+    family_id: mistral-small-4
+    family_display_name: Mistral Small 4
+    family_aliases: ["Mistral Small 4"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key
+    last_verified: "2026-04-22"
+  - provider: mistral
+    model_id: mistral-medium-latest
+    display_name: Mistral Medium Latest
+    aliases: []
+    family_id: mistral-medium-latest
+    family_display_name: Mistral Medium Latest
+    family_aliases: ["Mistral Medium Latest"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.mistral.ai/api
+    last_verified: "2026-04-22"
+
+  - provider: moonshot
+    model_id: kimi-k2.6
+    display_name: Kimi K2.6
+    aliases: ["Kimi K2.6"]
+    family_id: kimi-k2.6
+    family_display_name: Kimi K2.6
+    family_aliases: ["Kimi K2.6"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart
+    last_verified: "2026-04-22"
+  - provider: moonshot
+    model_id: kimi-k2.5
+    display_name: Kimi K2.5
+    aliases: ["Kimi K2.5"]
+    family_id: kimi-k2.5
+    family_display_name: Kimi K2.5
+    family_aliases: ["Kimi K2.5"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://platform.kimi.ai/docs/api/models-overview
+    last_verified: "2026-04-22"
+  - provider: moonshot
+    model_id: kimi-k2-turbo-preview
+    display_name: Kimi K2 Turbo Preview
+    aliases: ["Kimi K2 Turbo Preview"]
+    family_id: kimi-k2-turbo-preview
+    family_display_name: Kimi K2 Turbo Preview
+    family_aliases: ["Kimi K2 Turbo Preview"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: preview
+    verification_class: opt_in
+    doc_url: https://platform.kimi.ai/docs/models
+    last_verified: "2026-04-22"
+
+  - provider: nvidia
+    model_id: nvidia/Llama-3_3-Nemotron-Super-49B-v1_5
+    display_name: Llama Nemotron Super 49B on NVIDIA
+    aliases: ["Llama Nemotron Super 49B"]
+    family_id: llama-nemotron-super-49b
+    family_display_name: Llama Nemotron Super 49B
+    family_aliases: ["Llama Nemotron Super 49B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    cost_tier: balanced
+    latency_tier: fast
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.api.nvidia.com/nim/reference/nvidia-llama-3_3-nemotron-super-49b-v1_5
+    last_verified: "2026-04-22"
+  - provider: nvidia
+    model_id: nvidia/NVIDIA-Nemotron-Nano-9B-v2
+    display_name: NVIDIA Nemotron Nano 9B v2
+    aliases: ["NVIDIA Nemotron Nano 9B V2"]
+    family_id: nvidia-nemotron-nano-9b-v2
+    family_display_name: NVIDIA Nemotron Nano 9B V2
+    family_aliases: ["NVIDIA Nemotron Nano 9B V2"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    cost_tier: low
+    latency_tier: fast
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.api.nvidia.com/nim/reference/nvidia-nvidia-nemotron-nano-9b-v2
+    last_verified: "2026-04-22"
+  - provider: nvidia
+    model_id: nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1
+    display_name: NVIDIA Nemotron 3 Nano 4B
+    aliases: ["NVIDIA Nemotron 3 Nano 4B"]
+    family_id: nvidia-nemotron-3-nano-4b
+    family_display_name: NVIDIA Nemotron 3 Nano 4B
+    family_aliases: ["NVIDIA Nemotron 3 Nano 4B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    cost_tier: low
+    latency_tier: fast
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.api.nvidia.com/nim/reference/nvidia-llama-3_1-nemotron-nano-4b-v1_1
+    last_verified: "2026-04-22"
+  - provider: nvidia
+    model_id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16
+    display_name: Nemotron 3 Super 120B A12B on NVIDIA
+    aliases: []
+    family_id: nvidia-nemotron-3-super-120b-a12b
+    family_display_name: Nemotron 3 Super 120B A12B
+    family_aliases: ["Nemotron 3 Super 120B A12B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling]
+    cost_tier: premium
+    latency_tier: balanced
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b
+    last_verified: "2026-04-22"
+  - provider: nvidia
+    model_id: nvidia/llama-nemotron-embed-1b-v2
+    display_name: Llama Nemotron Embed 1B v2 on NVIDIA
+    aliases: ["Llama Nemotron Embed 1B V2", "NVIDIA Llama Nemotron Embed 1B V2"]
+    family_id: llama-nemotron-embed-1b-v2
+    family_display_name: Llama Nemotron Embed 1B V2
+    family_aliases: ["Llama Nemotron Embed 1B V2", "NVIDIA Llama Nemotron Embed 1B V2"]
+    family_priority: 10
+    modality: embed
+    capabilities: []
+    cost_tier: balanced
+    latency_tier: fast
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.api.nvidia.com/nim/reference/nvidia-llama-nemotron-embed-1b-v2
+    last_verified: "2026-04-22"
+
+  - provider: ollama
+    model_id: llama3
+    display_name: Llama 3
+    aliases: []
+    family_id: llama-3
+    family_display_name: Llama 3
+    family_aliases: ["Llama 3"]
+    family_priority: 30
+    modality: chat
+    capabilities: [streaming]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://ollama.com/library/llama3
+    last_verified: "2026-04-22"
+
+  - provider: openai
+    model_id: gpt-5.5
+    display_name: GPT-5.5
+    aliases: ["GPT-5.5"]
+    family_id: gpt-5.5
+    family_display_name: GPT-5.5
+    family_aliases: ["GPT-5.5"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: ga
+    verification_class: strict
+    doc_url: https://developers.openai.com/api/docs/models
+    last_verified: "2026-04-24"
+  - provider: openai
+    model_id: gpt-5.4
+    display_name: GPT-5.4
+    aliases: ["GPT-5.4"]
+    family_id: gpt-5.4
+    family_display_name: GPT-5.4
+    family_aliases: ["GPT-5.4"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-5.4-mini
+    display_name: GPT-5.4 mini
+    aliases: ["GPT-5.4 mini"]
+    family_id: gpt-5.4-mini
+    family_display_name: GPT-5.4 mini
+    family_aliases: ["GPT-5.4 mini"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    cost_tier: balanced
+    latency_tier: balanced
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openrouter
+    model_id: openai/gpt-5.4-mini
+    display_name: GPT-5.4 mini on OpenRouter
+    aliases: []
+    family_id: gpt-5.4-mini
+    family_display_name: GPT-5.4 mini
+    family_aliases: ["GPT-5.4 mini"]
+    family_priority: 20
+    modality: chat
+    capabilities: [streaming, function_calling]
+    cost_tier: balanced
+    latency_tier: balanced
+    status: preview
+    verification_class: opt_in
+    doc_url: https://openrouter.ai/docs/api/reference/overview/
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-5.4-nano
+    display_name: GPT-5.4 nano
+    aliases: ["GPT-5.4 nano"]
+    family_id: gpt-5.4-nano
+    family_display_name: GPT-5.4 nano
+    family_aliases: ["GPT-5.4 nano"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, reasoning]
+    cost_tier: low
+    latency_tier: fast
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-5.3-codex
+    display_name: GPT-5.3 Codex
+    aliases: ["GPT-5.3 Codex"]
+    family_id: gpt-5.3-codex
+    family_display_name: GPT-5.3 Codex
+    family_aliases: ["GPT-5.3 Codex"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-4o
+    display_name: GPT-4o
+    aliases: []
+    family_id: gpt-4o
+    family_display_name: GPT-4o
+    family_aliases: ["GPT-4o"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode, audio_input, audio_output]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-4o-mini
+    display_name: GPT-4o mini
+    aliases: []
+    family_id: gpt-4o-mini
+    family_display_name: GPT-4o mini
+    family_aliases: ["GPT-4o mini"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, json_mode]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/models
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: text-embedding-3-small
+    display_name: text-embedding-3-small
+    aliases: []
+    family_id: text-embedding-3-small
+    family_display_name: text-embedding-3-small
+    family_aliases: []
+    family_priority: 10
+    modality: embed
+    capabilities: []
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/embeddings
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: text-embedding-3-large
+    display_name: text-embedding-3-large
+    aliases: []
+    family_id: text-embedding-3-large
+    family_display_name: text-embedding-3-large
+    family_aliases: []
+    family_priority: 10
+    modality: embed
+    capabilities: []
+    cost_tier: premium
+    latency_tier: balanced
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/embeddings
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-image-2
+    display_name: GPT Image 2
+    aliases: []
+    family_id: gpt-image-2
+    family_display_name: GPT Image 2
+    family_aliases: ["GPT Image 2"]
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing]
+    cost_tier: premium
+    latency_tier: balanced
+    status: ga
+    verification_class: strict
+    doc_url: https://developers.openai.com/api/docs/models/gpt-image-2
+    last_verified: "2026-04-24"
+  - provider: openai
+    model_id: gpt-image-1
+    display_name: GPT Image 1
+    aliases: []
+    family_id: gpt-image-1
+    family_display_name: GPT Image 1
+    family_aliases: ["GPT Image 1"]
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/images
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: dall-e-3
+    display_name: DALL-E 3
+    aliases: ["DALL-E 3"]
+    family_id: dall-e-3
+    family_display_name: DALL-E 3
+    family_aliases: ["DALL-E 3"]
+    family_priority: 10
+    modality: image
+    capabilities: [generation]
+    cost_tier: premium
+    latency_tier: balanced
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/images
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: tts-1
+    display_name: TTS 1
+    aliases: []
+    family_id: tts-1
+    family_display_name: TTS 1
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [tts]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/text-to-speech
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: tts-1-hd
+    display_name: TTS 1 HD
+    aliases: []
+    family_id: tts-1-hd
+    family_display_name: TTS 1 HD
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [tts]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/text-to-speech
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: whisper-1
+    display_name: Whisper 1
+    aliases: []
+    family_id: whisper-1
+    family_display_name: Whisper 1
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [stt]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/speech-to-text
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: gpt-4o-audio
+    display_name: GPT-4o Audio
+    aliases: []
+    family_id: gpt-4o-audio
+    family_display_name: GPT-4o Audio
+    family_aliases: ["GPT-4o Audio"]
+    family_priority: 10
+    modality: audio
+    capabilities: [audio_input, audio_output]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/realtime
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: sora-2
+    display_name: Sora 2
+    aliases: []
+    family_id: sora-2
+    family_display_name: Sora 2
+    family_aliases: ["Sora 2"]
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/video-generation
+    last_verified: "2026-04-22"
+  - provider: openai
+    model_id: sora-2-pro
+    display_name: Sora 2 Pro
+    aliases: []
+    family_id: sora-2-pro
+    family_display_name: Sora 2 Pro
+    family_aliases: ["Sora 2 Pro"]
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, native_audio]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.openai.com/docs/guides/video-generation
+    last_verified: "2026-04-22"
+
+  - provider: qwen
+    model_id: qwen3-max-preview
+    display_name: Qwen3 Max Preview
+    aliases: ["Qwen3 Max Preview"]
+    family_id: qwen3-max-preview
+    family_display_name: Qwen3 Max Preview
+    family_aliases: ["Qwen3 Max Preview", "Qwen3 Max Thinking"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, reasoning]
+    status: preview
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-plus
+    display_name: Qwen3.5 Plus
+    aliases: ["Qwen3.5 Plus"]
+    family_id: qwen3.5-plus
+    family_display_name: Qwen3.5 Plus
+    family_aliases: ["Qwen3.5 Plus"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-397b-a17b
+    display_name: Qwen3.5 397B A17B
+    aliases: ["Qwen3.5 397B A17B"]
+    family_id: qwen3.5-397b-a17b
+    family_display_name: Qwen3.5 397B A17B
+    family_aliases: ["Qwen3.5 397B A17B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-122b-a10b
+    display_name: Qwen3.5 122B A10B
+    aliases: ["Qwen3.5 122B A10B"]
+    family_id: qwen3.5-122b-a10b
+    family_display_name: Qwen3.5 122B A10B
+    family_aliases: ["Qwen3.5 122B A10B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-35b-a3b
+    display_name: Qwen3.5 35B A3B
+    aliases: ["Qwen3.5 35B A3B"]
+    family_id: qwen3.5-35b-a3b
+    family_display_name: Qwen3.5 35B A3B
+    family_aliases: ["Qwen3.5 35B A3B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-27b
+    display_name: Qwen3.5 27B
+    aliases: ["Qwen3.5 27B"]
+    family_id: qwen3.5-27b
+    family_display_name: Qwen3.5 27B
+    family_aliases: ["Qwen3.5 27B"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen-max
+    display_name: Qwen Max
+    aliases: []
+    family_id: qwen-max
+    family_display_name: Qwen Max
+    family_aliases: ["Qwen Max"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/developer-reference/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen3.5-flash
+    display_name: Qwen 3.5 Flash
+    aliases: []
+    family_id: qwen3.5-flash
+    family_display_name: Qwen 3.5 Flash
+    family_aliases: ["Qwen 3.5 Flash"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/developer-reference/use-qwen-by-calling-api
+    last_verified: "2026-04-22"
+  - provider: qwen
+    model_id: qwen-image-2.0
+    display_name: Qwen Image 2.0
+    aliases: []
+    family_id: qwen-image-2.0
+    family_display_name: Qwen Image 2.0
+    family_aliases: ["Qwen Image 2.0"]
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing]
+    status: preview
+    verification_class: opt_in
+    doc_url: https://www.alibabacloud.com/help/en/model-studio/developer-reference/qwen-image
+    last_verified: "2026-04-22"
+
+  - provider: replicate
+    model_id: minimax/video-01
+    display_name: MiniMax Video 01 on Replicate
+    aliases: ["MiniMax Video 01 on Replicate", "Replicate MiniMax Video 01"]
+    family_id: minimax-video-01
+    family_display_name: MiniMax Video 01
+    family_aliases: ["MiniMax Video 01"]
+    family_priority: 20
+    modality: video
+    capabilities: [text_to_video, image_to_video]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://replicate.com/minimax/video-01
+    last_verified: "2026-04-22"
+  - provider: replicate
+    model_id: minimax/hailuo-02
+    display_name: MiniMax Hailuo 02 on Replicate
+    aliases: ["MiniMax Hailuo 02 on Replicate", "Replicate Hailuo 02"]
+    family_id: minimax-hailuo-02
+    family_display_name: MiniMax Hailuo 02
+    family_aliases: ["MiniMax Hailuo 02"]
+    family_priority: 20
+    modality: video
+    capabilities: [text_to_video, image_to_video]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://replicate.com/minimax/hailuo-02
+    last_verified: "2026-04-22"
+
+  - provider: together
+    model_id: meta-llama/Llama-3.3-70B-Instruct-Turbo
+    display_name: Llama 3.3 70B Instruct Turbo on Together
+    aliases: []
+    family_id: llama-3.3-70b-instruct-turbo
+    family_display_name: Llama 3.3 70B Instruct Turbo
+    family_aliases: ["Llama 3.3 70B Instruct Turbo"]
+    family_priority: 20
+    modality: chat
+    capabilities: [streaming, function_calling]
+    status: ga
+    verification_class: opt_in
+    doc_url: https://docs.together.ai/docs/openai-api-compatibility
+    last_verified: "2026-04-22"
+
+  - provider: xai
+    model_id: grok-4.20-reasoning
+    display_name: Grok 4.20
+    aliases: ["Grok 4.20"]
+    family_id: grok-4.20
+    family_display_name: Grok 4.20
+    family_aliases: ["Grok 4.20"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.x.ai/developers/model-capabilities/text/reasoning
+    last_verified: "2026-04-22"
+  - provider: xai
+    model_id: grok-4-1-fast-reasoning
+    display_name: Grok 4.1 Fast
+    aliases: ["Grok 4.1 Fast"]
+    family_id: grok-4.1-fast
+    family_display_name: Grok 4.1 Fast
+    family_aliases: ["Grok 4.1 Fast"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.x.ai/docs/release-notes
+    last_verified: "2026-04-22"
+  - provider: xai
+    model_id: grok-3
+    display_name: Grok 3
+    aliases: []
+    family_id: grok-3
+    family_display_name: Grok 3
+    family_aliases: ["Grok 3"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.x.ai/docs/models
+    last_verified: "2026-04-22"
+  - provider: xai
+    model_id: grok-3-mini
+    display_name: Grok 3 mini Reasoning
+    aliases: ["Grok 3 mini Reasoning"]
+    family_id: grok-3-mini-reasoning
+    family_display_name: Grok 3 mini Reasoning
+    family_aliases: ["Grok 3 mini Reasoning"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.x.ai/cookbook/examples/sentiment_analysis_on_x
+    last_verified: "2026-04-22"
+  - provider: xai
+    model_id: grok-code-fast-1
+    display_name: Grok Code Fast 1
+    aliases: ["Grok Code Fast 1"]
+    family_id: grok-code-fast-1
+    family_display_name: Grok Code Fast 1
+    family_aliases: ["Grok Code Fast 1"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, reasoning]
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.x.ai/developers/advanced-api-usage/grok-code-prompt-engineering
+    last_verified: "2026-04-22"
+
+  - provider: google
+    model_id: gemini-embedding-001
+    display_name: Gemini Embedding 001
+    aliases: []
+    family_id: gemini-embedding-001
+    family_display_name: Gemini Embedding 001
+    family_aliases: []
+    family_priority: 10
+    modality: embed
+    capabilities: []
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/embeddings
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: nano-banana-2
+    display_name: Nano Banana 2
+    aliases: []
+    family_id: nano-banana-2
+    family_display_name: Nano Banana 2
+    family_aliases: []
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing]
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/image-generation
+    last_verified: "2026-04-22"
+  - provider: google
+    model_id: nano-banana-pro
+    display_name: Nano Banana Pro
+    aliases: []
+    family_id: nano-banana-pro
+    family_display_name: Nano Banana Pro
+    family_aliases: []
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing, multi_reference]
+    cost_tier: premium
+    latency_tier: best_quality
+    status: ga
+    verification_class: strict
+    doc_url: https://ai.google.dev/gemini-api/docs/image-generation
+    last_verified: "2026-04-22"
+  - provider: google-vertex
+    model_id: veo-3.1-generate-001
+    display_name: Veo 3.1 Generate 001
+    aliases: []
+    family_id: veo-3.1-generate-001
+    family_display_name: Veo 3.1 Generate 001
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/veo-video-generation
+    last_verified: "2026-04-22"
+  - provider: google-vertex
+    model_id: veo-3.1-fast-generate-001
+    display_name: Veo 3.1 Fast Generate 001
+    aliases: []
+    family_id: veo-3.1-fast-generate-001
+    family_display_name: Veo 3.1 Fast Generate 001
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, last_frame, native_audio]
+    cost_tier: balanced
+    latency_tier: fast
+    status: ga
+    verification_class: strict
+    doc_url: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/veo-video-generation
+    last_verified: "2026-04-22"
+
+  - provider: bytedance
+    model_id: doubao-seed-2.0-pro
+    display_name: Doubao Seed 2.0 Pro
+    aliases: []
+    family_id: doubao-seed-2.0-pro
+    family_display_name: Doubao Seed 2.0 Pro
+    family_aliases: []
+    family_priority: 10
+    modality: chat
+    capabilities: [vision, function_calling, streaming]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/84313/2288351
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-seed-1.6-vision
+    display_name: Doubao Seed 1.6 Vision
+    aliases: []
+    family_id: doubao-seed-1.6-vision
+    family_display_name: Doubao Seed 1.6 Vision
+    family_aliases: []
+    family_priority: 10
+    modality: chat
+    capabilities: [vision, streaming]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/84313/2288351
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-seedream-5.0-lite
+    display_name: Doubao Seedream 5.0 Lite
+    aliases: []
+    family_id: doubao-seedream-5.0-lite
+    family_display_name: Doubao Seedream 5.0 Lite
+    family_aliases: []
+    family_priority: 10
+    modality: image
+    capabilities: [generation]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6492/2165228
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-pro-256k
+    display_name: Doubao Pro 256K
+    aliases: []
+    family_id: doubao-pro-256k
+    family_display_name: Doubao Pro 256K
+    family_aliases: []
+    family_priority: 10
+    modality: chat
+    capabilities: [function_calling, streaming]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/84313/2288351
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-tts-2.0
+    display_name: Doubao TTS 2.0
+    aliases: []
+    family_id: doubao-tts-2.0
+    family_display_name: Doubao TTS 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [tts, voice_cloning, voice_design]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-asr-2.0
+    display_name: Doubao ASR 2.0
+    aliases: []
+    family_id: doubao-asr-2.0
+    family_display_name: Doubao ASR 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [stt]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-audio
+    display_name: Doubao Realtime Audio
+    aliases: []
+    family_id: doubao-audio
+    family_display_name: Doubao Realtime Audio
+    family_aliases: []
+    family_priority: 10
+    modality: audio
+    capabilities: [audio_input, audio_output]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1597643
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-streaming-asr-2.0
+    display_name: Doubao Streaming ASR 2.0
+    aliases: []
+    family_id: doubao-streaming-asr-2.0
+    family_display_name: Doubao Streaming ASR 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: voice
+    capabilities: [streaming]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-streaming-asr-2.0-concurrent
+    display_name: Doubao Streaming ASR 2.0 Concurrent
+    aliases: []
+    family_id: doubao-streaming-asr-2.0
+    family_display_name: Doubao Streaming ASR 2.0
+    family_aliases: []
+    family_priority: 20
+    modality: voice
+    capabilities: [streaming]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-interpreting-2.0
+    display_name: Doubao Interpreting 2.0
+    aliases: []
+    family_id: doubao-interpreting-2.0
+    family_display_name: Doubao Interpreting 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: interpreting
+    capabilities: [audio_input, audio_output]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1756902
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-translation-2.0
+    display_name: Doubao Translation 2.0
+    aliases: []
+    family_id: doubao-translation-2.0
+    family_display_name: Doubao Translation 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: translation
+    capabilities: []
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-notes-2.0
+    display_name: Doubao Notes 2.0
+    aliases: []
+    family_id: doubao-notes-2.0
+    family_display_name: Doubao Notes 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: notes
+    capabilities: [audio_notes]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-podcast-2.0
+    display_name: Doubao Podcast 2.0
+    aliases: []
+    family_id: doubao-podcast-2.0
+    family_display_name: Doubao Podcast 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: podcast
+    capabilities: [podcast_generation]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6561/1594357?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-seedance-2.0
+    display_name: Doubao Seedance 2.0
+    aliases: []
+    family_id: doubao-seedance-2.0
+    family_display_name: Doubao Seedance 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/82379/1520757?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: doubao-seedance-2.0-fast
+    display_name: Doubao Seedance 2.0 Fast
+    aliases: []
+    family_id: doubao-seedance-2.0-fast
+    family_display_name: Doubao Seedance 2.0 Fast
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/82379/1520757?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: seedance-2.0
+    display_name: Seedance 2.0
+    aliases: []
+    family_id: seedance-2.0
+    family_display_name: Seedance 2.0
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/82379/1520757?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: seedance-2.0-fast
+    display_name: Seedance 2.0 Fast
+    aliases: []
+    family_id: seedance-2.0-fast
+    family_display_name: Seedance 2.0 Fast
+    family_aliases: []
+    family_priority: 10
+    modality: video
+    capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/82379/1520757?lang=zh
+    last_verified: "2026-04-22"
+  - provider: bytedance
+    model_id: seedream-4.5
+    display_name: Seedream 4.5
+    aliases: []
+    family_id: seedream-4.5
+    family_display_name: Seedream 4.5
+    family_aliases: []
+    family_priority: 10
+    modality: image
+    capabilities: [generation, editing, multi_reference]
+    status: ga
+    verification_class: strict
+    doc_url: https://www.volcengine.com/docs/6492/2165228
+    last_verified: "2026-04-22"
+
+  - provider: minimax
+    model_id: music-2.6
+    display_name: MiniMax Music 2.6
+    aliases: []
+    family_id: minimax-music-2.6
+    family_display_name: MiniMax Music 2.6
+    family_aliases: []
+    family_priority: 10
+    modality: music
+    capabilities: [music_generation, lyrics_generation, instrumental]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.minimax.io/docs/guides/music-generation-api-refer
+    last_verified: "2026-04-22"
+  - provider: minimax
+    model_id: music-cover
+    display_name: MiniMax Music Cover
+    aliases: []
+    family_id: minimax-music-cover
+    family_display_name: MiniMax Music Cover
+    family_aliases: []
+    family_priority: 10
+    modality: music
+    capabilities: [music_editing, music_cover]
+    status: ga
+    verification_class: strict
+    doc_url: https://platform.minimax.io/docs/guides/music-generation-api-refer
+    last_verified: "2026-04-22"
+  - provider: elevenlabs
+    model_id: music_v1
+    display_name: ElevenLabs Music v1
+    aliases: []
+    family_id: elevenlabs-music-v1
+    family_display_name: ElevenLabs Music v1
+    family_aliases: []
+    family_priority: 10
+    modality: music
+    capabilities: [music_generation, music_streaming, music_stems, composition_plans, instrumental]
+    status: preview
+    verification_class: opt_in
+    doc_url: https://elevenlabs.io/music-api
+    last_verified: "2026-04-22"

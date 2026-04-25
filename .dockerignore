@@ -1,0 +1,84 @@
+# VCS and local metadata
+.git
+.gitignore
+.dockerignore
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.direnv/
+*.swp
+*.swo
+*~
+
+# Local environment and secrets
+.env
+.env.*
+.envrc
+.secrets/
+secrets/
+certs/
+certificates/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.cer
+*.secrets.yaml
+*.secret.yaml
+
+# Build outputs and local binaries
+polaris
+bin/
+dist/
+build/
+coverage/
+*.test
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Runtime data
+*.log
+*.pid
+*.sock
+logs/
+tmp/
+temp/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Test and tooling outputs
+coverage.out
+coverage.txt
+coverage.xml
+*.coverprofile
+.coverprofile
+*.bench
+bench.out
+*.prof
+*.pprof
+*.trace
+test-results/
+.playwright-mcp/
+.cache/
+
+# Local Docker/Compose state
+docker-compose.override.yml
+.docker/
+pgdata/
+redis-data/
+grafana-data/
+prometheus-data/
+
+# Infrastructure local state
+.terraform/
+*.tfstate
+*.tfstate.*

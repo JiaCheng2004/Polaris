@@ -3,23 +3,24 @@ package handler
 import (
 	"net/http"
 
-	"github.com/JiaCheng2004/Polaris/internal/provider"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
+	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
 )
 
 type HealthHandler struct {
-	store    store.Store
-	cache    cache.Cache
-	registry *provider.Registry
+	store   store.Store
+	cache   cache.Cache
+	runtime *gwruntime.Holder
 }
 
-func NewHealthHandler(store store.Store, cache cache.Cache, registry *provider.Registry) *HealthHandler {
+func NewHealthHandler(store store.Store, cache cache.Cache, runtime *gwruntime.Holder) *HealthHandler {
 	return &HealthHandler{
-		store:    store,
-		cache:    cache,
-		registry: registry,
+		store:   store,
+		cache:   cache,
+		runtime: runtime,
 	}
 }
 
@@ -57,8 +58,8 @@ func (h *HealthHandler) Readiness(c *gin.Context) {
 	}
 
 	count := 0
-	if h.registry != nil {
-		count = h.registry.ProviderCount()
+	if snapshot := middleware.RuntimeSnapshot(c, h.runtime); snapshot != nil && snapshot.Registry != nil {
+		count = snapshot.Registry.ProviderCount()
 	}
 	status["providers"] = count
 	if count == 0 {

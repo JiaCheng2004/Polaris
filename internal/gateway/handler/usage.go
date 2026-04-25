@@ -53,7 +53,7 @@ func (h *UsageHandler) Get(c *gin.Context) {
 	}
 	if raw := c.Query("modality"); raw != "" {
 		m := modality.Modality(raw)
-		if !m.Valid() || m == modality.ModalityAudio {
+		if !m.Valid() {
 			httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_modality", "modality", "Query parameter 'modality' is invalid."))
 			return
 		}

@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
 const anthropicVersion = "2023-06-01"
@@ -49,7 +49,8 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		baseURL: baseURL,
 		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
-			Timeout: timeout,
+			Timeout:   timeout,
+			Transport: telemetry.NewProviderTransport("anthropic", nil),
 		},
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
@@ -66,7 +67,9 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		return c.apiError(resp)
@@ -88,7 +91,9 @@ func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Respo
 		return nil, err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		return nil, c.apiError(resp)
 	}
 	return resp, nil
@@ -114,18 +119,18 @@ func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Res
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
-			if attempt < attempts && retryableTransportError(err) {
-				if sleepErr := sleepWithContext(ctx, backoffDelay(c.initialDelay, attempt)); sleepErr == nil {
+			if attempt < attempts && retrypkg.RetryableTransportError(err) {
+				if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
 					continue
 				}
 			}
-			return nil, translateTransportError(err, "Anthropic")
+			return nil, retrypkg.TranslateTransportError(err, "Anthropic")
 		}
 
-		if retryableStatus(resp.StatusCode) && attempt < attempts {
+		if retrypkg.RetryableStatus(resp.StatusCode) && attempt < attempts {
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
-			if sleepErr := sleepWithContext(ctx, backoffDelay(c.initialDelay, attempt)); sleepErr == nil {
+			if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
 				continue
 			}
 		}
@@ -133,7 +138,7 @@ func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Res
 		return resp, nil
 	}
 
-	return nil, translateTransportError(lastErr, "Anthropic")
+	return nil, retrypkg.TranslateTransportError(lastErr, "Anthropic")
 }
 
 func (c *Client) apiError(resp *http.Response) error {
@@ -149,89 +154,9 @@ func (c *Client) apiError(resp *http.Response) error {
 	var parsed anthropicErrorEnvelope
 	_ = json.Unmarshal(body, &parsed)
 
-	message := strings.TrimSpace(parsed.Error.Message)
-	if message == "" {
-		message = strings.TrimSpace(string(body))
-	}
-	if message == "" {
-		message = "Anthropic returned an error."
-	}
-
-	switch resp.StatusCode {
-	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", firstNonEmpty(parsed.Error.Type, "provider_bad_request"), "", message)
-	case http.StatusTooManyRequests:
-		return httputil.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
-	default:
-		if resp.StatusCode >= http.StatusInternalServerError {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
-		}
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
-	}
-}
-
-func retryableStatus(status int) bool {
-	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
-}
-
-func retryableTransportError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return true
-	}
-	var netErr net.Error
-	return errors.As(err, &netErr)
-}
-
-func translateTransportError(err error, providerName string) error {
-	if err == nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", providerName+" request failed.")
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return httputil.NewError(http.StatusGatewayTimeout, "timeout_error", "provider_timeout", "", providerName+" timed out.")
-	}
-	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
-		return httputil.NewError(http.StatusGatewayTimeout, "timeout_error", "provider_timeout", "", providerName+" timed out.")
-	}
-	return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", providerName+" request failed.")
-}
-
-func backoffDelay(initial time.Duration, attempt int) time.Duration {
-	if attempt <= 1 {
-		return initial
-	}
-	delay := initial
-	for i := 1; i < attempt; i++ {
-		delay *= 2
-		if delay > 5*time.Second {
-			return 5 * time.Second
-		}
-	}
-	return delay
-}
-
-func sleepWithContext(ctx context.Context, delay time.Duration) error {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
+	return httputil.ProviderAPIError("Anthropic", resp.StatusCode, httputil.ProviderErrorDetails{
+		Message: parsed.Error.Message,
+		Body:    string(body),
+		Type:    parsed.Error.Type,
+	})
 }

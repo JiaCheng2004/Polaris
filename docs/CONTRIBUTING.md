@@ -25,7 +25,7 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 - `internal/gateway/handler/`: HTTP translation layer
 - `internal/gateway/middleware/`: auth, rate limiting, logging, recovery
 - `internal/store/`: database and cache abstractions
-- `pkg/client/`: public Go SDK, deferred until Phase 3
+- `pkg/client/`: public Go SDK for implemented Polaris endpoints
 
 ## PR Expectations
 
@@ -33,22 +33,20 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 - If you change an endpoint, update `docs/API_REFERENCE.md` in the same PR.
 - If you change config schema, update `docs/CONFIGURATION.md`.
 - If you add or change a provider, update `docs/PROVIDERS.md`.
+- If you change the SDK surface, update `README.md`.
 - Prefer one provider per PR.
 
 ## Testing Expectations
 
 - Use `go test -race ./...` as the default test baseline.
+- Use `make release-check` for the repo-local close-out gate.
+- Use `make stack-validate STACK=<name>` for CI-safe Compose validation; reserve `make stack-config STACK=<name>` for local rendered-config debugging.
+- Use `make live-smoke` for the env-gated real-provider matrix when working on shipped provider paths.
+- Use `make load-check` before release when provider quota is available.
 - Adapter tests should use `httptest.NewServer`.
 - Do not hit real provider APIs in tests.
 - Store changes should be covered by integration tests.
 
 ## Implementation Phasing
 
-Work should follow the blueprint phases:
-
-1. Foundation
-2. Chat ecosystem
-3. Image + voice + embeddings
-4. Video + audio + polish
-
-Do not skip ahead with deep implementation work that depends on unfinished lower-phase foundations.
+The early blueprint phases are implemented. New work should follow `BLUEPRINT.md` §16: keep `/v1` stable, add provider variants only through the model matrix when a real adapter exists, and prioritize capability completion, routing quality, validation proof, and operational hardening over generic provider expansion.

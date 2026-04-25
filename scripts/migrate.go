@@ -1,3 +1,3 @@
 package scripts
 
-// Migration tooling will land with the first store implementation.
+// Store migrations are executed by cmd/polaris --migrate through make migrate.

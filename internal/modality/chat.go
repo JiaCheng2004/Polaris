@@ -11,17 +11,43 @@ type ChatAdapter interface {
 	Stream(ctx context.Context, req *ChatRequest) (<-chan ChatChunk, error)
 }
 
+type NativeJSONResponse struct {
+	Payload json.RawMessage
+	Model   string
+	Usage   *Usage
+}
+
+type NativeJSONStreamEvent struct {
+	Event   string
+	Payload json.RawMessage
+	Model   string
+	Usage   *Usage
+	Err     error
+}
+
+type NativeResponsesAdapter interface {
+	CreateResponse(ctx context.Context, raw json.RawMessage, canonicalModel string) (*NativeJSONResponse, error)
+	StreamResponse(ctx context.Context, raw json.RawMessage, canonicalModel string) (<-chan NativeJSONStreamEvent, error)
+}
+
+type NativeMessagesAdapter interface {
+	CreateMessage(ctx context.Context, raw json.RawMessage, canonicalModel string) (*NativeJSONResponse, error)
+	StreamMessage(ctx context.Context, raw json.RawMessage, canonicalModel string) (<-chan NativeJSONStreamEvent, error)
+}
+
 type ChatRequest struct {
-	Model          string           `json:"model"`
-	Messages       []ChatMessage    `json:"messages"`
-	Temperature    *float64         `json:"temperature,omitempty"`
-	TopP           *float64         `json:"top_p,omitempty"`
-	MaxTokens      int              `json:"max_tokens,omitempty"`
-	Stream         bool             `json:"stream,omitempty"`
-	Tools          []ToolDefinition `json:"tools,omitempty"`
-	ToolChoice     json.RawMessage  `json:"tool_choice,omitempty"`
-	ResponseFormat *ResponseFormat  `json:"response_format,omitempty"`
-	Stop           []string         `json:"stop,omitempty"`
+	Model          string            `json:"model"`
+	Routing        *RoutingOptions   `json:"routing,omitempty"`
+	Messages       []ChatMessage     `json:"messages"`
+	Temperature    *float64          `json:"temperature,omitempty"`
+	TopP           *float64          `json:"top_p,omitempty"`
+	MaxTokens      int               `json:"max_tokens,omitempty"`
+	Stream         bool              `json:"stream,omitempty"`
+	Tools          []ToolDefinition  `json:"tools,omitempty"`
+	ToolChoice     json.RawMessage   `json:"tool_choice,omitempty"`
+	ResponseFormat *ResponseFormat   `json:"response_format,omitempty"`
+	Stop           []string          `json:"stop,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 
 type ChatMessage struct {
@@ -169,7 +195,8 @@ type ChatDelta struct {
 }
 
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens     int              `json:"prompt_tokens"`
+	CompletionTokens int              `json:"completion_tokens"`
+	TotalTokens      int              `json:"total_tokens"`
+	Source           TokenCountSource `json:"source,omitempty"`
 }

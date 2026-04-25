@@ -2,11 +2,138 @@ package store
 
 import (
 	"errors"
-	"log/slog"
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
+
+type Project struct {
+	ID          string
+	Name        string
+	Description string
+	CreatedAt   time.Time
+	ArchivedAt  *time.Time
+}
+
+type VirtualKey struct {
+	ID                string
+	ProjectID         string
+	Name              string
+	KeyHash           string
+	KeyPrefix         string
+	RateLimit         string
+	AllowedModels     []string
+	AllowedModalities []modality.Modality
+	AllowedToolsets   []string
+	AllowedMCP        []string
+	IsAdmin           bool
+	CreatedAt         time.Time
+	LastUsedAt        *time.Time
+	ExpiresAt         *time.Time
+	IsRevoked         bool
+}
+
+type Policy struct {
+	ID                string
+	ProjectID         string
+	Name              string
+	Description       string
+	AllowedModels     []string
+	AllowedModalities []modality.Modality
+	AllowedToolsets   []string
+	AllowedMCP        []string
+	CreatedAt         time.Time
+}
+
+type BudgetMode string
+
+const (
+	BudgetModeSoft BudgetMode = "soft"
+	BudgetModeHard BudgetMode = "hard"
+)
+
+func (m BudgetMode) Valid() bool {
+	switch m {
+	case BudgetModeSoft, BudgetModeHard:
+		return true
+	default:
+		return false
+	}
+}
+
+type Budget struct {
+	ID            string
+	ProjectID     string
+	Name          string
+	Mode          BudgetMode
+	LimitUSD      float64
+	LimitRequests int64
+	Window        string
+	CreatedAt     time.Time
+}
+
+type AuditEvent struct {
+	ID           string
+	ProjectID    string
+	ActorKeyID   string
+	Kind         string
+	ResourceType string
+	ResourceID   string
+	MetadataJSON string
+	CreatedAt    time.Time
+}
+
+type ToolDefinition struct {
+	ID             string
+	Name           string
+	Description    string
+	Implementation string
+	InputSchema    string
+	Enabled        bool
+	CreatedAt      time.Time
+}
+
+type Toolset struct {
+	ID          string
+	Name        string
+	Description string
+	ToolIDs     []string
+	CreatedAt   time.Time
+}
+
+type MCPBindingKind string
+
+const (
+	MCPBindingKindUpstreamProxy MCPBindingKind = "upstream_proxy"
+	MCPBindingKindLocalToolset  MCPBindingKind = "local_toolset"
+)
+
+func (k MCPBindingKind) Valid() bool {
+	switch k {
+	case MCPBindingKindUpstreamProxy, MCPBindingKindLocalToolset:
+		return true
+	default:
+		return false
+	}
+}
+
+type MCPBinding struct {
+	ID          string
+	Name        string
+	Kind        MCPBindingKind
+	UpstreamURL string
+	ToolsetID   string
+	HeadersJSON string
+	Enabled     bool
+	CreatedAt   time.Time
+}
+
+type ArchivedVoice struct {
+	Provider   string
+	Model      string
+	VoiceID    string
+	ArchivedAt time.Time
+}
 
 type APIKey struct {
 	ID            string
@@ -27,8 +154,16 @@ type RequestLog struct {
 	ID                string
 	RequestID         string
 	KeyID             string
+	ProjectID         string
 	Model             string
 	Modality          modality.Modality
+	InterfaceFamily   string
+	TokenSource       string
+	CacheStatus       string
+	FallbackModel     string
+	TraceID           string
+	Toolset           string
+	MCPBinding        string
 	ProviderLatencyMs int
 	TotalLatencyMs    int
 	InputTokens       int
@@ -41,12 +176,13 @@ type RequestLog struct {
 }
 
 type UsageFilter struct {
-	KeyID    string
-	OwnerID  string
-	Model    string
-	Modality modality.Modality
-	From     *time.Time
-	To       *time.Time
+	KeyID     string
+	OwnerID   string
+	ProjectID string
+	Model     string
+	Modality  modality.Modality
+	From      *time.Time
+	To        *time.Time
 }
 
 type DailyUsage struct {
@@ -86,8 +222,4 @@ func NewLoggerConfig(bufferSize int, flushInterval time.Duration) LoggerConfig {
 		BufferSize:    bufferSize,
 		FlushInterval: flushInterval,
 	}
-}
-
-func discardLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(nil, nil))
 }

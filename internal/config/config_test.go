@@ -89,6 +89,71 @@ observability:
 	}
 }
 
+func TestLoadRequiresRedisURLWhenRedisCacheIsEnabled(t *testing.T) {
+	configPath := writeTempConfig(t, `
+server:
+  host: 127.0.0.1
+auth:
+  mode: none
+cache:
+  driver: redis
+providers:
+  openai:
+    api_key: sk-test
+    base_url: https://api.openai.com/v1
+    timeout: 60s
+    models:
+      gpt-4o:
+        modality: chat
+        capabilities: [streaming]
+observability:
+  logging:
+    format: json
+`)
+
+	_, _, err := Load(configPath)
+	if err == nil || !strings.Contains(err.Error(), "cache.url is required") {
+		t.Fatalf("expected redis cache url validation error, got %v", err)
+	}
+}
+
+func TestLoadExpandsRedisURLFromEnvironment(t *testing.T) {
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+
+	configPath := writeTempConfig(t, `
+server:
+  host: 127.0.0.1
+auth:
+  mode: none
+cache:
+  driver: redis
+  url: ${REDIS_URL}
+providers:
+  openai:
+    api_key: sk-test
+    base_url: https://api.openai.com/v1
+    timeout: 60s
+    models:
+      gpt-4o:
+        modality: chat
+        capabilities: [streaming]
+observability:
+  logging:
+    format: json
+`)
+
+	cfg, warnings, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+	if cfg.Cache.URL != "redis://localhost:6379/0" {
+		t.Fatalf("expected redis url expansion, got %q", cfg.Cache.URL)
+	}
+}
+
 func writeTempConfig(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()

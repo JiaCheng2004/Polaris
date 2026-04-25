@@ -1,8 +1,10 @@
 # OS / editor
 .DS_Store
+**/.DS_Store
 Thumbs.db
 .idea/
 .vscode/
+.direnv/
 *.swp
 *.swo
 *~
@@ -12,8 +14,13 @@ Thumbs.db
 /bin/
 /dist/
 /build/
+coverage/
 *.test
 *.out
+*.exe
+*.dll
+*.so
+*.dylib
 coverage.out
 coverage.txt
 coverage.xml
@@ -27,14 +34,21 @@ go.work.sum
 
 # Runtime data
 *.log
+*.pid
+*.sock
 /logs/
 /tmp/
 /temp/
 /polaris.db
 /polaris.db-*
+/polaris-live-smoke.db
+/polaris-live-smoke.db-*
 *.db
+*.db-*
 *.sqlite
+*.sqlite-*
 *.sqlite3
+*.sqlite3-*
 
 # Docker / compose local overrides and volumes
 docker-compose.override.yml
@@ -48,6 +62,7 @@ prometheus-data/
 .env
 .env.*
 !.env.example
+.envrc
 *.pem
 *.key
 *.crt
@@ -57,14 +72,18 @@ prometheus-data/
 *.secrets.yaml
 *.secret.yaml
 secrets/
+.secrets/
 certs/
 certificates/
 
 # Test and benchmark outputs
+*.bench
+bench.out
 *.prof
 *.pprof
 *.trace
 test-results/
+.playwright-mcp/
 
 # Terraform / misc
 .terraform/

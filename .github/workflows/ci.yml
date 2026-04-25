@@ -19,6 +19,9 @@ jobs:
       - name: Run gofmt check
         run: test -z "$(gofmt -l .)"
 
+      - name: Run lint
+        run: make lint
+
       - name: Run tests
         run: go test -race ./...
 

@@ -1,12 +1,17 @@
 BINARY := polaris
 CONFIG ?= ./config/polaris.yaml
 STACK ?= local
+LIVE_SMOKE_TIMEOUT ?= 45m
+LOAD_CHECK_TIMEOUT ?= 60m
+GOLANGCI_LINT_VERSION ?= v2.11.4
+GOLANGCI_LINT_MODULE := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+GOLANGCI_LINT ?= go run $(GOLANGCI_LINT_MODULE)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test lint migrate docker-build \
+.PHONY: help dev build run test lint migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in load-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
-	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-pull
+	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
 help:
 	@printf "\nPolaris developer commands\n\n"
@@ -14,13 +19,22 @@ help:
 	@printf "  make build          Build ./bin/$(BINARY)\n"
 	@printf "  make run            Build then run ./bin/$(BINARY)\n"
 	@printf "  make test           Run go test -race ./...\n"
-	@printf "  make lint           Run golangci-lint\n"
+	@printf "  make lint           Run pinned golangci-lint\n"
+	@printf "  make migrate        Run configured store migrations\n"
 	@printf "  make docker-build   Build the Polaris Docker image\n"
+	@printf "  make verify-models  Print configured model verification summary\n"
+	@printf "  make verify-models-json  Print configured model verification summary as JSON\n"
+	@printf "  make live-smoke     Run env-gated live provider smoke tests\n"
+	@printf "  make live-smoke-strict  Run strict live smoke for release-blocking models\n"
+	@printf "  make live-smoke-opt-in  Run live smoke including opt-in models\n"
+	@printf "  make load-check     Run env-gated load validation with SQLite + memory cache\n"
+	@printf "  make release-check  Run the current repo-local release validation gate\n"
 	@printf "  make stack-up       Start Docker stack STACK=%s\n" "$(STACK)"
 	@printf "  make stack-down     Stop Docker stack STACK=%s\n" "$(STACK)"
 	@printf "  make stack-logs     Follow logs for stack STACK=%s\n" "$(STACK)"
 	@printf "  make stack-ps       Show status for stack STACK=%s\n" "$(STACK)"
 	@printf "  make stack-config   Render Compose config for STACK=%s\n" "$(STACK)"
+	@printf "  make stack-validate Validate Compose config for STACK=%s without rendering secrets\n" "$(STACK)"
 	@printf "  make stack-pull     Pull images for stack STACK=%s\n" "$(STACK)"
 	@printf "\n"
 	@printf "  stacks: local | prod | dev\n"
@@ -40,13 +54,49 @@ test:
 	go test -race ./...
 
 lint:
-	golangci-lint run ./...
+	$(GOLANGCI_LINT) run ./...
 
 migrate:
-	@echo "scripts/migrate.go is a placeholder until Phase 1 store wiring lands"
+	go run ./cmd/polaris --config $(CONFIG) --migrate
 
 docker-build:
 	docker build -f deployments/Dockerfile -t polaris:dev .
+
+verify-models:
+	go run ./cmd/polaris --config $(CONFIG) --verify-models
+
+verify-models-json:
+	go run ./cmd/polaris --config $(CONFIG) --verify-models-json
+
+live-smoke:
+	POLARIS_LIVE_SMOKE=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
+
+live-smoke-strict:
+	POLARIS_LIVE_SMOKE=1 POLARIS_LIVE_SMOKE_STRICT=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
+
+live-smoke-opt-in:
+	POLARIS_LIVE_SMOKE=1 POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
+
+load-check:
+	POLARIS_LOAD_CHECK=1 go test -count=1 -timeout $(LOAD_CHECK_TIMEOUT) ./tests/e2e -run TestLoadCheckMatrix
+
+fmt-check:
+	test -z "$$(gofmt -l .)"
+
+panic-scan:
+	! rg -n "panic\\(" internal --glob '!**/*_test.go'
+
+release-check:
+	$(MAKE) fmt-check
+	$(MAKE) lint
+	$(MAKE) panic-scan
+	$(MAKE) verify-models CONFIG=$(CONFIG)
+	go test -race ./...
+	$(MAKE) build
+	$(MAKE) stack-validate STACK=local
+	$(MAKE) stack-validate STACK=prod
+	$(MAKE) stack-validate STACK=dev
+	$(MAKE) docker-build
 
 local-up:
 	STACK=local ./scripts/stack.sh up
@@ -83,6 +133,9 @@ stack-ps:
 
 stack-config:
 	STACK=$(STACK) ./scripts/stack.sh config
+
+stack-validate:
+	STACK=$(STACK) ./scripts/stack.sh validate
 
 stack-pull:
 	STACK=$(STACK) ./scripts/stack.sh pull

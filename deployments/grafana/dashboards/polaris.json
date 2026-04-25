@@ -2,14 +2,21 @@
   "title": "Polaris Overview",
   "uid": "polaris-overview",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
-  "tags": ["polaris", "gateway"],
+  "tags": ["polaris", "gateway", "observability"],
   "timezone": "browser",
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "panels": [
     {
       "id": 1,
-      "title": "Requests Total",
+      "title": "Requests By Status",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -17,13 +24,14 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(polaris_requests_total[5m]))",
+          "expr": "sum(rate(polaris_requests_total[5m])) by (interface_family, status)",
+          "legendFormat": "{{interface_family}} / {{status}}",
           "refId": "A"
         }
       ],
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 0
       }
@@ -38,7 +46,74 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(polaris_provider_errors_total[5m])) by (provider)",
+          "expr": "sum(rate(polaris_provider_errors_total[5m])) by (provider, error_type)",
+          "legendFormat": "{{provider}} / {{error_type}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Rate Limit Hits",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(polaris_rate_limit_hits_total[5m])) by (key_id)",
+          "legendFormat": "{{key_id}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "title": "P95 Request Duration",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(polaris_request_duration_seconds_bucket[5m])) by (le, interface_family, provider))",
+          "legendFormat": "{{interface_family}} / {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 5,
+      "title": "P95 Provider Latency",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(polaris_provider_latency_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}}",
           "refId": "A"
         }
       ],
@@ -46,15 +121,96 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 8
+      }
+    },
+    {
+      "id": 6,
+      "title": "Failovers",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(polaris_failovers_total[5m])) by (from_model, to_model)",
+          "legendFormat": "{{from_model}} -> {{to_model}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "id": 7,
+      "title": "Active Streams",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(polaris_active_streams) by (provider, model)",
+          "legendFormat": "{{provider}} / {{model}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      }
+    },
+    {
+      "id": 8,
+      "title": "Token Throughput",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(polaris_tokens_total[5m])) by (provider, direction, token_source)",
+          "legendFormat": "{{provider}} / {{direction}} / {{token_source}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      }
+    },
+    {
+      "id": 9,
+      "title": "Estimated Cost (1h)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(polaris_estimated_cost_usd[1h])) by (provider)",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
       }
     }
-  ],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  }
+  ]
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -65,7 +64,9 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 	stream := make(chan modality.ChatChunk)
 	go func() {
 		defer close(stream)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if err := a.decodeStream(resp.Body, req.Model, stream); err != nil {
 			stream <- modality.ChatChunk{Err: err}
@@ -73,6 +74,35 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 	}()
 
 	return stream, nil
+}
+
+func (a *ChatAdapter) CountTokens(ctx context.Context, req *modality.ChatRequest) (*modality.TokenCountResult, error) {
+	payload, err := a.translateRequest(req, false)
+	if err != nil {
+		return nil, err
+	}
+
+	countPayload := anthropicCountTokensRequest{
+		Model:      payload.Model,
+		Messages:   payload.Messages,
+		System:     payload.System,
+		Tools:      payload.Tools,
+		ToolChoice: payload.ToolChoice,
+	}
+
+	var response anthropicCountTokensResponse
+	if err := a.client.JSON(ctx, "/v1/messages/count_tokens", countPayload, &response); err != nil {
+		return nil, err
+	}
+
+	return &modality.TokenCountResult{
+		InputTokens: response.InputTokens,
+		Source:      modality.TokenCountSourceProviderReported,
+		Notes: []string{
+			"input tokens were returned by Anthropic's native token counting endpoint",
+			"output_tokens_estimate remains a Polaris estimate derived from max_tokens limits",
+		},
+	}, nil
 }
 
 type anthropicMessagesRequest struct {
@@ -127,6 +157,18 @@ type anthropicMessagesResponse struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
 	} `json:"usage"`
+}
+
+type anthropicCountTokensRequest struct {
+	Model      string             `json:"model"`
+	Messages   []anthropicMessage `json:"messages"`
+	System     string             `json:"system,omitempty"`
+	Tools      []anthropicTool    `json:"tools,omitempty"`
+	ToolChoice map[string]any     `json:"tool_choice,omitempty"`
+}
+
+type anthropicCountTokensResponse struct {
+	InputTokens int `json:"input_tokens"`
 }
 
 func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) (anthropicMessagesRequest, error) {
@@ -699,25 +741,4 @@ func providerModelName(requestModel string, fallbackModel string) string {
 		return fallbackModel[idx+1:]
 	}
 	return fallbackModel
-}
-
-func parseDataURI(raw string) (mediaType string, data string, err error) {
-	if !strings.HasPrefix(raw, "data:") {
-		return "", "", fmt.Errorf("not a data URI")
-	}
-	header, data, ok := strings.Cut(strings.TrimPrefix(raw, "data:"), ",")
-	if !ok {
-		return "", "", fmt.Errorf("invalid data URI")
-	}
-	mediaType, _, _ = strings.Cut(header, ";")
-	if mediaType == "" {
-		mediaType = "application/octet-stream"
-	}
-	if !strings.Contains(header, ";base64") {
-		data = base64.StdEncoding.EncodeToString([]byte(data))
-	}
-	if _, _, err := mime.ParseMediaType(mediaType); err != nil {
-		return "", "", err
-	}
-	return mediaType, data, nil
 }

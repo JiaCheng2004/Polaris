@@ -1,6 +1,5 @@
 # Polaris local development config.
-# This file is intended for single-binary, zero-dependency startup while
-# Phase 1 is being implemented.
+# This file is intended for single-binary, zero-dependency local startup.
 
 server:
   host: 0.0.0.0
@@ -44,6 +43,11 @@ providers:
       backoff: exponential
       initial_delay: 1s
     models:
+      gpt-5.5:
+        modality: chat
+        capabilities: [vision, function_calling, streaming, json_mode, reasoning]
+        context_window: 1000000
+        max_output_tokens: 128000
       gpt-4o:
         modality: chat
         capabilities: [vision, function_calling, streaming, json_mode, audio_input, audio_output]
@@ -54,6 +58,10 @@ providers:
         capabilities: [vision, function_calling, streaming, json_mode]
         context_window: 128000
         max_output_tokens: 16384
+      gpt-image-2:
+        modality: image
+        capabilities: [generation, editing]
+        output_formats: [png, jpeg, webp]
 
   anthropic:
     api_key: ${ANTHROPIC_API_KEY}
@@ -85,7 +93,14 @@ routing:
       on: [rate_limit, timeout, server_error]
   aliases:
     default-chat: openai/gpt-4o
+    openai-frontier-chat: openai/gpt-5.5
+    openai-image-latest: openai/gpt-image-2
     premium-chat: anthropic/claude-opus-4-6
+  selectors:
+    tooling-chat:
+      modality: chat
+      capabilities: [streaming, function_calling]
+      providers: [openai, anthropic]
 
 observability:
   metrics:

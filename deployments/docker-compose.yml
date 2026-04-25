@@ -1,19 +1,18 @@
 services:
   polaris:
     build:
-      context: ..
+      context: .
       dockerfile: deployments/Dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - ../config/polaris.example.yaml:/etc/polaris/polaris.yaml:ro
+      - ./config/polaris.example.yaml:/etc/polaris/polaris.yaml:ro
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      VOLCENGINE_ACCESS_KEY_ID: ${VOLCENGINE_ACCESS_KEY_ID:-}
-      VOLCENGINE_SECRET_ACCESS_KEY: ${VOLCENGINE_SECRET_ACCESS_KEY:-}
+      VOLCENGINE_ARK_API_KEY: ${VOLCENGINE_ARK_API_KEY:-}
       XAI_API_KEY: ${XAI_API_KEY:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DATABASE_URL: postgres://polaris:polaris@postgres:5432/polaris?sslmode=disable

@@ -20,6 +20,9 @@ type Config struct {
 	Cache         CacheConfig               `yaml:"cache"`
 	Providers     map[string]ProviderConfig `yaml:"providers"`
 	Routing       RoutingConfig             `yaml:"routing"`
+	ControlPlane  ControlPlaneConfig        `yaml:"control_plane"`
+	Tools         ToolsConfig               `yaml:"tools"`
+	MCP           MCPConfig                 `yaml:"mcp"`
 	Observability ObservabilityConfig       `yaml:"observability"`
 }
 
@@ -34,15 +37,17 @@ type ServerConfig struct {
 type AuthMode string
 
 const (
-	AuthModeNone      AuthMode = "none"
-	AuthModeStatic    AuthMode = "static"
-	AuthModeMultiUser AuthMode = "multi-user"
+	AuthModeNone        AuthMode = "none"
+	AuthModeStatic      AuthMode = "static"
+	AuthModeVirtualKeys AuthMode = "virtual_keys"
+	AuthModeMultiUser   AuthMode = "multi-user"
 )
 
 type AuthConfig struct {
-	Mode         AuthMode          `yaml:"mode"`
-	StaticKeys   []StaticKeyConfig `yaml:"static_keys"`
-	AdminKeyHash string            `yaml:"admin_key_hash"`
+	Mode                  AuthMode          `yaml:"mode"`
+	StaticKeys            []StaticKeyConfig `yaml:"static_keys"`
+	AdminKeyHash          string            `yaml:"admin_key_hash"`
+	BootstrapAdminKeyHash string            `yaml:"bootstrap_admin_key_hash"`
 }
 
 type StaticKeyConfig struct {
@@ -63,6 +68,7 @@ type StoreConfig struct {
 
 type CacheConfig struct {
 	Driver        string          `yaml:"driver"`
+	URL           string          `yaml:"url"`
 	RateLimit     RateLimitConfig `yaml:"rate_limit"`
 	ResponseCache ResponseCache   `yaml:"response_cache"`
 }
@@ -81,13 +87,22 @@ type ResponseCache struct {
 }
 
 type ProviderConfig struct {
-	APIKey    string                 `yaml:"api_key"`
-	AccessKey string                 `yaml:"access_key"`
-	SecretKey string                 `yaml:"secret_key"`
-	BaseURL   string                 `yaml:"base_url"`
-	Timeout   time.Duration          `yaml:"timeout"`
-	Retry     RetryConfig            `yaml:"retry"`
-	Models    map[string]ModelConfig `yaml:"models"`
+	APIKey            string                 `yaml:"api_key"`
+	AccessKeyID       string                 `yaml:"access_key_id"`
+	AccessKeySecret   string                 `yaml:"access_key_secret"`
+	SessionToken      string                 `yaml:"session_token"`
+	AppID             string                 `yaml:"app_id"`
+	SpeechAPIKey      string                 `yaml:"speech_api_key"`
+	SpeechAccessToken string                 `yaml:"speech_access_token"`
+	SecretKey         string                 `yaml:"secret_key"`
+	ProjectName       string                 `yaml:"project_name"`
+	ProjectID         string                 `yaml:"project_id"`
+	Location          string                 `yaml:"location"`
+	BaseURL           string                 `yaml:"base_url"`
+	ControlBaseURL    string                 `yaml:"control_base_url"`
+	Timeout           time.Duration          `yaml:"timeout"`
+	Retry             RetryConfig            `yaml:"retry"`
+	Models            map[string]ModelConfig `yaml:"models"`
 }
 
 type RetryConfig struct {
@@ -97,22 +112,76 @@ type RetryConfig struct {
 }
 
 type ModelConfig struct {
-	Modality        modality.Modality     `yaml:"modality"`
-	Capabilities    []modality.Capability `yaml:"capabilities"`
-	ContextWindow   int                   `yaml:"context_window"`
-	MaxOutputTokens int                   `yaml:"max_output_tokens"`
-	OutputFormats   []string              `yaml:"output_formats"`
-	Dimensions      int                   `yaml:"dimensions"`
-	Endpoint        string                `yaml:"endpoint"`
-	MaxDuration     int                   `yaml:"max_duration"`
-	Resolutions     []string              `yaml:"resolutions"`
-	Voices          []string              `yaml:"voices"`
-	Formats         []string              `yaml:"formats"`
+	Modality         modality.Modality     `yaml:"modality"`
+	Capabilities     []modality.Capability `yaml:"capabilities"`
+	ContextWindow    int                   `yaml:"context_window"`
+	MaxOutputTokens  int                   `yaml:"max_output_tokens"`
+	OutputFormats    []string              `yaml:"output_formats"`
+	MinDurationMs    int                   `yaml:"min_duration_ms"`
+	MaxDurationMs    int                   `yaml:"max_duration_ms"`
+	SampleRatesHz    []int                 `yaml:"sample_rates_hz"`
+	Dimensions       int                   `yaml:"dimensions"`
+	Endpoint         string                `yaml:"endpoint"`
+	MaxDuration      int                   `yaml:"max_duration"`
+	AllowedDurations []int                 `yaml:"allowed_durations"`
+	AspectRatios     []string              `yaml:"aspect_ratios"`
+	Resolutions      []string              `yaml:"resolutions"`
+	Cancelable       bool                  `yaml:"cancelable"`
+	Voices           []string              `yaml:"voices"`
+	Formats          []string              `yaml:"formats"`
+	AudioPipeline    AudioPipelineConfig   `yaml:"audio_pipeline"`
+	RealtimeSession  AudioRealtimeConfig   `yaml:"realtime_session"`
+	SessionTTL       time.Duration         `yaml:"session_ttl"`
+}
+
+type AudioPipelineConfig struct {
+	ChatModel string `yaml:"chat_model"`
+	STTModel  string `yaml:"stt_model"`
+	TTSModel  string `yaml:"tts_model"`
+}
+
+type AudioRealtimeConfig struct {
+	Transport  string `yaml:"transport"`
+	Auth       string `yaml:"auth"`
+	URL        string `yaml:"url"`
+	Model      string `yaml:"model"`
+	ResourceID string `yaml:"resource_id"`
+	AppKey     string `yaml:"app_key"`
 }
 
 type RoutingConfig struct {
-	Fallbacks []FallbackRule    `yaml:"fallbacks"`
-	Aliases   map[string]string `yaml:"aliases"`
+	Fallbacks []FallbackRule             `yaml:"fallbacks"`
+	Aliases   map[string]string          `yaml:"aliases"`
+	Selectors map[string]RoutingSelector `yaml:"selectors"`
+}
+
+type RoutingSelector struct {
+	Modality            modality.Modality     `yaml:"modality"`
+	Capabilities        []modality.Capability `yaml:"capabilities"`
+	Providers           []string              `yaml:"providers"`
+	ExcludeProviders    []string              `yaml:"exclude_providers"`
+	Statuses            []string              `yaml:"statuses"`
+	VerificationClasses []string              `yaml:"verification_classes"`
+	Prefer              []string              `yaml:"prefer"`
+	CostTier            string                `yaml:"cost_tier"`
+	LatencyTier         string                `yaml:"latency_tier"`
+}
+
+type ControlPlaneConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+type LocalToolConfig struct {
+	Implementation string `yaml:"implementation"`
+}
+
+type ToolsConfig struct {
+	Enabled bool                       `yaml:"enabled"`
+	Local   map[string]LocalToolConfig `yaml:"local"`
+}
+
+type MCPConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type FallbackRule struct {
@@ -124,6 +193,8 @@ type FallbackRule struct {
 type ObservabilityConfig struct {
 	Metrics MetricsConfig `yaml:"metrics"`
 	Logging LoggingConfig `yaml:"logging"`
+	Traces  TracesConfig  `yaml:"traces"`
+	Audit   AuditConfig   `yaml:"audit"`
 }
 
 type MetricsConfig struct {
@@ -134,6 +205,18 @@ type MetricsConfig struct {
 type LoggingConfig struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
+}
+
+type TracesConfig struct {
+	Enabled     bool    `yaml:"enabled"`
+	Endpoint    string  `yaml:"endpoint"`
+	Insecure    bool    `yaml:"insecure"`
+	ServiceName string  `yaml:"service_name"`
+	SampleRatio float64 `yaml:"sample_ratio"`
+}
+
+type AuditConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type RuntimeOverrides struct {
@@ -179,8 +262,14 @@ func Default() Config {
 		},
 		Providers: map[string]ProviderConfig{},
 		Routing: RoutingConfig{
-			Aliases: map[string]string{},
+			Aliases:   map[string]string{},
+			Selectors: map[string]RoutingSelector{},
 		},
+		ControlPlane: ControlPlaneConfig{},
+		Tools: ToolsConfig{
+			Local: map[string]LocalToolConfig{},
+		},
+		MCP: MCPConfig{},
 		Observability: ObservabilityConfig{
 			Metrics: MetricsConfig{
 				Enabled: true,
@@ -189,6 +278,13 @@ func Default() Config {
 			Logging: LoggingConfig{
 				Level:  "info",
 				Format: "json",
+			},
+			Traces: TracesConfig{
+				ServiceName: "polaris",
+				SampleRatio: 1,
+			},
+			Audit: AuditConfig{
+				Enabled: true,
 			},
 		},
 	}
@@ -211,6 +307,12 @@ func Load(path string) (*Config, []string, error) {
 	}
 	if cfg.Routing.Aliases == nil {
 		cfg.Routing.Aliases = map[string]string{}
+	}
+	if cfg.Routing.Selectors == nil {
+		cfg.Routing.Selectors = map[string]RoutingSelector{}
+	}
+	if cfg.Tools.Local == nil {
+		cfg.Tools.Local = map[string]LocalToolConfig{}
 	}
 
 	if err := ApplyEnvOverrides(&cfg); err != nil {
@@ -240,6 +342,9 @@ func ApplyEnvOverrides(cfg *Config) error {
 	if value := os.Getenv("POLARIS_AUTH_MODE"); value != "" {
 		cfg.Auth.Mode = AuthMode(value)
 	}
+	if value := os.Getenv("POLARIS_BOOTSTRAP_ADMIN_KEY_HASH"); value != "" {
+		cfg.Auth.BootstrapAdminKeyHash = value
+	}
 	if value := os.Getenv("POLARIS_STORE_DRIVER"); value != "" {
 		cfg.Store.Driver = value
 	}
@@ -248,6 +353,29 @@ func ApplyEnvOverrides(cfg *Config) error {
 	}
 	if value := os.Getenv("POLARIS_CACHE_DRIVER"); value != "" {
 		cfg.Cache.Driver = value
+	}
+	if value := os.Getenv("POLARIS_CACHE_URL"); value != "" {
+		cfg.Cache.URL = value
+	}
+	if value := os.Getenv("POLARIS_OTEL_ENDPOINT"); value != "" {
+		cfg.Observability.Traces.Endpoint = value
+	}
+	if value := os.Getenv("POLARIS_OTEL_SERVICE_NAME"); value != "" {
+		cfg.Observability.Traces.ServiceName = value
+	}
+	if value := os.Getenv("POLARIS_OTEL_INSECURE"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_OTEL_INSECURE: %w", err)
+		}
+		cfg.Observability.Traces.Insecure = parsed
+	}
+	if value := os.Getenv("POLARIS_OTEL_SAMPLE_RATIO"); value != "" {
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_OTEL_SAMPLE_RATIO: %w", err)
+		}
+		cfg.Observability.Traces.SampleRatio = parsed
 	}
 	return nil
 }
@@ -297,7 +425,7 @@ func (c Config) Address() string {
 
 func (m AuthMode) Valid() bool {
 	switch m {
-	case AuthModeNone, AuthModeStatic, AuthModeMultiUser:
+	case AuthModeNone, AuthModeStatic, AuthModeVirtualKeys, AuthModeMultiUser:
 		return true
 	default:
 		return false

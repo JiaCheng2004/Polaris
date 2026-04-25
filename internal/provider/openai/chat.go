@@ -52,7 +52,9 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 	stream := make(chan modality.ChatChunk)
 	go func() {
 		defer close(stream)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if err := decodeOpenAIStream(resp.Body, req.Model, a.model, stream); err != nil {
 			stream <- modality.ChatChunk{Err: err}

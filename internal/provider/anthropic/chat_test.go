@@ -122,6 +122,50 @@ func TestChatAdapterStreamNormalizesEvents(t *testing.T) {
 	}
 }
 
+func TestChatAdapterCountTokensUsesNativeEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages/count_tokens" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("x-api-key"); got != "sk-anthropic" {
+			t.Fatalf("unexpected x-api-key header %q", got)
+		}
+
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if payload["system"] != "You are helpful." {
+			t.Fatalf("expected hoisted system prompt, got %#v", payload["system"])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"input_tokens":23}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(config.ProviderConfig{
+		APIKey:  "sk-anthropic",
+		BaseURL: server.URL,
+		Timeout: time.Second,
+	})
+	adapter := NewChatAdapter(client, "anthropic/claude-sonnet-4-6", 4096)
+
+	result, err := adapter.CountTokens(context.Background(), &modality.ChatRequest{
+		Model: "anthropic/claude-sonnet-4-6",
+		Messages: []modality.ChatMessage{
+			{Role: "system", Content: modality.NewTextContent("You are helpful.")},
+			{Role: "user", Content: modality.NewTextContent("Count this prompt.")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CountTokens() error = %v", err)
+	}
+	if result.Source != modality.TokenCountSourceProviderReported || result.InputTokens != 23 {
+		t.Fatalf("unexpected count token result %#v", result)
+	}
+}
+
 func TestChatAdapterMapsAuthFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

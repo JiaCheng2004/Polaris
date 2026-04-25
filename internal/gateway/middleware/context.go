@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/gin-gonic/gin"
 )
@@ -8,23 +9,41 @@ import (
 const (
 	authContextKey = "polaris.auth"
 	requestIDKey   = "polaris.request_id"
+	traceIDKey     = "polaris.trace_id"
 	outcomeKey     = "polaris.request_outcome"
+	runtimeKey     = "polaris.runtime"
 )
 
 type AuthContext struct {
-	KeyID         string
-	OwnerID       string
-	KeyPrefix     string
-	RateLimit     string
-	AllowedModels []string
-	IsAdmin       bool
-	Mode          string
+	ProjectID          string
+	VirtualKeyID       string
+	KeyID              string
+	OwnerID            string
+	KeyPrefix          string
+	RateLimit          string
+	AllowedModels      []string
+	AllowedModalities  []modality.Modality
+	AllowedToolsets    []string
+	AllowedMCPBindings []string
+	PolicyModels       []string
+	PolicyModalities   []modality.Modality
+	PolicyToolsets     []string
+	PolicyMCPBindings  []string
+	IsAdmin            bool
+	Mode               string
+	TokenSource        string
 }
 
 type RequestOutcome struct {
 	Model             string
 	Provider          string
 	Modality          modality.Modality
+	InterfaceFamily   string
+	TokenSource       modality.TokenCountSource
+	CacheStatus       string
+	FallbackModel     string
+	Toolset           string
+	MCPBinding        string
 	StatusCode        int
 	ErrorType         string
 	ProviderLatencyMs int
@@ -63,6 +82,19 @@ func GetRequestID(c *gin.Context) string {
 	return requestID
 }
 
+func SetTraceID(c *gin.Context, traceID string) {
+	c.Set(traceIDKey, traceID)
+}
+
+func GetTraceID(c *gin.Context) string {
+	value, ok := c.Get(traceIDKey)
+	if !ok {
+		return ""
+	}
+	traceID, _ := value.(string)
+	return traceID
+}
+
 func SetRequestOutcome(c *gin.Context, outcome RequestOutcome) {
 	c.Set(outcomeKey, outcome)
 }
@@ -77,4 +109,30 @@ func GetRequestOutcome(c *gin.Context) (RequestOutcome, bool) {
 		return RequestOutcome{}, false
 	}
 	return outcome, true
+}
+
+func SetRuntimeSnapshot(c *gin.Context, snapshot *gwruntime.Snapshot) {
+	c.Set(runtimeKey, snapshot)
+}
+
+func GetRuntimeSnapshot(c *gin.Context) (*gwruntime.Snapshot, bool) {
+	value, ok := c.Get(runtimeKey)
+	if !ok {
+		return nil, false
+	}
+	snapshot, ok := value.(*gwruntime.Snapshot)
+	if !ok {
+		return nil, false
+	}
+	return snapshot, true
+}
+
+func RuntimeSnapshot(c *gin.Context, holder *gwruntime.Holder) *gwruntime.Snapshot {
+	if snapshot, ok := GetRuntimeSnapshot(c); ok {
+		return snapshot
+	}
+	if holder == nil {
+		return nil
+	}
+	return holder.Current()
 }

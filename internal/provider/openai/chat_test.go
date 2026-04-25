@@ -131,3 +131,35 @@ func TestChatAdapterMapsRateLimitError(t *testing.T) {
 		t.Fatalf("unexpected api error %#v", apiErr)
 	}
 }
+
+func TestChatAdapterMapsQuotaExceededError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"insufficient_quota","code":"insufficient_quota"}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(config.ProviderConfig{
+		APIKey:  "sk-test",
+		BaseURL: server.URL + "/v1",
+		Timeout: time.Second,
+	})
+	adapter := NewChatAdapter(client, "openai/gpt-4o")
+
+	_, err := adapter.Complete(context.Background(), &modality.ChatRequest{
+		Model: "openai/gpt-4o",
+		Messages: []modality.ChatMessage{
+			{Role: "user", Content: modality.NewTextContent("Hello")},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	var apiErr *httputil.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected APIError, got %T", err)
+	}
+	if apiErr.Status != http.StatusTooManyRequests || apiErr.Type != "rate_limit_error" || apiErr.Code != "quota_exceeded" {
+		t.Fatalf("unexpected api error %#v", apiErr)
+	}
+}

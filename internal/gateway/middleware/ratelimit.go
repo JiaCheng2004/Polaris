@@ -10,18 +10,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
+	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/attribute"
 )
 
-func RateLimit(cfg *config.Config, limiter cache.Cache, logger *slog.Logger) gin.HandlerFunc {
+func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logger, recorder *metrics.Recorder) gin.HandlerFunc {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	return func(c *gin.Context) {
+		ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "rate_limit.evaluate")
+		defer span.End()
+		c.Request = c.Request.WithContext(ctx)
+
+		snapshot := RuntimeSnapshot(c, holder)
+		if snapshot == nil || snapshot.Config == nil {
+			httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "runtime_unavailable", "", "Runtime configuration is unavailable."))
+			return
+		}
+		cfg := snapshot.Config
+
 		if !cfg.Cache.RateLimit.Enabled || limiter == nil {
 			c.Next()
 			return
@@ -76,7 +90,12 @@ func RateLimit(cfg *config.Config, limiter cache.Cache, logger *slog.Logger) gin
 			if retryAfter < 1 {
 				retryAfter = 1
 			}
+			span.SetAttributes(
+				attribute.String("polaris.key_id", auth.KeyID),
+				attribute.Bool("polaris.rate_limit.denied", true),
+			)
 			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+			recorder.IncRateLimit(auth.KeyID)
 			httputil.WriteError(c, httputil.NewError(http.StatusTooManyRequests, "rate_limit_error", "rate_limit_exceeded", "", "Rate limit exceeded."))
 			return
 		}

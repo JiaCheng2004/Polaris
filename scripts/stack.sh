@@ -16,6 +16,7 @@ Commands:
   logs       Follow logs for the selected stack
   ps         Show container status for the selected stack
   config     Render the effective Compose config for the selected stack
+  validate   Validate the effective Compose config without rendering it
   pull       Pull images for the selected stack
 
 Stacks:
@@ -140,6 +141,9 @@ main() {
       ;;
     config)
       compose "${stack}" config "$@"
+      ;;
+    validate)
+      compose "${stack}" config --quiet "$@"
       ;;
     pull)
       compose "${stack}" pull "$@"
