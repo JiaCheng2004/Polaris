@@ -45,7 +45,12 @@ func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.R
 
 		snapshot := RuntimeSnapshot(c, runtime)
 		auth := GetAuthContext(c)
-		if snapshot == nil || snapshot.Config == nil || snapshot.Config.Auth.Mode != config.AuthModeVirtualKeys {
+		if snapshot == nil || snapshot.Config == nil {
+			c.Next()
+			return
+		}
+		authMode := snapshot.Config.Auth.Mode
+		if authMode != config.AuthModeVirtualKeys && authMode != config.AuthModeExternal {
 			c.Next()
 			return
 		}
@@ -54,6 +59,10 @@ func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.R
 			return
 		}
 		if auth.ProjectID == "" || auth.TokenSource == "bootstrap_admin" {
+			c.Next()
+			return
+		}
+		if appStore == nil {
 			c.Next()
 			return
 		}

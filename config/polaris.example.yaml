@@ -11,7 +11,14 @@ server:
 
 auth:
   # End-state production auth: Polaris virtual keys issued from the control plane.
+  # Use external when another platform owns login and signs trusted claims for Polaris.
+  # Supported modes: none, static, external, virtual_keys, multi-user.
   mode: virtual_keys
+  external:
+    provider: signed_headers
+    shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}
+    max_clock_skew: 60s
+    cache_ttl: 60s
   bootstrap_admin_key_hash: ${POLARIS_BOOTSTRAP_ADMIN_KEY_HASH}
 
 store:

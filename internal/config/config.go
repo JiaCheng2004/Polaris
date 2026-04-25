@@ -39,15 +39,24 @@ type AuthMode string
 const (
 	AuthModeNone        AuthMode = "none"
 	AuthModeStatic      AuthMode = "static"
+	AuthModeExternal    AuthMode = "external"
 	AuthModeVirtualKeys AuthMode = "virtual_keys"
 	AuthModeMultiUser   AuthMode = "multi-user"
 )
 
 type AuthConfig struct {
-	Mode                  AuthMode          `yaml:"mode"`
-	StaticKeys            []StaticKeyConfig `yaml:"static_keys"`
-	AdminKeyHash          string            `yaml:"admin_key_hash"`
-	BootstrapAdminKeyHash string            `yaml:"bootstrap_admin_key_hash"`
+	Mode                  AuthMode           `yaml:"mode"`
+	StaticKeys            []StaticKeyConfig  `yaml:"static_keys"`
+	External              ExternalAuthConfig `yaml:"external"`
+	AdminKeyHash          string             `yaml:"admin_key_hash"`
+	BootstrapAdminKeyHash string             `yaml:"bootstrap_admin_key_hash"`
+}
+
+type ExternalAuthConfig struct {
+	Provider     string        `yaml:"provider"`
+	SharedSecret string        `yaml:"shared_secret"`
+	MaxClockSkew time.Duration `yaml:"max_clock_skew"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
 }
 
 type StaticKeyConfig struct {
@@ -238,6 +247,11 @@ func Default() Config {
 		Auth: AuthConfig{
 			Mode:       AuthModeNone,
 			StaticKeys: []StaticKeyConfig{},
+			External: ExternalAuthConfig{
+				Provider:     "signed_headers",
+				MaxClockSkew: 60 * time.Second,
+				CacheTTL:     60 * time.Second,
+			},
 		},
 		Store: StoreConfig{
 			Driver:           "sqlite",
@@ -345,6 +359,26 @@ func ApplyEnvOverrides(cfg *Config) error {
 	if value := os.Getenv("POLARIS_BOOTSTRAP_ADMIN_KEY_HASH"); value != "" {
 		cfg.Auth.BootstrapAdminKeyHash = value
 	}
+	if value := os.Getenv("POLARIS_EXTERNAL_AUTH_PROVIDER"); value != "" {
+		cfg.Auth.External.Provider = value
+	}
+	if value := os.Getenv("POLARIS_EXTERNAL_AUTH_SECRET"); value != "" {
+		cfg.Auth.External.SharedSecret = value
+	}
+	if value := os.Getenv("POLARIS_EXTERNAL_AUTH_MAX_CLOCK_SKEW"); value != "" {
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_EXTERNAL_AUTH_MAX_CLOCK_SKEW: %w", err)
+		}
+		cfg.Auth.External.MaxClockSkew = parsed
+	}
+	if value := os.Getenv("POLARIS_EXTERNAL_AUTH_CACHE_TTL"); value != "" {
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_EXTERNAL_AUTH_CACHE_TTL: %w", err)
+		}
+		cfg.Auth.External.CacheTTL = parsed
+	}
 	if value := os.Getenv("POLARIS_STORE_DRIVER"); value != "" {
 		cfg.Store.Driver = value
 	}
@@ -425,7 +459,7 @@ func (c Config) Address() string {
 
 func (m AuthMode) Valid() bool {
 	switch m {
-	case AuthModeNone, AuthModeStatic, AuthModeVirtualKeys, AuthModeMultiUser:
+	case AuthModeNone, AuthModeStatic, AuthModeExternal, AuthModeVirtualKeys, AuthModeMultiUser:
 		return true
 	default:
 		return false

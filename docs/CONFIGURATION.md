@@ -25,7 +25,7 @@ Supported CLI flags from the blueprint:
 ## Sections
 
 - `server`: listener address and request/shutdown timeouts.
-- `auth`: auth mode, static keys, legacy multi-user compatibility, and virtual-key bootstrap settings.
+- `auth`: auth mode, static keys, external signed-claim auth, legacy multi-user compatibility, and virtual-key bootstrap settings.
 - `store`: backing database driver, DSN, and async log writer tuning.
 - `cache`: driver selection, Redis connection settings, rate limiting, and response-cache settings.
 - `providers`: provider credentials, base URLs, retry policy, and model catalog.
@@ -42,6 +42,66 @@ The current runtime intentionally keeps `control_plane`, `tools`, and `mcp` YAML
 - Provider credentials must come from environment variables via `${VAR_NAME}` references.
 - Do not commit plaintext API keys, admin keys, TLS material, or local `.env` files.
 - Static and admin gateway keys must be stored as hashes, not plaintext values.
+- `auth.external.shared_secret` must come from an environment variable such as `${POLARIS_EXTERNAL_AUTH_SECRET}` and must not be committed as a literal.
+
+## Authentication Modes
+
+Choose the smallest auth mode that matches the deployment:
+
+- `auth.mode: none`: local-only development path. Polaris accepts every request and applies wildcard model access.
+- `auth.mode: static`: simple fixed API keys defined in YAML. Good for private demos or one trusted service.
+- `auth.mode: external`: bring-your-own-auth path. Your app owns Google OAuth, SMS OTP, SSO, sessions, and user lifecycle; Polaris verifies signed request claims.
+- `auth.mode: virtual_keys`: Polaris-owned production key plane with projects, policies, budgets, toolsets, MCP bindings, and audit records.
+- `auth.mode: multi-user`: compatibility path for older database-backed `api_keys` rows.
+
+External auth uses the built-in `signed_headers` provider:
+
+```yaml
+auth:
+  mode: external
+  external:
+    provider: signed_headers
+    shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}
+    max_clock_skew: 60s
+    cache_ttl: 60s
+```
+
+Equivalent environment overrides are:
+
+- `POLARIS_AUTH_MODE=external`
+- `POLARIS_EXTERNAL_AUTH_PROVIDER=signed_headers`
+- `POLARIS_EXTERNAL_AUTH_SECRET=<shared-secret>`
+- `POLARIS_EXTERNAL_AUTH_MAX_CLOCK_SKEW=60s`
+- `POLARIS_EXTERNAL_AUTH_CACHE_TTL=60s`
+
+The host platform sends:
+
+- `X-Polaris-External-Auth`: base64url JSON claims
+- `X-Polaris-External-Auth-Timestamp`: Unix seconds
+- `X-Polaris-External-Auth-Signature`: `v1=<hex hmac-sha256>` over `timestamp + "\n" + encoded_claims`
+
+Required claim:
+
+- `sub`: stable external subject/user ID
+
+Optional policy claims:
+
+- `project_id`
+- `key_id`
+- `key_prefix`
+- `is_admin`
+- `rate_limit`
+- `allowed_models`
+- `allowed_modalities`
+- `allowed_toolsets`
+- `allowed_mcp_bindings`
+- `policy_models`
+- `policy_modalities`
+- `policy_toolsets`
+- `policy_mcp_bindings`
+- `expires_at`
+
+Use `external` when Polaris is embedded behind a product backend. Use `virtual_keys` when Polaris itself should be the API key and project boundary.
 
 ## Current Phase Guidance
 
@@ -79,6 +139,7 @@ Phase 5 music hardening is current. The shipped runtime supports:
 - `observability.traces`
 - `observability.audit`
 - `auth.mode: virtual_keys`
+- `auth.mode: external`
 - compatibility `auth.mode: multi-user`
 - control-plane management via `/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, and `/v1/mcp/bindings`
 - legacy key management compatibility via `/v1/keys`
@@ -168,10 +229,17 @@ Current runtime limits for audio sessions:
 Preferred auth mode for production is `virtual_keys`. In that mode:
 
 - bearer tokens are Polaris virtual keys stored in the database
-- `auth.bootstrap_admin_key_hash` is required when `control_plane.enabled: true`
+- `auth.bootstrap_admin_key_hash` is required when `auth.mode: virtual_keys`
 - the bootstrap admin key can manage control-plane endpoints, but it is not valid for inference endpoints
 - project policies gate models, modalities, toolsets, and MCP bindings
 - hard budgets can block requests once the current budget window is already exceeded
+
+Preferred auth mode for embedding Polaris behind another platform is `external`. In that mode:
+
+- the platform handles OAuth, SMS OTP, SSO, users, sessions, and tenancy
+- Polaris verifies signed headers from that trusted platform
+- signed claims become the same request `AuthContext` used by rate limits, model policy, modality policy, tools, MCP, audit, and budgets
+- `is_admin: true` in the signed claims is required for control-plane endpoints
 
 `auth.mode: multi-user` remains as a compatibility path for older database-backed key rows and the legacy `/v1/keys` surface.
 
@@ -354,6 +422,13 @@ Recommended production/auth baseline:
 - `mcp.enabled: true`
 - `observability.audit.enabled: true`
 - `observability.traces.enabled: true` when OTLP export is available
+
+Recommended embedded-platform auth baseline:
+
+- `auth.mode: external`
+- `auth.external.provider: signed_headers`
+- `auth.external.shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}`
+- `control_plane.enabled: true` only if the upstream platform signs `is_admin: true` for trusted operators
 
 Compatibility/local options still exist:
 

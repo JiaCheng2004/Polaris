@@ -33,8 +33,29 @@ func Validate(cfg *Config) error {
 	if cfg.Auth.Mode == AuthModeStatic && len(cfg.Auth.StaticKeys) == 0 {
 		problems = append(problems, errors.New("auth.static_keys must contain at least one key in static mode"))
 	}
-	if cfg.ControlPlane.Enabled && strings.TrimSpace(cfg.Auth.BootstrapAdminKeyHash) == "" {
-		problems = append(problems, errors.New("auth.bootstrap_admin_key_hash is required when control_plane.enabled=true"))
+	if cfg.Auth.Mode == AuthModeExternal {
+		provider := strings.TrimSpace(cfg.Auth.External.Provider)
+		if provider == "" {
+			problems = append(problems, errors.New("auth.external.provider is required when auth.mode=external"))
+		} else if provider != "signed_headers" {
+			problems = append(problems, fmt.Errorf("auth.external.provider %q is invalid; expected signed_headers", cfg.Auth.External.Provider))
+		}
+		if strings.TrimSpace(cfg.Auth.External.SharedSecret) == "" {
+			problems = append(problems, errors.New("auth.external.shared_secret is required when auth.mode=external"))
+		}
+		if cfg.Auth.External.MaxClockSkew <= 0 {
+			problems = append(problems, errors.New("auth.external.max_clock_skew must be greater than zero"))
+		}
+		if cfg.Auth.External.CacheTTL < 0 {
+			problems = append(problems, errors.New("auth.external.cache_ttl must not be negative"))
+		}
+	}
+	if cfg.ControlPlane.Enabled {
+		switch cfg.Auth.Mode {
+		case AuthModeVirtualKeys, AuthModeExternal, AuthModeMultiUser:
+		default:
+			problems = append(problems, errors.New("control_plane.enabled requires auth.mode=virtual_keys, external, or multi-user"))
+		}
 	}
 	if cfg.Auth.Mode == AuthModeVirtualKeys && strings.TrimSpace(cfg.Auth.BootstrapAdminKeyHash) == "" {
 		problems = append(problems, errors.New("auth.bootstrap_admin_key_hash is required when auth.mode=virtual_keys"))

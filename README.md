@@ -28,6 +28,7 @@ The repository now contains the full Phase 1 foundation from the blueprint: boot
 - Optional request-level routing hints across model-taking endpoints, including multipart endpoints through a JSON `routing` form field
 - Built-in configured-model verification reports via `make verify-models`
 - Operator-managed virtual keys over provider-owned credentials
+- Bring-your-own-auth mode for platforms that already own OAuth, SMS OTP, SSO, sessions, and users
 - Policy-gated tool and MCP brokering
 - Stateless at runtime, with persistence delegated to external stores
 - Designed to run as a single binary with SQLite or scale out with PostgreSQL and Redis
@@ -328,6 +329,7 @@ Secrets must always come from environment variables via `${VAR_NAME}` references
 - [`spec/phase_3_image_voice_embeddings/README.md`](./spec/phase_3_image_voice_embeddings/README.md): Phase 3 ABZ package
 - [`CLAUDE.md`](./CLAUDE.md): repo-local agent workflow companion
 - [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md): target HTTP contract
+- [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md): local, static, external, virtual-key, and compatibility auth modes
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md): config guidance
 - [`docs/PROVIDERS.md`](./docs/PROVIDERS.md): provider-specific auth and quirks
 - [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md): contributor rules and phase boundaries

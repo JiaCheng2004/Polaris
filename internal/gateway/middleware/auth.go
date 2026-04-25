@@ -36,6 +36,7 @@ func Auth(holder *gwruntime.Holder, appStore store.Store, keyCache *APIKeyCache,
 	if virtualKeyCache == nil {
 		virtualKeyCache = NewVirtualKeyCache(authCacheTTL)
 	}
+	externalAuthCache := newExternalAuthCache()
 
 	return func(c *gin.Context) {
 		snapshot := RuntimeSnapshot(c, holder)
@@ -88,6 +89,21 @@ func Auth(holder *gwruntime.Holder, appStore store.Store, keyCache *APIKeyCache,
 				TokenSource:       "static",
 			})
 			span.SetAttributes(attribute.String("polaris.auth_source", "static"))
+			c.Next()
+			return
+		case config.AuthModeExternal:
+			auth, err := authenticateExternalSignedHeaders(c.Request, cfg.Auth.External, time.Now().UTC(), externalAuthCache)
+			if err != nil {
+				writeExternalAuthError(c, err)
+				return
+			}
+
+			SetAuthContext(c, auth)
+			span.SetAttributes(
+				attribute.String("polaris.auth_source", "external"),
+				attribute.String("polaris.project_id", auth.ProjectID),
+				attribute.String("polaris.key_id", auth.KeyID),
+			)
 			c.Next()
 			return
 		case config.AuthModeVirtualKeys:

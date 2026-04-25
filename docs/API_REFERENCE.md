@@ -46,19 +46,67 @@
 
 ## 2. Authentication
 
-Polaris supports three auth modes, selected via `auth.mode` in `polaris.yaml` (see `BLUEPRINT.md` §5.1 and §10.1):
+Polaris supports five auth modes, selected via `auth.mode` in `polaris.yaml` (see `BLUEPRINT.md` §5.1 and §10.1):
 
 | Mode | Header | Key source |
 |---|---|---|
 | `none` | — | No key required. Every request passes. Intended for local development only. |
 | `static` | `Authorization: Bearer <key>` | Keys defined in `polaris.yaml` under `auth.static_keys`. SHA-256 hash lookup in-memory, O(1). |
+| `external` | `X-Polaris-External-Auth`, `X-Polaris-External-Auth-Timestamp`, `X-Polaris-External-Auth-Signature` | Bring-your-own-auth mode. Your platform owns login, OAuth, SMS OTP, sessions, and user lifecycle. Polaris verifies signed claims and turns them into request policy context. |
 | `virtual_keys` | `Authorization: Bearer <key>` | Preferred production mode. Polaris virtual keys stored in the database. Hashed lookup via `store.GetVirtualKeyByHash`, cached in-memory with 60s TTL, then expanded into project / policy / budget context. |
 | `multi-user` | `Authorization: Bearer <key>` | Compatibility mode for older database-backed API key rows. Hashed lookup via `store.GetAPIKeyByHash`, cached in-memory with 60s TTL. |
+
+### External Auth
+
+`auth.mode: external` is the integration path for platforms that already have their own authentication. Polaris does not implement Google OAuth, SMS OTP, enterprise SSO, or application sessions directly. Instead, the host platform validates the user, builds a small claims document, signs it with a shared secret, and forwards the request to Polaris.
+
+The built-in external provider is `signed_headers`:
+
+| Header | Value |
+|---|---|
+| `X-Polaris-External-Auth` | Base64url-encoded JSON claims. |
+| `X-Polaris-External-Auth-Timestamp` | Unix seconds when the claims were signed. |
+| `X-Polaris-External-Auth-Signature` | `v1=<hex hmac-sha256>` over `timestamp + "\n" + encoded_claims`. Bare hex is also accepted. |
+
+Supported claim fields:
+
+| Claim | Type | Behavior |
+|---|---|---|
+| `sub` | string | Required. External subject/user ID. Used as `OwnerID`; `key_id` defaults to `external:<sub>`. |
+| `project_id` | string | Optional Polaris project ID for usage, budgets, audit context, and control-plane ownership. |
+| `key_id` | string | Optional stable key identity for logs/audit. |
+| `key_prefix` | string | Optional non-secret display prefix for logs/audit. |
+| `is_admin` | boolean | Allows control-plane endpoints when true. |
+| `rate_limit` | string | Optional per-identity limit such as `60/min`. |
+| `allowed_models` | string array | Model glob allowlist. Defaults to `["*"]`. |
+| `allowed_modalities` | string array | Modality allowlist. Defaults to all modalities. |
+| `allowed_toolsets` | string array | Toolset allowlist for tool execution. |
+| `allowed_mcp_bindings` | string array | MCP binding allowlist. |
+| `policy_models` | string array | Optional additional model policy gate. |
+| `policy_modalities` | string array | Optional additional modality policy gate. |
+| `policy_toolsets` | string array | Optional additional toolset policy gate. |
+| `policy_mcp_bindings` | string array | Optional additional MCP binding policy gate. |
+| `expires_at` | RFC3339 string or Unix seconds | Optional claim expiry. |
+
+Example claims before base64url encoding:
+
+```json
+{
+  "sub": "user_123",
+  "project_id": "proj_123",
+  "is_admin": false,
+  "rate_limit": "60/min",
+  "allowed_models": ["openai/*", "anthropic/*"],
+  "allowed_modalities": ["chat", "embed"],
+  "expires_at": "2026-04-25T20:30:00Z"
+}
+```
 
 Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, `/v1/mcp/bindings`) require admin access:
 
 - in `auth.mode: virtual_keys`, use either the configured bootstrap admin key or a virtual key with `is_admin: true`
-- in `auth.mode: multi-user`, only the legacy `/v1/keys` surface is available
+- in `auth.mode: external`, set `is_admin: true` in the signed claims from the trusted upstream platform
+- in `auth.mode: multi-user`, use a legacy database API key with `is_admin: true`; prefer `virtual_keys` or `external` for new deployments
 
 `/v1/keys` remains implemented as a compatibility facade. In `virtual_keys` mode it issues Polaris virtual keys using the older response shape. In `multi-user` mode it continues to manage the legacy `api_keys` rows.
 
@@ -73,6 +121,7 @@ Per `BLUEPRINT.md` §19:
 | Missing `Authorization` header | 401 | `authentication_error` | `missing_api_key` |
 | Header present but key not found | 401 | `authentication_error` | `invalid_api_key` |
 | Key found but revoked or expired | 401 | `authentication_error` | `key_revoked` / `key_expired` |
+| Missing or invalid external auth headers | 401 | `authentication_error` | `missing_external_auth` / `invalid_external_auth_signature` / `external_auth_timestamp_expired` / `external_auth_claims_expired` |
 | Key valid but not permitted to use the requested model | 403 | `permission_error` | `model_not_allowed` |
 | Key valid but not permitted to use the requested modality/toolset/MCP binding | 403 | `permission_error` | `modality_not_allowed` / `toolset_not_allowed` / `mcp_binding_not_allowed` |
 | Hard budget already exceeded for the current project | 403 | `permission_error` | `budget_exceeded` |

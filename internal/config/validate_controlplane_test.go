@@ -15,13 +15,34 @@ func TestValidateRejectsVirtualKeysWithoutBootstrapAdmin(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsEnabledControlPlaneWithoutBootstrapAdmin(t *testing.T) {
+func TestValidateRejectsEnabledControlPlaneWithUnsupportedAuthMode(t *testing.T) {
 	cfg := Default()
 	cfg.ControlPlane.Enabled = true
 
 	err := Validate(&cfg)
-	if err == nil || !strings.Contains(err.Error(), "auth.bootstrap_admin_key_hash is required when control_plane.enabled=true") {
-		t.Fatalf("expected control plane bootstrap validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "control_plane.enabled requires auth.mode=virtual_keys, external, or multi-user") {
+		t.Fatalf("expected control plane auth mode validation error, got %v", err)
+	}
+}
+
+func TestValidateAcceptsExternalAuthForControlPlane(t *testing.T) {
+	cfg := Default()
+	cfg.Auth.Mode = AuthModeExternal
+	cfg.Auth.External.SharedSecret = "test-secret"
+	cfg.ControlPlane.Enabled = true
+
+	if err := Validate(&cfg); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func TestValidateRejectsExternalAuthWithoutSharedSecret(t *testing.T) {
+	cfg := Default()
+	cfg.Auth.Mode = AuthModeExternal
+
+	err := Validate(&cfg)
+	if err == nil || !strings.Contains(err.Error(), "auth.external.shared_secret is required when auth.mode=external") {
+		t.Fatalf("expected external auth shared secret validation error, got %v", err)
 	}
 }
 
