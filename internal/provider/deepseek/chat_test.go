@@ -2,6 +2,7 @@ package deepseek
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -56,6 +57,51 @@ func TestChatAdapterComplete(t *testing.T) {
 	}
 	if len(response.Choices) != 1 || response.Choices[0].Message.Content.Text == nil || *response.Choices[0].Message.Content.Text != "Hello" {
 		t.Fatalf("unexpected response %#v", response)
+	}
+}
+
+func TestChatAdapterUsesV4ProviderModel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if payload.Model != "deepseek-v4-pro" {
+			t.Fatalf("provider model = %q, want deepseek-v4-pro", payload.Model)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl-v4",
+			"object":"chat.completion",
+			"created":1777161600,
+			"model":"deepseek-v4-pro",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"V4"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(config.ProviderConfig{
+		APIKey:  "sk-deepseek",
+		BaseURL: server.URL + "/v1",
+		Timeout: time.Second,
+	})
+	adapter := NewChatAdapter(client, "deepseek/deepseek-v4-pro")
+
+	response, err := adapter.Complete(context.Background(), &modality.ChatRequest{
+		Model: "deepseek/deepseek-v4-pro",
+		Messages: []modality.ChatMessage{
+			{Role: "user", Content: modality.NewTextContent("Hello")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+	if response.Model != "deepseek/deepseek-v4-pro" {
+		t.Fatalf("expected canonical model, got %q", response.Model)
 	}
 }
 

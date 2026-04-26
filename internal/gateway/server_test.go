@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2616,6 +2617,12 @@ func TestMetricsCaptureFailoverAndRateLimit(t *testing.T) {
 func TestMetricsActiveStreamsGaugeTracksInFlightStreams(t *testing.T) {
 	streamStarted := make(chan struct{})
 	releaseStream := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() {
+		releaseOnce.Do(func() {
+			close(releaseStream)
+		})
+	}
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -2662,6 +2669,7 @@ func TestMetricsActiveStreamsGaugeTracksInFlightStreams(t *testing.T) {
 
 	server := httptest.NewServer(engine)
 	defer server.Close()
+	defer release()
 
 	client := server.Client()
 	streamDone := make(chan string, 1)
@@ -2695,23 +2703,42 @@ func TestMetricsActiveStreamsGaugeTracksInFlightStreams(t *testing.T) {
 		t.Fatal("timed out waiting for stream to start")
 	}
 
-	metricsResp, err := client.Get(server.URL + "/metrics")
-	if err != nil {
-		t.Fatalf("GET /metrics error = %v", err)
+	readMetrics := func() string {
+		t.Helper()
+
+		metricsResp, err := client.Get(server.URL + "/metrics")
+		if err != nil {
+			t.Fatalf("GET /metrics error = %v", err)
+		}
+		bodyBytes, err := io.ReadAll(metricsResp.Body)
+		if closeErr := metricsResp.Body.Close(); closeErr != nil {
+			t.Fatalf("close metrics body: %v", closeErr)
+		}
+		if err != nil {
+			t.Fatalf("read metrics body: %v", err)
+		}
+		return string(bodyBytes)
 	}
-	bodyBytes, err := io.ReadAll(metricsResp.Body)
-	if closeErr := metricsResp.Body.Close(); closeErr != nil {
-		t.Fatalf("close metrics body: %v", closeErr)
-	}
-	if err != nil {
-		t.Fatalf("read metrics body: %v", err)
-	}
-	body := string(bodyBytes)
-	if !strings.Contains(body, `polaris_active_streams{model="openai/gpt-4o",provider="openai"} 1`) {
-		t.Fatalf("expected active stream gauge to be 1, got %s", body)
+	waitForMetric := func(expected string) string {
+		t.Helper()
+
+		deadline := time.Now().Add(2 * time.Second)
+		var body string
+		for {
+			body = readMetrics()
+			if strings.Contains(body, expected) {
+				return body
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("expected metrics to contain %q, got %s", expected, body)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 
-	close(releaseStream)
+	waitForMetric(`polaris_active_streams{model="openai/gpt-4o",provider="openai"} 1`)
+
+	release()
 
 	select {
 	case payload := <-streamDone:
@@ -2722,21 +2749,7 @@ func TestMetricsActiveStreamsGaugeTracksInFlightStreams(t *testing.T) {
 		t.Fatal("timed out waiting for stream completion")
 	}
 
-	metricsResp, err = client.Get(server.URL + "/metrics")
-	if err != nil {
-		t.Fatalf("GET /metrics error = %v", err)
-	}
-	bodyBytes, err = io.ReadAll(metricsResp.Body)
-	if closeErr := metricsResp.Body.Close(); closeErr != nil {
-		t.Fatalf("close metrics body: %v", closeErr)
-	}
-	if err != nil {
-		t.Fatalf("read metrics body: %v", err)
-	}
-	body = string(bodyBytes)
-	if !strings.Contains(body, `polaris_active_streams{model="openai/gpt-4o",provider="openai"} 0`) {
-		t.Fatalf("expected active stream gauge to return to 0, got %s", body)
-	}
+	waitForMetric(`polaris_active_streams{model="openai/gpt-4o",provider="openai"} 0`)
 }
 
 func testConfig(t *testing.T) *config.Config {

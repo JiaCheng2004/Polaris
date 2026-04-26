@@ -354,6 +354,46 @@ providers:
 	}
 }
 
+func TestLoadExpandsDeepSeekV4CatalogModelRefs(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+providers:
+  deepseek:
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.deepseek.com/v1
+      timeout: 60s
+    models:
+      use: [deepseek-v4-flash, deepseek-v4-pro]
+`)
+
+	cfg, _, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	for _, name := range []string{"deepseek-v4-flash", "deepseek-v4-pro"} {
+		model := cfg.Providers["deepseek"].Models[name]
+		if model.Modality != "chat" {
+			t.Fatalf("%s modality = %q, want chat", name, model.Modality)
+		}
+		if model.ContextWindow != 1000000 {
+			t.Fatalf("%s context_window = %d, want 1000000", name, model.ContextWindow)
+		}
+		if model.MaxOutputTokens != 384000 {
+			t.Fatalf("%s max_output_tokens = %d, want 384000", name, model.MaxOutputTokens)
+		}
+		if !modelHasCapability(model, "reasoning") {
+			t.Fatalf("%s missing reasoning capability: %#v", name, model.Capabilities)
+		}
+	}
+}
+
 func TestLoadRejectsUnknownModelRefWithoutModality(t *testing.T) {
 	configPath := writeTempConfig(t, `
 version: 2
@@ -445,4 +485,13 @@ func writeTempConfig(t *testing.T, content string) string {
 		t.Fatalf("write temp config: %v", err)
 	}
 	return path
+}
+
+func modelHasCapability(model ModelConfig, capability string) bool {
+	for _, item := range model.Capabilities {
+		if string(item) == capability {
+			return true
+		}
+	}
+	return false
 }

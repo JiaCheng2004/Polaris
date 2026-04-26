@@ -121,6 +121,7 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 
 	var (
 		writeMu    sync.Mutex
+		outcomeMu  sync.Mutex
 		done       = make(chan struct{})
 		writerDone sync.WaitGroup
 		outcome    = middleware.RequestOutcome{
@@ -131,13 +132,23 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 			StatusCode:      http.StatusSwitchingProtocols,
 			TokenSource:     modality.TokenCountSourceUnavailable,
 		}
-		lastErrorTyp string
 	)
 
 	writeEvent := func(event modality.StreamingTranscriptionServerEvent) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
 		return conn.WriteJSON(event)
+	}
+	recordOutcomeError := func(errorType string) {
+		outcomeMu.Lock()
+		defer outcomeMu.Unlock()
+		outcome.ErrorType = errorType
+		outcome.StatusCode = http.StatusBadGateway
+	}
+	snapshotOutcome := func() middleware.RequestOutcome {
+		outcomeMu.Lock()
+		defer outcomeMu.Unlock()
+		return outcome
 	}
 
 	writerDone.Add(1)
@@ -153,8 +164,7 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 					return
 				}
 				if event.Error != nil && strings.TrimSpace(event.Error.Type) != "" {
-					lastErrorTyp = event.Error.Type
-					outcome.StatusCode = http.StatusBadGateway
+					recordOutcomeError(event.Error.Type)
 				}
 				if err := writeEvent(event); err != nil {
 					return
@@ -184,8 +194,7 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 		var event modality.StreamingTranscriptionClientEvent
 		if err := conn.ReadJSON(&event); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				lastErrorTyp = "provider_transport_error"
-				outcome.StatusCode = http.StatusBadGateway
+				recordOutcomeError("provider_transport_error")
 			}
 			break
 		}
@@ -213,8 +222,7 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 
 	close(done)
 	writerDone.Wait()
-	outcome.ErrorType = lastErrorTyp
-	middleware.SetRequestOutcome(c, outcome)
+	middleware.SetRequestOutcome(c, snapshotOutcome())
 }
 
 func validateStreamingTranscriptionRequest(req *modality.StreamingTranscriptionSessionConfig) error {

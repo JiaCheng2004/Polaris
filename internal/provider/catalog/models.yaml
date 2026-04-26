@@ -135,6 +135,42 @@ models:
     verification_class: strict
     doc_url: https://api-docs.deepseek.com/
     last_verified: "2026-04-22"
+  - provider: deepseek
+    model_id: deepseek-v4-flash
+    display_name: DeepSeek V4 Flash
+    aliases: []
+    family_id: deepseek-v4-flash
+    family_display_name: DeepSeek V4 Flash
+    family_aliases: ["DeepSeek V4 Flash"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, json_mode, reasoning]
+    context_window: 1000000
+    max_output_tokens: 384000
+    cost_tier: low
+    latency_tier: fast
+    status: preview
+    verification_class: opt_in
+    doc_url: https://api-docs.deepseek.com/news/news260424
+    last_verified: "2026-04-26"
+  - provider: deepseek
+    model_id: deepseek-v4-pro
+    display_name: DeepSeek V4 Pro
+    aliases: []
+    family_id: deepseek-v4-pro
+    family_display_name: DeepSeek V4 Pro
+    family_aliases: ["DeepSeek V4 Pro"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, json_mode, reasoning]
+    context_window: 1000000
+    max_output_tokens: 384000
+    cost_tier: premium
+    latency_tier: best_quality
+    status: preview
+    verification_class: opt_in
+    doc_url: https://api-docs.deepseek.com/news/news260424
+    last_verified: "2026-04-26"
 
   - provider: featherless
     model_id: meta-llama/Meta-Llama-3.1-8B-Instruct
