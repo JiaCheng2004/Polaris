@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone completes the missing feature work inside Blueprint Phase 1. The goal is to move Polaris from a bootable kernel to a working chat gateway that can serve real OpenAI-compatible chat traffic through OpenAI and Anthropic, then record and report usage.
+This milestone completes the missing feature work inside Phase 1. The goal is to move Polaris from a bootable kernel to a working chat gateway that can serve real OpenAI-compatible chat traffic through OpenAI and Anthropic, then record and report usage.
 
 This is still Phase 1. It must not pull in Redis, PostgreSQL, hot reload, failover execution, metrics, or additional providers.
 

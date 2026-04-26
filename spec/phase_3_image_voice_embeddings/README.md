@@ -4,9 +4,9 @@ This folder is the ABZ package for Polaris Phase 3.
 
 - `A`: the current state after Phase 2 completion
 - `B`: the ordered implementation steps required to finish Phase 3
-- `Z`: the fully completed Phase 3 image, voice, embeddings, auth, and SDK layer described by `BLUEPRINT.md` section 16
+- `Z`: the fully completed Phase 3 image, voice, embeddings, auth, and SDK layer described by the architecture plan
 
-`BLUEPRINT.md` remains the source of truth. These files break Blueprint Phase 3 into concrete, decision-complete subplans with explicit dependencies and exit criteria.
+`docs/ARCHITECTURE.md` remains the source of truth. These files break Phase 3 into concrete, decision-complete subplans with explicit dependencies and exit criteria.
 
 ## ABZ Map
 
@@ -64,7 +64,7 @@ The following items are explicitly out of scope for this Phase 3 package:
 - release packaging and load testing
 - a public request contract for voice cloning
 
-Those belong to Blueprint Phase 4 or later follow-up work and should not be folded into this package.
+Those belong to Phase 4 or later follow-up work and should not be folded into this package.
 
 ## Sequence Rule
 

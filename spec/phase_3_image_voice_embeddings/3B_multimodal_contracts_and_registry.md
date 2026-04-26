@@ -9,7 +9,7 @@ This milestone turns the non-chat modality contracts into real runtime infrastru
 ## Key Changes
 
 - **Shared modality contracts**
-  - Implement real `internal/modality/embed.go`, `image.go`, and `voice.go` types and interfaces per `BLUEPRINT.md` section 6.
+  - Implement real `internal/modality/embed.go`, `image.go`, and `voice.go` types and interfaces per the architecture.
   - Keep the existing API reference as the wire-contract authority for field names, required fields, and response shapes.
   - Preserve the existing chat contract unchanged.
 

@@ -4,16 +4,16 @@
 
 Read these files before making non-trivial changes:
 
-1. `BLUEPRINT.md`
-2. `CLAUDE.md`
-3. `docs/API_REFERENCE.md` and `spec/openapi/polaris.v1.yaml` if your work touches HTTP behavior
+1. `docs/ARCHITECTURE.md`
+2. `docs/API_REFERENCE.md` and `spec/openapi/polaris.v1.yaml` if your work touches HTTP behavior
+3. `docs/ADDING_PROVIDER.md` if your work adds or changes a provider adapter
 
-The blueprint is the source of truth. If a local file disagrees with it, the blueprint wins.
+`docs/ARCHITECTURE.md` is the source of truth. If a local file disagrees with it, the architecture document wins.
 
 ## Ground Rules
 
 - Keep the project boring and dependency-light.
-- Do not add dependencies outside `BLUEPRINT.md` §3 without approval.
+- Do not add dependencies outside the documented architecture without approval.
 - Providers never import handlers.
 - Handlers never import provider packages directly.
 - Middleware stays generic and cross-cutting.
@@ -32,7 +32,7 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 - Keep PRs narrow.
 - If you change an endpoint, update `docs/API_REFERENCE.md`, `spec/openapi/polaris.v1.yaml`, and relevant contract fixtures in the same PR.
 - If you change config schema, update `docs/CONFIGURATION.md`, `schema/polaris.config.schema.json`, and `schema/cue/polaris.config.cue`.
-- If you add or change a provider, update `docs/PROVIDERS.md`.
+- If you add or change a provider, follow `docs/ADDING_PROVIDER.md` and update `docs/PROVIDERS.md`.
 - If you change the SDK surface, update `README.md`.
 - Prefer one provider per PR.
 
@@ -51,4 +51,4 @@ The blueprint is the source of truth. If a local file disagrees with it, the blu
 
 ## Implementation Phasing
 
-The early blueprint phases are implemented. New work should follow `BLUEPRINT.md` §16: keep `/v1` stable, add provider variants only through the model matrix when a real adapter exists, and prioritize capability completion, routing quality, validation proof, and operational hardening over generic provider expansion.
+The early implementation phases are complete. New work should keep `/v1` stable, add provider variants only through the model matrix when a real adapter exists, and prioritize capability completion, routing quality, validation proof, and operational hardening over generic provider expansion.

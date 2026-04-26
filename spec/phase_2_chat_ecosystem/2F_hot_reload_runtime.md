@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone adds safe runtime config reload without restarting the HTTP server. The blueprint is explicit: reload providers, models, aliases, fallbacks, and rate-limit settings in place, but do not restart the server and do not reinitialize the store connection.
+This milestone adds safe runtime config reload without restarting the HTTP server. Reload providers, models, aliases, fallbacks, and rate-limit settings in place, but do not restart the server and do not reinitialize the store connection.
 
 The implementation should be concurrency-safe first. Convenience comes second.
 

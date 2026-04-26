@@ -4,13 +4,13 @@
 
 ## Summary
 
-This milestone implements the Blueprint observability layer after the expanded provider matrix, distributed runtime, and failover behavior are real. Instrumentation should reflect the actual serving provider and actual runtime path, not just the requested model string.
+This milestone implements the observability layer after the expanded provider matrix, distributed runtime, and failover behavior are real. Instrumentation should reflect the actual serving provider and actual runtime path, not just the requested model string.
 
 ## Key Changes
 
 - **Prometheus metrics**
   - Implement `GET /metrics`.
-  - Expose the Blueprint metric catalog:
+  - Expose the metric catalog:
     - `polaris_requests_total`
     - `polaris_request_duration_seconds`
     - `polaris_provider_latency_seconds`
@@ -39,7 +39,7 @@ This milestone implements the Blueprint observability layer after the expanded p
     - status or error type as required by the metric
 
 - **Structured logging alignment**
-  - Keep log fields aligned with the Blueprint logging requirements:
+  - Keep log fields aligned with the logging requirements:
     - `request_id`
     - `model`
     - `provider`
@@ -78,7 +78,7 @@ This milestone implements the Blueprint observability layer after the expanded p
 
 `2G` is complete only when:
 
-- `/metrics` emits the Blueprint metric catalog
+- `/metrics` emits the metric catalog
 - instrumentation reflects the actual runtime behavior including fallback
 - the Grafana dashboard matches the exported metrics
 - `STACK=dev` is a real observability validation path

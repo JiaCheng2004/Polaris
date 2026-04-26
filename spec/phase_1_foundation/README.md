@@ -4,9 +4,9 @@ This folder is the ABZ package for Polaris Phase 1.
 
 - `A`: current state after the runtime-kernel work
 - `B`: the concrete implementation steps needed to finish Phase 1
-- `Z`: the fully completed Phase 1 foundation layer described by `BLUEPRINT.md` section 16
+- `Z`: the fully completed Phase 1 foundation layer described by the architecture plan
 
-`BLUEPRINT.md` remains the source of truth. These files break Blueprint Phase 1 into executable subplans with explicit exit criteria.
+`docs/ARCHITECTURE.md` remains the source of truth. These files break Phase 1 into executable subplans with explicit exit criteria.
 
 ## ABZ Map
 
@@ -60,8 +60,8 @@ The following items are explicitly out of scope for this Phase 1 package:
 - image, voice, embeddings, video, and full-duplex audio
 - response caching and cost-table expansion beyond what Phase 1 usage tracking needs
 
-Those belong to later Blueprint phases and should not be pulled into this package to finish chat faster.
+Those belong to later phases and should not be pulled into this package to finish chat faster.
 
 ## Exit Rule
 
-Do not mark Phase 1 done after `1B` lands. `1C` is the explicit close-out step that confirms the implementation, tests, docs, and repository status all match the Blueprint's Phase 1 definition.
+Do not mark Phase 1 done after `1B` lands. `1C` is the explicit close-out step that confirms the implementation, tests, docs, and repository status all match the Phase 1 definition.

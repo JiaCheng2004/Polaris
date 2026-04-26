@@ -127,6 +127,22 @@ func TestRegisteredRoutesMatchOpenAPIContract(t *testing.T) {
 	}
 }
 
+func TestOpenAPIPathsRemainDocumentedInAPIReference(t *testing.T) {
+	doc := loadOpenAPI(t)
+	reference := readAPIReference(t)
+
+	var missing []string
+	for path := range doc.Paths {
+		if !apiReferenceMentionsPath(reference, path) {
+			missing = append(missing, path)
+		}
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		t.Fatalf("OpenAPI paths missing from docs/API_REFERENCE.md:\n%s", strings.Join(missing, "\n"))
+	}
+}
+
 func TestGoldenHTTPContracts(t *testing.T) {
 	openAI := newFakeOpenAI(t)
 
@@ -401,6 +417,16 @@ func loadFixture(t *testing.T, name string) string {
 	return string(raw)
 }
 
+func readAPIReference(t *testing.T) string {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "API_REFERENCE.md"))
+	if err != nil {
+		t.Fatalf("read docs/API_REFERENCE.md: %v", err)
+	}
+	return string(raw)
+}
+
 func assertJSONFixture(t *testing.T, actual []byte, fixture string) {
 	t.Helper()
 
@@ -462,6 +488,29 @@ func normalizeGinPath(path string) string {
 	return strings.Join(parts, "/")
 }
 
+func apiReferenceMentionsPath(reference, path string) bool {
+	for _, candidate := range apiReferencePathCandidates(path) {
+		if strings.Contains(reference, candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+func apiReferencePathCandidates(path string) []string {
+	colonPath := strings.NewReplacer(
+		"{id}", ":id",
+		"{binding_id}", ":binding_id",
+		"{path}", "*path",
+	).Replace(path)
+	plainParamPath := strings.NewReplacer(
+		"{id}", "id",
+		"{binding_id}", "binding_id",
+		"{path}", "path",
+	).Replace(path)
+	return []string{path, colonPath, plainParamPath}
+}
+
 func missingRoutes(left, right map[string]struct{}) []string {
 	var missing []string
 	for route := range left {
@@ -489,8 +538,8 @@ func readPublicDocs(t *testing.T) string {
 	var builder strings.Builder
 	for _, name := range []string{
 		"README.md",
+		filepath.Join("docs", "ARCHITECTURE.md"),
 		filepath.Join("docs", "API_REFERENCE.md"),
-		"BLUEPRINT.md",
 	} {
 		raw, err := os.ReadFile(filepath.Join(repoRoot(t), name))
 		if err != nil {

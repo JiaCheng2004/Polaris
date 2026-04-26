@@ -2,7 +2,7 @@
 
 Polaris is a stateless, config-driven, multi-modality AI gateway written in Go. It sits between applications and external AI providers and exposes one unified gateway surface for chat, images, video, voice, embeddings, full-duplex audio sessions, and music.
 
-The project is being rebuilt as Polaris v2. The old Python monolith and Discord-bot infrastructure have been intentionally removed. This repository now tracks the Go gateway architecture defined in [BLUEPRINT.md](./BLUEPRINT.md).
+The project is being rebuilt as Polaris v2. The old Python monolith and Discord-bot infrastructure have been intentionally removed. This repository now tracks the Go gateway architecture defined in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ## Status
 
@@ -14,9 +14,9 @@ The project is being rebuilt as Polaris v2. The old Python monolith and Discord-
 - Current ByteDance speech coverage: TTS 2.0, file STT 2.0, streaming STT 2.0, realtime audio sessions, simultaneous interpretation 2.0, machine translation, voice catalog and voice assets, audio notes, and podcast generation are implemented and live-validated in the provider smoke matrix
 - Current provider-family hardening: the shared OpenAI-compatible adapter base is now in the runtime, the OpenAI catalog includes `gpt-5.5` and `gpt-image-2`, the chat-first families OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, and NVIDIA are wired through the same provider-common path, Amazon Bedrock is in the runtime through native Converse/ConverseStream plus Titan embedding adapters, NVIDIA now includes embeddings on the same official `/v1/embeddings` path, and Replicate is in the runtime through a native Predictions-based async video adapter plus an embedded YAML provider model matrix
 - Release validation: repo-local checks are the default open-source readiness gate. Live-smoke coverage is matrix-driven: `strict` models are release-blocking when credentials, quota, and plan access are available; `opt_in` models run only when explicitly enabled; `skipped` models stay outside the default matrix. Production Postgres/Redis load testing is optional operator validation for service deployments, not a default open-source release blocker.
-- Source of truth: `BLUEPRINT.md`
+- Source of truth: `docs/ARCHITECTURE.md`
 
-The repository now contains the full Phase 1 foundation from the blueprint: bootable server wiring, config loading and validation, SQLite storage, in-memory rate limiting, static auth, model registry, OpenAI and Anthropic chat adapters, usage logging, and the Phase 1 endpoints.
+The repository now contains the full Phase 1 foundation: bootable server wiring, config loading and validation, SQLite storage, in-memory rate limiting, static auth, model registry, OpenAI and Anthropic chat adapters, usage logging, and the Phase 1 endpoints.
 
 ## What Polaris Is
 
@@ -36,7 +36,7 @@ The repository now contains the full Phase 1 foundation from the blueprint: boot
 
 ## What Polaris Is Not
 
-- Not an agent framework
+- Not a workflow orchestration framework
 - Not a prompt orchestration system
 - Not a model host
 - Not a chat UI
@@ -125,7 +125,7 @@ Phase 3 completed scope:
 
 ## Repository Layout
 
-The repo follows the target layout from `BLUEPRINT.md`:
+The repo follows the target layout from `docs/ARCHITECTURE.md`:
 
 ```text
 cmd/polaris/              entrypoint
@@ -337,16 +337,17 @@ Secrets must always come from environment variables via `${VAR_NAME}` references
 
 ## Documentation Map
 
-- [`BLUEPRINT.md`](./BLUEPRINT.md): architecture and implementation source of truth
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md): architecture and implementation source of truth
 - [`spec/phase_1_foundation/README.md`](./spec/phase_1_foundation/README.md): Phase 1 ABZ package
 - [`spec/phase_2_chat_ecosystem/README.md`](./spec/phase_2_chat_ecosystem/README.md): Phase 2 ABZ package
 - [`spec/phase_3_image_voice_embeddings/README.md`](./spec/phase_3_image_voice_embeddings/README.md): Phase 3 ABZ package
-- [`CLAUDE.md`](./CLAUDE.md): repo-local agent workflow companion
 - [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md): target HTTP contract
 - [`spec/openapi/polaris.v1.yaml`](./spec/openapi/polaris.v1.yaml): machine-readable HTTP contract checked by `make contract-check`
 - [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md): local, static, external, virtual-key, and compatibility auth modes
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md): config guidance
 - [`docs/PROVIDERS.md`](./docs/PROVIDERS.md): provider-specific auth and quirks
+- [`docs/ADDING_PROVIDER.md`](./docs/ADDING_PROVIDER.md): provider adapter implementation checklist
+- [`docs/INTEGRATION_RECIPES.md`](./docs/INTEGRATION_RECIPES.md): copy-paste integration paths for common deployments
 - [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md): contributor rules and phase boundaries
 
 ## Migration Note
@@ -371,7 +372,7 @@ What remains in scope for Polaris:
 
 ## Contribution Rules
 
-- Read `BLUEPRINT.md` before changing architecture, config, APIs, or providers.
+- Read `docs/ARCHITECTURE.md` before changing architecture, config, APIs, or providers.
 - Do not add dependencies outside the approved stack.
 - Keep provider work isolated to one provider per PR.
 - Update `docs/API_REFERENCE.md`, `spec/openapi/polaris.v1.yaml`, and contract fixtures in the same PR as any endpoint change.

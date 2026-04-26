@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone does not expand Phase 1. It closes it. The purpose is to harden the OpenAI and Anthropic chat foundation, align all claims and docs with the real codebase, and run an explicit acceptance pass against the Blueprint's Phase 1 definition.
+This milestone does not expand Phase 1. It closes it. The purpose is to harden the OpenAI and Anthropic chat foundation, align all claims and docs with the real codebase, and run an explicit acceptance pass against the Phase 1 definition.
 
 After `1C`, the repository should be able to state truthfully that Phase 1 is complete.
 
@@ -22,7 +22,7 @@ After `1C`, the repository should be able to state truthfully that Phase 1 is co
   - Fix any defects exposed by `1B` that do not require Phase 2 architecture.
 
 - **Acceptance audit**
-  - Run a Phase 1 checklist directly against `BLUEPRINT.md` section 16.
+  - Run a Phase 1 checklist directly against the architecture and phase definition.
   - Record pass or fail for each promised Phase 1 item:
     - working gateway routing chat to OpenAI and Anthropic
     - config loader
@@ -72,7 +72,7 @@ After `1C`, the repository should be able to state truthfully that Phase 1 is co
 
 Phase 1 is complete only when all of the following are true:
 
-- the Blueprint Phase 1 checklist is fully satisfied
+- the Phase 1 checklist is fully satisfied
 - the code, docs, and repo status all describe the same reality
 - the chat path is stable enough that Phase 2 can build on it without revisiting kernel decisions
 - no remaining open issue is actually a hidden Phase 1 blocker

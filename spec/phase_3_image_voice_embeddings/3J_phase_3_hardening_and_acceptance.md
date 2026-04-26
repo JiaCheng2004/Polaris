@@ -54,7 +54,7 @@ Those checks were not required for the local repository validation baseline abov
 
 Phase 3 exit criteria are satisfied for the repository:
 
-- the Blueprint Phase 3 checklist is satisfied in code
+- the Phase 3 checklist is satisfied in code
 - the image, voice, embeddings, auth, and SDK paths are real
 - the code, docs, SDK, and repo status describe the same implementation
 - no remaining known repo-local issue blocks Phase 4 work

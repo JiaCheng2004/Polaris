@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone closes the remaining Phase 4 parity, validation, and release-readiness gaps without expanding the public modality surface beyond the Blueprint.
+This milestone closes the remaining Phase 4 parity, validation, and release-readiness gaps without expanding the public modality surface beyond the approved architecture.
 
 Validation record date: `2026-04-20`
 
@@ -69,7 +69,7 @@ Missing credentials, inactive provider services, or unavailable local Ollama mod
 
 Phase 4 can be called complete only when all of the following are true:
 
-- the Blueprint Phase 4 surface is implemented and documented truthfully
+- the Phase 4 surface is implemented and documented truthfully
 - repo-local validation is green
 - the strict live provider smoke matrix is green
 - the load-validation checklist in `docs/LOAD_TESTING.md` is recorded as complete

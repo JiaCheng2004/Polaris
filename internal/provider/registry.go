@@ -94,6 +94,9 @@ type Model struct {
 }
 
 func New(cfg *config.Config) (*Registry, []string, error) {
+	if err := providerFamilyRegistrationError(); err != nil {
+		return nil, nil, fmt.Errorf("register provider families: %w", err)
+	}
 	if _, err := prepareProviderCatalog(); err != nil {
 		return nil, nil, fmt.Errorf("load provider catalog: %w", err)
 	}

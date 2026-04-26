@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone makes the distributed runtime path real. Phase 1 already proved the gateway with SQLite and the in-memory cache. Phase 2A adds the production-grade backends from the blueprint: PostgreSQL for storage and Redis for cache-backed rate limiting.
+This milestone makes the distributed runtime path real. Phase 1 already proved the gateway with SQLite and the in-memory cache. Phase 2A adds the production-grade backends: PostgreSQL for storage and Redis for cache-backed rate limiting.
 
 After this step, Polaris must support both:
 
@@ -15,7 +15,7 @@ After this step, Polaris must support both:
 
 - **PostgreSQL store**
   - Implement `internal/store/postgres/postgres.go` against the existing `store.Store` interface.
-  - Use `pgx`-backed SQL access as approved by the blueprint.
+  - Use `pgx`-backed SQL access as approved by the architecture.
   - Reuse the same logical schema and behavior as the SQLite store:
     - API key CRUD
     - request-log writes and batched writes

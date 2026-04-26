@@ -9,7 +9,7 @@ This milestone finishes the runtime routing behavior that becomes meaningful onc
 ## Key Changes
 
 - **Model resolution**
-  - Preserve the Blueprint routing order:
+  - Preserve the documented routing order:
     1. resolve alias if needed
     2. resolve canonical `provider/model`
     3. check modality

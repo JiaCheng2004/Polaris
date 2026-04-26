@@ -32,6 +32,11 @@ coverage.xml
 go.work
 go.work.sum
 
+# Local contributor/assistant notes
+/AGENTS.md
+/CLAUDE.md
+/BLUEPRINT.md
+
 # Runtime data
 *.log
 *.pid

@@ -4,9 +4,9 @@ This folder is the ABZ package for Polaris Phase 2.
 
 - `A`: the current state after Phase 1 completion
 - `B`: the ordered implementation steps required to finish Phase 2
-- `Z`: the fully completed Phase 2 chat ecosystem described by `BLUEPRINT.md` section 16
+- `Z`: the fully completed Phase 2 chat ecosystem described by the architecture plan
 
-`BLUEPRINT.md` remains the source of truth. These files break Blueprint Phase 2 into concrete, decision-complete subplans with explicit dependencies and exit criteria.
+`docs/ARCHITECTURE.md` remains the source of truth. These files break Phase 2 into concrete, decision-complete subplans with explicit dependencies and exit criteria.
 
 ## ABZ Map
 
@@ -65,7 +65,7 @@ The following items are explicitly out of scope for this Phase 2 package:
 - Go client SDK work
 - load testing and release packaging work from later phases
 
-Those belong to Blueprint Phase 3 or Phase 4 and should not be folded into the Phase 2 chat ecosystem.
+Those belong to Phase 3 or Phase 4 and should not be folded into the Phase 2 chat ecosystem.
 
 ## Sequence Rule
 

@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone makes `auth.mode: multi-user` real. Phase 1 and Phase 2 proved the gateway with `none` and `static` auth. Phase 3A adds the database-backed key path, the admin authorization layer, and the `/v1/keys` management API from the blueprint.
+This milestone makes `auth.mode: multi-user` real. Phase 1 and Phase 2 proved the gateway with `none` and `static` auth. Phase 3A adds the database-backed key path, the admin authorization layer, and the `/v1/keys` management API from the architecture.
 
 After this step, Polaris must support all three auth modes:
 

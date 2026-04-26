@@ -28,6 +28,11 @@ certificates/
 *.secrets.yaml
 *.secret.yaml
 
+# Local contributor/assistant notes
+AGENTS.md
+CLAUDE.md
+BLUEPRINT.md
+
 # Build outputs and local binaries
 polaris
 bin/

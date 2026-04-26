@@ -4,7 +4,7 @@
 
 ## Summary
 
-This milestone delivers the first non-chat modality through the OpenAI-compatible embeddings endpoint. It uses the two providers already declared in the blueprint and config: OpenAI and Google.
+This milestone delivers the first non-chat modality through the OpenAI-compatible embeddings endpoint. It uses the two providers already declared in the architecture and config: OpenAI and Google.
 
 Embeddings land first because they are synchronous, JSON-only, and lower-friction than image or voice while still exercising the new Phase 3 contract and registry path.
 

@@ -1,6 +1,6 @@
 # Polaris Provider Notes
 
-This file is the operator-facing companion to `BLUEPRINT.md` §7 and §11. It records provider-specific authentication rules, compatibility quirks, and the implementation phase each provider belongs to.
+This file records provider-specific authentication rules, compatibility quirks, and the implementation phase each provider belongs to.
 
 Provider/model metadata is sourced from the embedded matrix in `internal/provider/catalog/models.yaml`. Docs describe that matrix-driven implementation; they are not the source of truth for model IDs, family IDs, aliases, or verification classes.
 
@@ -173,3 +173,5 @@ Every provider implementation PR should update this file with:
 - modality support added in that PR
 - any request or response translation quirks
 - any operational gotchas operators need to know
+
+Use `docs/ADDING_PROVIDER.md` as the implementation checklist for new provider adapters.

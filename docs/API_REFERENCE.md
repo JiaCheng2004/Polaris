@@ -2,7 +2,7 @@
 
 > **Version:** 2.1.0
 > **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. Release readiness is gated by repo-local validation plus live-provider proof where credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
-> **Authority:** Per `BLUEPRINT.md` §18, every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
+> **Authority:** Every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
 
 ---
 
@@ -48,7 +48,7 @@
 
 ## 2. Authentication
 
-Polaris supports five auth modes, selected via `runtime.auth.mode` in config v2 (see `BLUEPRINT.md` §5.1 and §10.1):
+Polaris supports five auth modes, selected via `runtime.auth.mode` in config v2:
 
 | Mode | Header | Key source |
 |---|---|---|
@@ -112,7 +112,7 @@ Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v
 
 `/v1/keys` remains implemented as a compatibility facade. In `virtual_keys` mode it issues Polaris virtual keys using the older response shape. In `multi-user` mode it continues to manage the legacy `api_keys` rows.
 
-Per `BLUEPRINT.md` §19:
+Security rules:
 - Keys are stored as SHA-256 hashes. Plaintext keys are never persisted.
 - Logs contain `key_prefix` (first 8 characters) only. Never the full key.
 
@@ -133,7 +133,7 @@ Per `BLUEPRINT.md` §19:
 
 ## 3. Model Naming
 
-All model references use one of three shapes (`BLUEPRINT.md` §8.5):
+All model references use one of three shapes:
 
 - **Provider variant:** `openai/gpt-4o`, `anthropic/claude-sonnet-4-6`, `bytedance/doubao-seedance-2.0`
 - **Model family:** `gpt-5.5`, `gpt-5.4-mini`, `claude-opus-4-7`, `amazon-nova-2-lite`
@@ -191,7 +191,7 @@ Routed responses may include:
 
 ## 4. Error Format
 
-Every error response — regardless of endpoint — uses the OpenAI-compatible envelope (`BLUEPRINT.md` §8.3):
+Every error response — regardless of endpoint — uses the OpenAI-compatible envelope:
 
 ```json
 {
@@ -232,13 +232,13 @@ Provider-specific failures are normalized into the envelope above. Common stable
 
 ### Failover behavior
 
-Per `BLUEPRINT.md` §12.2, retryable errors (`rate_limit_error`, `timeout_error`, `provider_error` with 5xx status) trigger failover if `routing.fallbacks` is configured for the originating `provider/model`. Non-retryable errors (400, 401, 403, 422) never trigger failover. When a fallback answers, the response body is the fallback's normal response and the response carries `X-Polaris-Fallback: <provider/model>`.
+Retryable errors (`rate_limit_error`, `timeout_error`, `provider_error` with 5xx status) trigger failover if `routing.fallbacks` is configured for the originating `provider/model`. Non-retryable errors (400, 401, 403, 422) never trigger failover. When a fallback answers, the response body is the fallback's normal response and the response carries `X-Polaris-Fallback: <provider/model>`.
 
 ---
 
 ## 5. Streaming Protocol
 
-Streaming endpoints (currently chat only) use Server-Sent Events, wire-compatible with OpenAI (`BLUEPRINT.md` §8.4):
+Streaming endpoints (currently chat only) use Server-Sent Events, wire-compatible with OpenAI:
 
 ```
 Content-Type: text/event-stream
@@ -271,7 +271,7 @@ Generate a chat completion. Supports streaming and non-streaming, text-only and 
 
 **Auth:** required (any mode except `none`).
 **Modality:** `chat`.
-**Backed by:** any model registered with `modality: chat` (see `BLUEPRINT.md` §5.1 for the provider catalog).
+**Backed by:** any model registered with `modality: chat` in the provider catalog.
 
 #### Request body
 
@@ -2165,7 +2165,7 @@ Implemented. Prometheus text-format metrics are exposed when `runtime.observabil
 
 When OTLP tracing is enabled, request traces now include child spans for auth lookup, rate-limit and budget evaluation, cache lookup/store, provider HTTP calls, fallback attempts, and tool/MCP execution. Polaris uses stable OpenTelemetry HTTP semantics plus low-cardinality `polaris.*` attributes such as `polaris.interface_family`, `polaris.token_source`, `polaris.cache_status`, `polaris.tool_name`, and `polaris.mcp_binding_id`.
 
-Metric catalog (`BLUEPRINT.md` §13.2):
+Metric catalog:
 
 | Metric | Type | Labels |
 |---|---|---|

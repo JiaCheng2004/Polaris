@@ -23,7 +23,7 @@ This milestone closes Phase 2. It does not add new Phase 2 features. It aligns t
   - Update `docs/PROVIDERS.md` so all shipped Phase 2 chat providers are documented.
 
 - **Acceptance audit**
-  - Run a Phase 2 checklist directly against `BLUEPRINT.md` section 16.
+  - Run a Phase 2 checklist directly against the architecture and phase definition.
   - Record pass or fail for each promised Phase 2 item:
     - DeepSeek, Google, xAI, Qwen, ByteDance, and Ollama chat adapters
     - PostgreSQL store
@@ -74,7 +74,7 @@ This milestone closes Phase 2. It does not add new Phase 2 features. It aligns t
 
 Phase 2 is complete only when all of the following are true:
 
-- the Blueprint Phase 2 checklist is fully satisfied
+- the Phase 2 checklist is fully satisfied
 - the provider matrix, distributed runtime, failover, reload, and observability paths are all real
 - the code, docs, and repo status all describe the same reality
 - no remaining issue is actually a hidden Phase 2 blocker for Phase 3 work

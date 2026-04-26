@@ -13,7 +13,7 @@ Configuration is resolved in this order:
 3. YAML config, including imported files
 4. Built-in defaults
 
-Supported CLI flags from the blueprint:
+Supported CLI flags:
 
 - `--config <path>`
 - `--port <port>`
