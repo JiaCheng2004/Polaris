@@ -1,239 +1,260 @@
+<div align="center">
+
 # Polaris
 
-Polaris is a stateless, config-driven, multi-modality AI gateway written in Go. It sits between applications and external AI providers and exposes one unified gateway surface for chat, images, video, voice, embeddings, full-duplex audio sessions, and music.
+**A stateless, config-driven AI gateway for routing one application across many model providers and modalities.**
 
-The project is being rebuilt as Polaris v2. The old Python monolith and Discord-bot infrastructure have been intentionally removed. This repository now tracks the Go gateway architecture defined in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+[![Go](https://img.shields.io/badge/Go-1.26.2-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
+[![API](https://img.shields.io/badge/API-v1-2563EB?style=for-the-badge)](./docs/API_REFERENCE.md)
+[![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-F97316?style=for-the-badge)](./LICENSE)
 
-## Status
+[Quick Start](#quick-start) · [API Surface](#api-surface) · [Providers](#providers) · [Configuration](#configuration) · [Documentation](#documentation)
 
-- Architecture: finalized
-- Repository bootstrap: complete
-- Current implementation phase: release-readiness consolidation and operational hardening
-- Implemented code: Phase 1 foundation, full Phase 2, full Phase 3, the full Phase 4 runtime surface, Phase 5A music, and the post-Phase-5 provider-family/runtime hardening wave
-- Current platform foundation work: virtual-key control plane, MCP/tool runtime, OTLP tracing, and the next conversation surfaces (`/v1/responses`, `/v1/messages`, `/v1/tokens/count`) are implemented in the runtime and docs, including SSE streaming for `responses` and `messages` plus native token counting for Anthropic and Gemini chat models
-- Current ByteDance speech coverage: TTS 2.0, file STT 2.0, streaming STT 2.0, realtime audio sessions, simultaneous interpretation 2.0, machine translation, voice catalog and voice assets, audio notes, and podcast generation are implemented and live-validated in the provider smoke matrix
-- Current provider-family hardening: the shared OpenAI-compatible adapter base is now in the runtime, the OpenAI catalog includes `gpt-5.5` and `gpt-image-2`, the chat-first families OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, and NVIDIA are wired through the same provider-common path, Amazon Bedrock is in the runtime through native Converse/ConverseStream plus Titan embedding adapters, NVIDIA now includes embeddings on the same official `/v1/embeddings` path, and Replicate is in the runtime through a native Predictions-based async video adapter plus an embedded YAML provider model matrix
-- Release validation: repo-local checks are the default open-source readiness gate. Live-smoke coverage is matrix-driven: `strict` models are release-blocking when credentials, quota, and plan access are available; `opt_in` models run only when explicitly enabled; `skipped` models stay outside the default matrix. Production Postgres/Redis load testing is optional operator validation for service deployments, not a default open-source release blocker.
-- Source of truth: `docs/ARCHITECTURE.md`
+[简体中文](./README.zh-CN.md)
 
-The repository now contains the full Phase 1 foundation: bootable server wiring, config loading and validation, SQLite storage, in-memory rate limiting, static auth, model registry, OpenAI and Anthropic chat adapters, usage logging, and the Phase 1 endpoints.
+</div>
 
-## What Polaris Is
+---
 
-- A unified gateway for multiple AI modalities
-- OpenAI-compatible where a standard already exists
-- Config-driven for providers, models, aliases, and failover
-- Capability-driven selector aliases for intent-based model routing
-- Family-aware model routing where canonical family IDs resolve to provider variants without rewriting exact provider-model requests
-- Optional request-level routing hints across model-taking endpoints, including multipart endpoints through a JSON `routing` form field
-- Built-in configured-model verification reports via `make verify-models`
-- Modular YAML config v2 with imported provider/routing snippets and catalog-backed model references
-- Operator-managed virtual keys over provider-owned credentials
-- Bring-your-own-auth mode for platforms that already own OAuth, SMS OTP, SSO, sessions, and users
-- Policy-gated tool and MCP brokering
-- Stateless at runtime, with persistence delegated to external stores
-- Designed to run as a single binary with SQLite or scale out with PostgreSQL and Redis
+## What Is Polaris?
 
-## What Polaris Is Not
+Polaris is a Go gateway that sits between your application and upstream AI providers. Your app calls one stable Polaris API, while Polaris handles provider credentials, model routing, failover, authentication, rate limiting, usage logging, response caching, and operational safety.
 
-- Not a workflow orchestration framework
-- Not a prompt orchestration system
-- Not a model host
-- Not a chat UI
-- Not a catch-all replacement for application business logic
+It is designed for teams that want one self-hosted gateway for multiple model families and modalities without moving product logic, prompts, RAG, user sessions, or business workflows into the gateway.
 
-Consumer apps should keep prompts, RAG, search, user management, and product logic outside Polaris. Polaris owns provider access, routing, auth, rate limiting, usage tracking, and operational gateway concerns.
+### What Polaris Handles
 
-## Roadmap by Phase
+| Area | What is implemented |
+| --- | --- |
+| Unified `/v1` API | Chat, responses, messages, embeddings, images, video, voice, audio sessions, transcription, translation, notes, podcasts, music, models, usage, keys, and control-plane resources. |
+| Provider routing | Provider-native model IDs, aliases, selector aliases, family-aware routing, request-level routing hints, and configured fallback chains. |
+| Authentication | Local no-auth mode, static bearer keys, external signed-header auth, virtual keys, and legacy multi-user compatibility. |
+| Control plane | Projects, virtual keys, policies, budgets, tools, toolsets, and MCP bindings. |
+| Storage | SQLite for local use, PostgreSQL for production-shaped deployments, memory cache, and Redis cache. |
+| Operations | Prometheus metrics, structured logs, optional OpenTelemetry tracing, request IDs, body limits, CORS controls, Docker, Compose, and release validation commands. |
+| Go SDK | `pkg/client` wraps the shipped HTTP endpoints for Go applications. |
 
-### Phase 1: Foundation
+### What Polaris Does Not Handle
 
-- Config loader and validation
-- SQLite store and in-memory cache
-- Static auth and rate limiting
-- Core middleware and gateway routing
-- Chat modality only
-- OpenAI and Anthropic chat adapters
-- Health, models, and usage endpoints
-- Docker image and baseline tests
+Polaris is not a workflow orchestrator, prompt framework, RAG engine, model host, vector database, chat UI, or application-auth provider. Keep user login, Google OAuth, SMS OTP, SSO, product permissions, prompts, retrieval, and business workflows in your application. Polaris should be the gateway layer underneath them.
 
-### Phase 2: Chat Ecosystem
+## Project Status
 
-- DeepSeek, Google, xAI, Qwen, ByteDance, Ollama, OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, Bedrock, and NVIDIA chat adapters, plus Replicate async video adapters
-- PostgreSQL store and Redis cache
-- Failover, aliases, hot reload, metrics, and Grafana
+The current codebase ships a broad multi-provider runtime with local validation gates. Real-provider proof depends on credentials, quota, billing, regional availability, and provider plan access.
 
-Phase 2 completed scope:
+Use this rule of thumb:
 
-- implemented: PostgreSQL store, Redis cache
-- implemented: DeepSeek chat, xAI chat, Ollama chat
-- implemented: Google Gemini chat, Qwen chat
-- implemented: shared OpenAI-compatible provider base plus OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, and NVIDIA chat-provider families
-- implemented: Amazon Bedrock native `Converse` / `ConverseStream` chat-provider family
-- implemented: Replicate native Predictions-based async video-provider family
-- implemented: capability-driven routing selectors plus family-aware model routing in config/registry resolution and `/v1/models?include_aliases=true`
-- implemented: ByteDance Doubao chat
-- implemented: runtime failover with `X-Polaris-Fallback`
-- implemented: hot reload via `SIGHUP` and file watch
-- implemented: Prometheus metrics and Grafana dashboard alignment
-- implemented: docs, stack commands, and acceptance checks reconciled to the shipped runtime
+- `make release-check` proves the repository builds, tests, contracts, configs, security checks, and Docker image locally.
+- `make live-smoke` proves real upstream provider access only when the required environment variables and provider access are available.
+- Missing provider credentials are not a local development blocker; they only block claims that a provider was live-smoked in your environment.
 
-### Phase 3: Image + Voice + Embeddings
+## Quick Start
 
-- Image adapters for OpenAI, Google, ByteDance, and Qwen
-- Voice adapters for OpenAI and ByteDance
-- Embeddings for OpenAI and Google
-- Multi-user auth
-- Public Go SDK in `pkg/client`
+### 1. Prerequisites
 
-Phase 3 completed scope:
+- Go `1.26.2`
+- Git
+- Docker Desktop or Docker Engine, only if you use Compose or Docker validation
+- At least one provider credential for real model calls, unless you use a local provider such as Ollama
 
-- implemented in Phase 3: `runtime.auth.mode: multi-user`
-- implemented and still shipped as compatibility: `POST /v1/keys`, `GET /v1/keys`, and `DELETE /v1/keys/:id`
-- current preferred control-plane path: `runtime.auth.mode: virtual_keys` plus `/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, and `/v1/mcp/bindings`
-- implemented: real embed, image, and voice modality contracts
-- implemented: registry lookup and model metadata for embed, image, and voice models
-- implemented: `POST /v1/embeddings` end to end for OpenAI, Google, Amazon Bedrock Titan embeddings, and NVIDIA embeddings
-- implemented: `POST /v1/images/generations` and `POST /v1/images/edits` end to end for OpenAI, Google, ByteDance, and Qwen
-- implemented: `POST /v1/audio/speech` end to end for OpenAI and ByteDance TTS
-- implemented: `POST /v1/audio/transcriptions` end to end for OpenAI and ByteDance STT
-- implemented: mixed-modality usage reporting and known-cost estimation without schema changes
-- implemented: public Go SDK in `pkg/client` for chat, embeddings, images, voice, models, usage, and admin keys
-- completed: Phase 3 close-out acceptance in `spec/phase_3_image_voice_embeddings/3J_phase_3_hardening_and_acceptance.md`
-
-### Phase 4: Video + Audio + Polish
-
-- implemented: Seedance video Phase 4A async job flow plus Phase 4B request parity for `last_frame`, `reference_videos`, and synced input `audio`
-- implemented: Phase 4C video hardening with Polaris-owned `GET /v1/video/generations/:id/content`
-- implemented: OpenAI Sora (`sora-2`, `sora-2-pro`) and Google Vertex Veo (`google-vertex`) video providers
-- implemented: per-model video metadata in `/v1/models` via `allowed_durations`, `aspect_ratios`, and `cancelable`
-- implemented: public Go SDK video helpers in `pkg/client/video.go`, including content download
-- implemented: full-duplex audio sessions via `POST /v1/audio/sessions` and `GET /v1/audio/sessions/:id/ws`
-- implemented: OpenAI native Realtime audio sessions and ByteDance native realtime audio sessions behind the shared `modality: audio` contract; explicit cascaded `audio_pipeline` compatibility remains available for older configurations
-- implemented: response caching for non-streaming chat, embeddings, images, TTS, and STT with `X-Polaris-Cache`
-- implemented: Phase 4 close-out validation assets in `config/polaris.live-smoke.yaml`, `tests/e2e/live_smoke_test.go`, `docs/LOAD_TESTING.md`, and `spec/phase_4_video_audio_polish/4E_phase_4_hardening_and_acceptance.md`
-
-### Phase 5A: Music
-
-- implemented: first-class `music` modality in the shared registry, model catalog, usage layer, and Go SDK
-- implemented: unified music endpoints for generation, edits, stems, lyrics, plans, async job polling, cancellation, and content download
-- implemented: Polaris-managed async music jobs backed by the configured cache
-- implemented: MiniMax generation, cover-edit, and lyrics adapters as the `v2.1.0` release-blocking music path
-- implemented in preview: ElevenLabs generation, streaming generation, composition plans, and stems adapters
-- implemented: exact-match caching for synchronous music generation, edit, stems, lyrics, and plan calls
-- validation: MiniMax music is part of the strict matrix; ElevenLabs music remains opt-in preview; production Postgres/Redis load validation is operator-specific
-
-## Repository Layout
-
-The repo follows the target layout from `docs/ARCHITECTURE.md`:
-
-```text
-cmd/polaris/              entrypoint
-internal/config/          config loading, validation, hot reload
-internal/modality/        shared modality contracts
-internal/provider/        provider adapters and registry
-internal/provider/common/ reusable provider-family transport, auth, and SSE helpers
-internal/gateway/         Gin server, handlers, middleware
-internal/store/           store abstractions, cache, migrations
-pkg/client/               public Go SDK
-config/                   local and reference YAML config
-schema/                   JSON Schema and CUE config contracts
-deployments/              Docker, Compose, Grafana, Prometheus, pgAdmin
-docs/                     API, configuration, provider, and contributor docs
-spec/openapi/             machine-readable public HTTP contracts
-scripts/                  helper entrypoints such as migration tooling
-tests/                    integration, e2e, live-smoke, and load-check validation
-```
-
-Provider and modality directories should now be treated as shipped runtime areas or explicit preview work. Avoid adding placeholder provider trees without a concrete adapter, config entry, matrix entry, and validation path.
-
-## Getting Started
-
-### Developer commands
-
-The stable command surface for this repo is the `Makefile`. Treat it as the Go-repo equivalent of `npm run ...`.
+### 2. Clone And Build
 
 ```bash
-make dev
+git clone https://github.com/JiaCheng2004/Polaris.git
+cd Polaris
 make build
-make test
-make security-check
-make config-check
-make contract-check
-make release-check
-make live-smoke
-make lint
+```
+
+The binary is written to `./bin/polaris`.
+
+### 3. Run The Local Gateway
+
+The default config is [`config/polaris.yaml`](./config/polaris.yaml). It binds to `127.0.0.1:8080`, uses SQLite, uses the in-memory cache, and sets `runtime.auth.mode: none` for local development.
+
+```bash
+export OPENAI_API_KEY=<your-openai-key>
+make run
+```
+
+In another terminal:
+
+```bash
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/v1/models
+```
+
+Call the OpenAI-compatible chat endpoint:
+
+```bash
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "default-chat",
+    "messages": [
+      {"role": "user", "content": "Explain Polaris in one sentence."}
+    ]
+  }'
+```
+
+Because the local config uses `auth.mode: none`, the request above does not need a Polaris API key. Do not expose that config publicly.
+
+### 4. Run With Docker Compose
+
+```bash
+cp .env.example .env
 make stack-up STACK=local
 make stack-logs STACK=local
 make stack-down STACK=local
 ```
 
-The underlying implementation may change in later phases, but these command names should remain the main developer entrypoints.
+Available stacks:
 
-`make config-check` validates the v2 config loader, modular YAML examples, and embedded model catalog wiring. `make contract-check` validates the machine-readable OpenAPI contract against registered Gin routes plus golden HTTP/SSE fixtures for stable response shapes. `make security-check` runs pinned gosec with the repo's exact audited allowlist. `make release-check` is the current repo-local release gate and includes those checks. `make live-smoke` runs the env-gated real-provider smoke matrix and becomes a release-proof gate when `POLARIS_LIVE_SMOKE_STRICT=1` and the required provider credentials, quota, and plan access are available. ElevenLabs music smoke is preview-only for `v2.1.0` and runs only when `POLARIS_LIVE_SMOKE_ELEVENLABS=1` is also set.
+| Stack | Command | Purpose |
+| --- | --- | --- |
+| `local` | `make stack-up STACK=local` | Single Polaris service with SQLite and memory cache. |
+| `prod` | `make stack-up STACK=prod` | Production-shaped Polaris, PostgreSQL, and Redis stack. |
+| `dev` | `make stack-up STACK=dev` | Production-shaped stack plus Prometheus, Grafana, and pgAdmin. |
 
-`make release-check` validates Compose files through the quiet `stack-validate` path so shared CI logs do not render environment-expanded service configuration. Use `make stack-config STACK=<name>` only when you intentionally need to inspect the fully rendered Compose config locally.
+Use `make stack-validate STACK=<local|prod|dev>` to validate Compose files without printing interpolated secrets.
 
-For container workflows:
+### 5. Use A Local Ollama Model
 
-- `STACK=local`: local single-binary runtime with SQLite and in-memory cache
-- `STACK=prod`: production-shaped Compose stack
-- `STACK=dev`: production-shaped stack plus Prometheus, Grafana, and pgAdmin
-
-This keeps the developer command surface stable while letting the underlying stack evolve phase by phase.
-
-### Release-candidate verification
+Ollama is implemented as a native chat provider. Start Ollama first:
 
 ```bash
-make build
-make test
-make security-check
-make config-check
-make contract-check
-make release-check
+ollama serve
+ollama pull llama3
 ```
 
-That is the default repo-local validation baseline. Release evidence can also include the env-gated strict live-smoke matrix and reduced local load validation when credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments, not a default contributor requirement.
+Create a local-only config that imports [`config/providers/ollama.yaml`](./config/providers/ollama.yaml) and a routing alias:
 
-### Local single-binary development
+```yaml
+version: 2
+imports:
+  - ./providers/ollama.yaml
+runtime:
+  server:
+    host: 127.0.0.1
+    port: 8080
+  auth:
+    mode: none
+  store:
+    driver: sqlite
+    dsn: ./polaris.db
+  cache:
+    driver: memory
+routing:
+  aliases:
+    default-chat: ollama/llama3
+```
 
-Use the local config:
+Then run Polaris with that config:
 
 ```bash
-./bin/polaris --config ./config/polaris.yaml
+go run ./cmd/polaris --config ./config/local.ollama.yaml
 ```
 
-`config/polaris.yaml` is intentionally development-oriented:
+## API Surface
 
-- SQLite store
-- in-memory cache
-- permissive `runtime.auth.mode: none`
-- OpenAI and Anthropic Phase 1 chat-provider references
+Polaris exposes a stable `/v1` gateway surface plus health, metrics, and MCP proxy routes.
+
+| Category | Endpoints |
+| --- | --- |
+| Health and metrics | `GET /health`, `GET /ready`, `GET /metrics` |
+| Chat and conversation | `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages`, `POST /v1/tokens/count` |
+| Embeddings and translation | `POST /v1/embeddings`, `POST /v1/translations` |
+| Images | `POST /v1/images/generations`, `POST /v1/images/edits` |
+| Video | `POST /v1/video/generations`, `GET /v1/video/generations/:id`, `GET /v1/video/generations/:id/content`, `DELETE /v1/video/generations/:id` |
+| Voice and audio | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions`, `POST /v1/audio/transcriptions/stream`, `GET /v1/audio/transcriptions/stream/:id/ws`, `POST /v1/audio/sessions`, `GET /v1/audio/sessions/:id/ws` |
+| Interpretation, notes, podcasts | `POST /v1/audio/interpreting/sessions`, `GET /v1/audio/interpreting/sessions/:id/ws`, `POST /v1/audio/notes`, `GET /v1/audio/notes/:id`, `DELETE /v1/audio/notes/:id`, `POST /v1/audio/podcasts`, `GET /v1/audio/podcasts/:id`, `GET /v1/audio/podcasts/:id/content`, `DELETE /v1/audio/podcasts/:id` |
+| Music | `POST /v1/music/generations`, `POST /v1/music/edits`, `POST /v1/music/stems`, `POST /v1/music/lyrics`, `POST /v1/music/plans`, `GET /v1/music/jobs/:id`, `GET /v1/music/jobs/:id/content`, `DELETE /v1/music/jobs/:id` |
+| Voice resources | `GET /v1/voices`, `GET /v1/voices/:id`, `DELETE /v1/voices/:id`, `POST /v1/voices/:id/archive`, `POST /v1/voices/:id/unarchive`, `POST /v1/voices/clones`, `POST /v1/voices/designs`, `POST /v1/voices/:id/retrain`, `POST /v1/voices/:id/activate` |
+| Models and usage | `GET /v1/models`, `GET /v1/usage` |
+| Keys and control plane | `POST /v1/keys`, `GET /v1/keys`, `DELETE /v1/keys/:id`, `POST /v1/projects`, `GET /v1/projects`, `POST /v1/virtual_keys`, `GET /v1/virtual_keys`, `DELETE /v1/virtual_keys/:id`, `POST /v1/policies`, `GET /v1/policies`, `POST /v1/budgets`, `GET /v1/budgets`, `POST /v1/tools`, `GET /v1/tools`, `POST /v1/toolsets`, `GET /v1/toolsets`, `POST /v1/mcp/bindings`, `GET /v1/mcp/bindings` |
+| MCP broker | `ANY /mcp/:binding_id`, `ANY /mcp/:binding_id/*path` |
+
+Full request and response details live in [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md). The machine-readable OpenAPI contract is [`spec/openapi/polaris.v1.yaml`](./spec/openapi/polaris.v1.yaml).
+
+## Providers
+
+Provider adapters are isolated under [`internal/provider`](./internal/provider), configured through [`config/providers`](./config/providers), and registered through provider-owned `registry_<provider>.go` files.
+
+| Provider | Current Polaris scope |
+| --- | --- |
+| OpenAI | Chat, responses, embeddings, images, voice, video, native realtime audio sessions. |
+| Anthropic | Chat and messages-compatible conversation surface. |
+| Google Gemini | Chat, embeddings, images. |
+| Google Vertex | Veo video. |
+| Amazon Bedrock | Native Converse chat and Titan embeddings. |
+| ByteDance / Volcengine | Chat, images, video, TTS, STT, streaming STT, realtime audio, interpretation, translation, notes, podcasts, voice catalog, and voice assets. |
+| Qwen / DashScope | Chat and images. |
+| DeepSeek, xAI, OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, NVIDIA | Chat-first adapters through native or OpenAI-compatible provider surfaces; NVIDIA also supports embeddings. |
+| Replicate | Async video through Predictions. |
+| MiniMax | Music generation, cover edit, and lyrics. |
+| ElevenLabs | Preview music generation, streaming generation, plans, and stems. |
+| Ollama | Local chat through native Ollama API. |
+
+Provider-specific credential rules and limitations are documented in [`docs/PROVIDERS.md`](./docs/PROVIDERS.md).
+
+## Model Routing
+
+Polaris accepts three model naming styles:
+
+| Style | Example | Behavior |
+| --- | --- | --- |
+| Provider model | `openai/gpt-4o` | Runs exactly that configured provider/model pair. |
+| Alias | `default-chat` | Resolves through `routing.aliases`. |
+| Family or selector | `gpt-5.5`, `tooling-chat` | Resolves deterministically using the embedded model catalog, provider availability, configured selectors, and request-level routing hints. |
+
+Model metadata is embedded from [`internal/provider/catalog/models.yaml`](./internal/provider/catalog/models.yaml). Validate configured models and aliases with:
+
+```bash
+make verify-models
+make verify-models-json
+```
+
+## Configuration
+
+Polaris uses YAML `version: 2` configs with ordered imports.
+
+| File or directory | Purpose |
+| --- | --- |
+| [`config/polaris.yaml`](./config/polaris.yaml) | Local development defaults. |
+| [`config/polaris.example.yaml`](./config/polaris.example.yaml) | Full reference config for production-shaped deployments. |
+| [`config/polaris.live-smoke.yaml`](./config/polaris.live-smoke.yaml) | Environment-driven real-provider smoke config. |
+| [`config/providers`](./config/providers) | Provider credentials, transport defaults, model use lists, and provider-specific overrides. |
+| [`config/routing`](./config/routing) | Aliases, selectors, and fallback rules. |
+| [`schema/polaris.config.schema.json`](./schema/polaris.config.schema.json) | JSON Schema contract for tooling. |
+| [`schema/cue/polaris.config.cue`](./schema/cue/polaris.config.cue) | Optional CUE validation contract. |
+
+Configuration precedence:
+
+1. CLI flags
+2. Environment variables
+3. YAML config and imported YAML snippets
+4. Built-in defaults
+
+Secrets should be referenced through environment variables such as `${OPENAI_API_KEY}`. Do not commit plaintext provider keys, gateway keys, admin keys, TLS material, or local `.env` files.
+
+## Authentication Modes
+
+| Mode | Use case |
+| --- | --- |
+| `none` | Local-only development. Never expose publicly. |
+| `static` | A small private deployment with fixed bearer keys in config. |
+| `external` | Your platform owns login, OAuth, SMS OTP, SSO, sessions, and users; Polaris verifies signed request claims. |
+| `virtual_keys` | Polaris owns projects, virtual keys, policies, budgets, toolsets, MCP bindings, and audit records. |
+| `multi-user` | Compatibility path for older database-backed API key rows. |
+
+For most product integrations, start with `external` if your app already has users, or `virtual_keys` if Polaris should be the API-key boundary.
+
+Detailed setup is in [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md).
 
 ## Go SDK
 
-`pkg/client` is the public Go SDK for the implemented Polaris surface. It wraps the live HTTP API and keeps SDK-owned request and response types.
-
-Supported helpers:
-
-- `CreateChatCompletion`, `StreamChatCompletion`
-- `CreateResponse`, `StreamResponse`, `CreateMessage`, `StreamMessage`, `CountTokens`
-- `CreateEmbedding`
-- `GenerateImage`, `EditImage`
-- `CreateMusicGeneration`, `StreamMusicGeneration`, `EditMusic`, `StreamMusicEdit`, `SeparateMusicStems`, `CreateMusicLyrics`, `CreateMusicPlan`, `GetMusicJob`, `GetMusicJobContent`, `CancelMusicJob`
-- `CreateSpeech`, `CreateTranscription`
-- `CreateAudioSession`, `DialAudioSession`
-- `ListModels`, `GetUsage`
-- `CreateKey`, `ListKeys`, `DeleteKey`
-- `CreateProject`, `ListProjects`
-- `CreateVirtualKey`, `ListVirtualKeys`, `DeleteVirtualKey`
-- `CreatePolicy`, `ListPolicies`
-- `CreateBudget`, `ListBudgets`
-- `CreateTool`, `ListTools`
-- `CreateToolset`, `ListToolsets`
-- `CreateMCPBinding`, `ListMCPBindings`
-
-Quick start:
+The public Go SDK lives in [`pkg/client`](./pkg/client).
 
 ```go
 package main
@@ -273,111 +294,71 @@ func main() {
 }
 ```
 
-`pkg/client/video.go` exposes the video helpers. `pkg/client/music.go` now exposes the music generation, edit, stems, lyrics, plan, streaming, and async job helpers.
+SDK helpers cover chat, streaming chat, responses, messages, token counting, embeddings, images, voice, streaming transcription, realtime audio sessions, interpreting sessions, video, music, notes, podcasts, models, usage, keys, and control-plane resources.
 
-### Docker and Compose
+## Validation
 
-Deployment assets live under [`deployments/`](./deployments).
+Use the Makefile as the stable developer command surface:
 
-- [`deployments/Dockerfile`](./deployments/Dockerfile): target container image
-- [`deployments/docker-compose.local.yml`](./deployments/docker-compose.local.yml): local stack using `config/polaris.yaml` with SQLite and in-memory cache
-- [`deployments/docker-compose.yml`](./deployments/docker-compose.yml): production-shaped stack with Polaris, PostgreSQL, and Redis
-- [`deployments/docker-compose.dev.yml`](./deployments/docker-compose.dev.yml): development stack with Prometheus, Grafana, and pgAdmin added
+| Command | What it proves |
+| --- | --- |
+| `make build` | Builds `./bin/polaris`. |
+| `make test` | Runs `go test -race ./...`. |
+| `make lint` | Runs pinned `golangci-lint`. |
+| `make security-check` | Runs pinned `gosec` with the exact audited allowlist. |
+| `make config-check` | Validates config loading, imports, and model catalog wiring. |
+| `make contract-check` | Validates registered routes, OpenAPI coverage, and golden fixtures. |
+| `make release-check` | Runs the full repo-local release gate, including Docker build and Compose validation. |
+| `make live-smoke` | Runs env-gated real-provider smoke tests when credentials and provider access are available. |
 
-For the current local runtime, use the dedicated wrapper script:
+## Repository Layout
 
-```bash
-cp .env.example .env
-./scripts/stack.sh up local
-./scripts/stack.sh logs local
-./scripts/stack.sh down local
+```text
+cmd/polaris/              process entrypoint
+internal/config/          config loading, validation, imports, and hot reload
+internal/modality/        shared provider contracts
+internal/provider/        provider adapters, catalog, registry, and routing
+internal/gateway/         HTTP server, handlers, routes, and middleware
+internal/store/           store interfaces, SQLite, PostgreSQL, memory cache, Redis
+internal/tooling/         local tool registry
+pkg/client/               public Go SDK
+config/                   local, reference, provider, routing, and smoke configs
+schema/                   JSON Schema and CUE config contracts
+deployments/              Docker, Compose, Prometheus, Grafana, and pgAdmin assets
+docs/                     human documentation
+spec/openapi/             machine-readable HTTP contract
+tests/                    contract, integration, e2e, smoke, and load validation
 ```
 
-Equivalent Make targets are available:
+## Documentation
 
-```bash
-make stack-up STACK=local
-make stack-logs STACK=local
-make stack-down STACK=local
-```
+| Document | Purpose |
+| --- | --- |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Runtime architecture and maintainability rules. |
+| [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) | Human-readable HTTP API contract. |
+| [`spec/openapi/polaris.v1.yaml`](./spec/openapi/polaris.v1.yaml) | Machine-readable OpenAPI contract. |
+| [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) | Config format, imports, auth, providers, and routing details. |
+| [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md) | Auth mode selection and external signed-header integration. |
+| [`docs/PROVIDERS.md`](./docs/PROVIDERS.md) | Provider-specific setup, behavior, and limitations. |
+| [`docs/ADDING_PROVIDER.md`](./docs/ADDING_PROVIDER.md) | Checklist for adding provider adapters safely. |
+| [`docs/INTEGRATION_RECIPES.md`](./docs/INTEGRATION_RECIPES.md) | Copy-paste integration patterns. |
+| [`docs/LOAD_TESTING.md`](./docs/LOAD_TESTING.md) | Local load validation guidance. |
+| [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) | Contributor expectations. |
 
-The production and dev Compose files are also addressable through the same interface:
+## Contributing
 
-```bash
-make stack-validate STACK=prod
-make stack-validate STACK=dev
-make stack-config STACK=prod
-make stack-config STACK=dev
-```
+Keep changes narrow and contract-driven:
 
-`stack-validate` checks Compose syntax without printing the interpolated service configuration. `stack-config` renders the effective config and may include environment-derived values, so treat it as a local debugging command.
-
-For local Compose usage, `.env.example` is the starting point for a developer `.env` file.
-
-## Configuration
-
-Three root config files are committed on purpose:
-
-- [`config/polaris.yaml`](./config/polaris.yaml): local-development default
-- [`config/polaris.example.yaml`](./config/polaris.example.yaml): full reference config
-- [`config/polaris.live-smoke.yaml`](./config/polaris.live-smoke.yaml): env-driven live-provider smoke config
-
-Configuration uses YAML `version: 2`. Root files can import modular provider and routing snippets from [`config/providers`](./config/providers) and [`config/routing`](./config/routing). Imported files are loaded in listed order; the root file overrides them. Provider model lists use `models.use` with model metadata expanded from the embedded catalog, and `models.overrides` for deployment-specific fields or private/custom models.
-
-Config contract files are committed under [`schema/`](./schema): JSON Schema is the editor/tooling contract, and CUE is an optional stricter validation aid. Runtime loading stays dependency-light and uses the Go loader.
-
-Configuration precedence is:
-
-1. CLI flags
-2. Environment variables
-3. YAML config
-4. Built-in defaults
-
-Secrets must always come from environment variables via `${VAR_NAME}` references. Do not commit plaintext provider keys, gateway secrets, or local `.env` files.
-
-## Documentation Map
-
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md): architecture and implementation source of truth
-- [`spec/phase_1_foundation/README.md`](./spec/phase_1_foundation/README.md): Phase 1 ABZ package
-- [`spec/phase_2_chat_ecosystem/README.md`](./spec/phase_2_chat_ecosystem/README.md): Phase 2 ABZ package
-- [`spec/phase_3_image_voice_embeddings/README.md`](./spec/phase_3_image_voice_embeddings/README.md): Phase 3 ABZ package
-- [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md): target HTTP contract
-- [`spec/openapi/polaris.v1.yaml`](./spec/openapi/polaris.v1.yaml): machine-readable HTTP contract checked by `make contract-check`
-- [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md): local, static, external, virtual-key, and compatibility auth modes
-- [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md): config guidance
-- [`docs/PROVIDERS.md`](./docs/PROVIDERS.md): provider-specific auth and quirks
-- [`docs/ADDING_PROVIDER.md`](./docs/ADDING_PROVIDER.md): provider adapter implementation checklist
-- [`docs/INTEGRATION_RECIPES.md`](./docs/INTEGRATION_RECIPES.md): copy-paste integration paths for common deployments
-- [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md): contributor rules and phase boundaries
-
-## Migration Note
-
-Polaris v1 was a Python/FastAPI monolith coupled to Discord-bot infrastructure. Polaris v2 shares zero code with that stack.
-
-What moved out of this repository:
-
-- Discord bot logic
-- PostgREST and related application APIs
-- Lavalink and bot-side audio infrastructure
-- Document parsing, search, vector storage, and other consumer concerns
-
-What remains in scope for Polaris:
-
-- provider API access
-- model routing
-- auth and rate limiting
-- failover
-- usage tracking
-- gateway operations
-
-## Contribution Rules
-
-- Read `docs/ARCHITECTURE.md` before changing architecture, config, APIs, or providers.
-- Do not add dependencies outside the approved stack.
-- Keep provider work isolated to one provider per PR.
-- Update `docs/API_REFERENCE.md`, `spec/openapi/polaris.v1.yaml`, and contract fixtures in the same PR as any endpoint change.
-- Keep secrets out of the repo.
+- Keep provider code isolated in `internal/provider/<name>/`.
+- Update API docs, OpenAPI, and contract fixtures when endpoint behavior changes.
+- Add provider tests with `httptest.NewServer`; unit tests must not call real provider APIs.
+- Keep secrets out of Git.
+- Run `make release-check` before release-oriented changes.
 
 ## License
 
-Polaris remains licensed under AGPL-3.0. See [`LICENSE`](./LICENSE).
+Polaris is licensed under [AGPL-3.0](./LICENSE).
+
+---
+
+> **Documentation notice:** This README was last updated on 04/26/2026. Provider APIs, model availability, pricing, and platform access rules can change over time; if this document has not been maintained recently, verify operational details against the current codebase and official provider documentation before production use.
