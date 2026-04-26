@@ -121,7 +121,7 @@ providers:
         backoff: exponential
         initial_delay: 1s
     models:
-      use: [deepseek-chat]
+      use: [deepseek-chat, deepseek-v4-flash, deepseek-v4-pro]
 
   bytedance:
     transport:

@@ -28,7 +28,7 @@ Release rule for `v2.1.0`: every provider path described here as shipped and rel
 - Auth: OpenAI-compatible bearer token
 - Scope: chat
 - Status: implemented in Phase 2B
-- Notes: OpenAI-compatible chat completions; `reasoning_content` is currently stripped from the normalized Polaris response surface
+- Notes: OpenAI-compatible chat completions against the DeepSeek API base. Polaris keeps the legacy `deepseek-chat` and `deepseek-reasoner` IDs configured for compatibility and also includes the official DeepSeek V4 Preview IDs `deepseek-v4-flash` and `deepseek-v4-pro`. DeepSeek documents `deepseek-chat` and `deepseek-reasoner` as retiring after July 24, 2026, 15:59 UTC. `reasoning_content` is currently stripped from the normalized Polaris response surface.
 
 ### Google
 

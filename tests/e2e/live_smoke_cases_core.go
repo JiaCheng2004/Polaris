@@ -221,6 +221,32 @@ func liveSmokeCoreCases() []liveSmokeCase {
 				harness.requireContains(t, resp, "DEEPSEEK_OK")
 			},
 		},
+		{
+			name:       "deepseek_v4_flash",
+			modelNames: []string{"deepseek/deepseek-v4-flash"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "DeepSeek V4 Flash", "deepseek/deepseek-v4-flash")
+				harness.requireEnv(t, policy, "DeepSeek V4 Flash", "DEEPSEEK_API_KEY")
+				resp, err := harness.chat(ctx, "deepseek/deepseek-v4-flash", "Reply with DEEPSEEK_V4_FLASH_OK only.")
+				if err != nil {
+					t.Fatalf("DeepSeek V4 Flash smoke failed: %v", err)
+				}
+				harness.requireContains(t, resp, "DEEPSEEK_V4_FLASH_OK")
+			},
+		},
+		{
+			name:       "deepseek_v4_pro",
+			modelNames: []string{"deepseek/deepseek-v4-pro"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "DeepSeek V4 Pro", "deepseek/deepseek-v4-pro")
+				harness.requireEnv(t, policy, "DeepSeek V4 Pro", "DEEPSEEK_API_KEY")
+				resp, err := harness.chat(ctx, "deepseek/deepseek-v4-pro", "Reply with DEEPSEEK_V4_PRO_OK only.")
+				if err != nil {
+					t.Fatalf("DeepSeek V4 Pro smoke failed: %v", err)
+				}
+				harness.requireContains(t, resp, "DEEPSEEK_V4_PRO_OK")
+			},
+		},
 	}
 }
 

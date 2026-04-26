@@ -12,7 +12,7 @@ providers:
         backoff: exponential
         initial_delay: 1s
     models:
-      use: [deepseek-chat, deepseek-reasoner]
+      use: [deepseek-chat, deepseek-reasoner, deepseek-v4-flash, deepseek-v4-pro]
       overrides:
         deepseek-chat:
           context_window: 64000

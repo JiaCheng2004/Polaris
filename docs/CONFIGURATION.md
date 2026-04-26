@@ -225,6 +225,14 @@ The verification report checks configured canonical models, aliases, and selecto
 
 Model-taking API requests may also include a request-level `routing` object. Polaris merges those per-request hints with the static selector/config policy when the caller uses a family ID, family alias, or selector alias. Exact `provider/model` requests still bypass routing.
 
+DeepSeek uses the shared OpenAI-compatible chat-provider base. Configure:
+
+- `providers.deepseek.credentials.api_key`
+- optional `providers.deepseek.transport.base_url`
+- `providers.deepseek.models.use`
+
+The shipped DeepSeek snippet keeps `deepseek-chat` and `deepseek-reasoner` for compatibility and appends the official DeepSeek V4 Preview model IDs `deepseek-v4-flash` and `deepseek-v4-pro`. The existing `deepseek-chat` alias continues to resolve to `deepseek/deepseek-chat`; call V4 models by exact provider/model IDs such as `deepseek/deepseek-v4-flash` unless you intentionally add your own routing alias.
+
 Amazon Bedrock is intentionally separate from the OpenAI-compatible family. Configure:
 
 - `providers.bedrock.credentials.access_key_id`

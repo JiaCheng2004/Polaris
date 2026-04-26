@@ -21,12 +21,36 @@ func TestDefaultCatalogLoadsAndValidates(t *testing.T) {
 	if _, ok := cat.Lookup("openai/gpt-image-2"); !ok {
 		t.Fatal("expected openai/gpt-image-2 in embedded catalog")
 	}
+	for _, id := range []string{"deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"} {
+		entry, ok := cat.Lookup(id)
+		if !ok {
+			t.Fatalf("expected %s in embedded catalog", id)
+		}
+		if entry.ContextWindow != 1000000 {
+			t.Fatalf("%s context_window = %d, want 1000000", id, entry.ContextWindow)
+		}
+		if entry.MaxOutputTokens != 384000 {
+			t.Fatalf("%s max_output_tokens = %d, want 384000", id, entry.MaxOutputTokens)
+		}
+		if !entryHasCapability(entry, "reasoning") {
+			t.Fatalf("%s missing reasoning capability: %#v", id, entry.Capabilities)
+		}
+	}
 	if target, ok := cat.AliasTarget("GLM-5.1"); !ok || target != "glm/glm-5.1" {
 		t.Fatalf("alias target = %q, %v", target, ok)
 	}
 	if family, ok := cat.Family("gpt-5.4"); !ok || family.DisplayName != "GPT-5.4" {
 		t.Fatalf("family = %#v, %v", family, ok)
 	}
+}
+
+func entryHasCapability(entry Entry, capability string) bool {
+	for _, item := range entry.Capabilities {
+		if string(item) == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func TestParseCatalogRejectsAliasCollision(t *testing.T) {
