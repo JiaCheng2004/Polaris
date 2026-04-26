@@ -32,6 +32,22 @@ type Entry struct {
 	LatencyTier       string                `yaml:"latency_tier"`
 	DocURL            string                `yaml:"doc_url"`
 	LastVerified      string                `yaml:"last_verified"`
+	ContextWindow     int                   `yaml:"context_window"`
+	MaxOutputTokens   int                   `yaml:"max_output_tokens"`
+	OutputFormats     []string              `yaml:"output_formats"`
+	MinDurationMs     int                   `yaml:"min_duration_ms"`
+	MaxDurationMs     int                   `yaml:"max_duration_ms"`
+	SampleRatesHz     []int                 `yaml:"sample_rates_hz"`
+	Dimensions        int                   `yaml:"dimensions"`
+	Endpoint          string                `yaml:"endpoint"`
+	MaxDuration       int                   `yaml:"max_duration"`
+	AllowedDurations  []int                 `yaml:"allowed_durations"`
+	AspectRatios      []string              `yaml:"aspect_ratios"`
+	Resolutions       []string              `yaml:"resolutions"`
+	Cancelable        bool                  `yaml:"cancelable"`
+	Voices            []string              `yaml:"voices"`
+	Formats           []string              `yaml:"formats"`
+	SessionTTL        time.Duration         `yaml:"session_ttl"`
 }
 
 func (e Entry) ID() string {

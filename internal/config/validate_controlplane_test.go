@@ -15,6 +15,27 @@ func TestValidateRejectsVirtualKeysWithoutBootstrapAdmin(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsPlaintextBootstrapAdminHash(t *testing.T) {
+	cfg := Default()
+	cfg.Auth.Mode = AuthModeVirtualKeys
+	cfg.Auth.BootstrapAdminKeyHash = "bootstrap-secret"
+
+	err := Validate(&cfg)
+	if err == nil || !strings.Contains(err.Error(), "auth.bootstrap_admin_key_hash must use the sha256: prefix") {
+		t.Fatalf("expected bootstrap admin sha256 prefix validation error, got %v", err)
+	}
+}
+
+func TestValidateRejectsPlaintextAdminKeyHash(t *testing.T) {
+	cfg := Default()
+	cfg.Auth.AdminKeyHash = "admin-secret"
+
+	err := Validate(&cfg)
+	if err == nil || !strings.Contains(err.Error(), "auth.admin_key_hash must use the sha256: prefix") {
+		t.Fatalf("expected admin key sha256 prefix validation error, got %v", err)
+	}
+}
+
 func TestValidateRejectsEnabledControlPlaneWithUnsupportedAuthMode(t *testing.T) {
 	cfg := Default()
 	cfg.ControlPlane.Enabled = true

@@ -14,6 +14,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
 )
 
@@ -438,14 +439,26 @@ func encodePodcastFrame(frame podcastFrame) ([]byte, error) {
 		writePodcastUint32(&buf, *frame.Event)
 	}
 	if podcastFrameHasSessionID(frame.Event) {
-		writePodcastUint32(&buf, uint32(len(frame.SessionID)))
+		size, err := safeconv.Uint32FromInt("podcast session id length", len(frame.SessionID))
+		if err != nil {
+			return nil, err
+		}
+		writePodcastUint32(&buf, size)
 		buf.WriteString(frame.SessionID)
 	}
 	if podcastFrameHasConnectID(frame.Event) {
-		writePodcastUint32(&buf, uint32(len(frame.ConnectID)))
+		size, err := safeconv.Uint32FromInt("podcast connect id length", len(frame.ConnectID))
+		if err != nil {
+			return nil, err
+		}
+		writePodcastUint32(&buf, size)
 		buf.WriteString(frame.ConnectID)
 	}
-	writePodcastUint32(&buf, uint32(len(frame.Payload)))
+	payloadSize, err := safeconv.Uint32FromInt("podcast payload length", len(frame.Payload))
+	if err != nil {
+		return nil, err
+	}
+	writePodcastUint32(&buf, payloadSize)
 	buf.Write(frame.Payload)
 	return buf.Bytes(), nil
 }
@@ -507,10 +520,14 @@ func decodePodcastFrame(payload []byte) (podcastFrame, error) {
 	if err != nil {
 		return podcastFrame{}, err
 	}
-	if size > uint32(reader.Len()) {
+	payloadSize, err := safeconv.IntFromUint32("podcast payload size", size)
+	if err != nil {
+		return podcastFrame{}, err
+	}
+	if payloadSize > reader.Len() {
 		return podcastFrame{}, fmt.Errorf("podcast payload size exceeds frame body")
 	}
-	frame.Payload = make([]byte, int(size))
+	frame.Payload = make([]byte, payloadSize)
 	if _, err := io.ReadFull(reader, frame.Payload); err != nil {
 		return podcastFrame{}, err
 	}
@@ -532,7 +549,7 @@ func writePodcastUint32(buf *bytes.Buffer, value uint32) {
 
 func writePodcastInt32(buf *bytes.Buffer, value int32) {
 	var raw [4]byte
-	binary.BigEndian.PutUint32(raw[:], uint32(value))
+	binary.BigEndian.PutUint32(raw[:], safeconv.Uint32FromInt32Bits(value))
 	buf.Write(raw[:])
 }
 
@@ -549,7 +566,7 @@ func readPodcastInt32(reader *bytes.Reader) (int32, error) {
 	if _, err := io.ReadFull(reader, raw[:]); err != nil {
 		return 0, err
 	}
-	return int32(binary.BigEndian.Uint32(raw[:])), nil
+	return safeconv.Int32FromUint32Bits(binary.BigEndian.Uint32(raw[:])), nil
 }
 
 func readPodcastString(reader *bytes.Reader) (string, error) {
@@ -557,10 +574,14 @@ func readPodcastString(reader *bytes.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if size > uint32(reader.Len()) {
+	valueSize, err := safeconv.IntFromUint32("podcast string size", size)
+	if err != nil {
+		return "", err
+	}
+	if valueSize > reader.Len() {
 		return "", fmt.Errorf("podcast string length exceeds frame body")
 	}
-	value := make([]byte, int(size))
+	value := make([]byte, valueSize)
 	if _, err := io.ReadFull(reader, value); err != nil {
 		return "", err
 	}

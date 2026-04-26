@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"log/slog"
+	"reflect"
 	"strings"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
@@ -79,7 +80,7 @@ func validateReloadable(current *config.Config, next *config.Config) error {
 
 	var problems []error
 
-	if current.Server != next.Server {
+	if !reflect.DeepEqual(current.Server, next.Server) {
 		problems = append(problems, errors.New("server settings cannot be changed by hot reload"))
 	}
 	if current.Store != next.Store {

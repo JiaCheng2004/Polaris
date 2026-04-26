@@ -3,10 +3,13 @@ package e2e
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +41,8 @@ type liveSmokeHarness struct {
 
 const tinyTransparentPNGDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHklEQVR4nGL5//8/AymAiSTVoxpGNQwpDYAAAAD//16dAyAxI91VAAAAAElFTkSuQmCC"
 const liveSmokeSpeechSampleURL = "https://raw.githubusercontent.com/Uberi/speech_recognition/master/examples/english.wav"
+
+var errInvalidOllamaURL = errors.New("OLLAMA_BASE_URL must use localhost, loopback, or private-network host")
 
 type liveSmokeHarnessOptions struct {
 	storeDriver          string
@@ -351,6 +356,12 @@ func (h *liveSmokeHarness) requireOllama(t *testing.T, policy verification.Resul
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
 	}
+	if err := validateLocalOllamaBaseURL(baseURL); err != nil {
+		if h.mandatory(policy) {
+			t.Fatalf("Ollama base URL is not an allowed local URL: %v", err)
+		}
+		t.Skipf("Ollama base URL is not an allowed local URL: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -374,6 +385,28 @@ func (h *liveSmokeHarness) requireOllama(t *testing.T, policy verification.Resul
 		}
 		t.Skipf("Ollama tags endpoint returned %d", resp.StatusCode)
 	}
+}
+
+func validateLocalOllamaBaseURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return &url.Error{Op: "parse", URL: raw, Err: errInvalidOllamaURL}
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return &url.Error{Op: "parse", URL: raw, Err: errInvalidOllamaURL}
+	}
+	if ip.IsLoopback() || ip.IsPrivate() {
+		return nil
+	}
+	return &url.Error{Op: "parse", URL: raw, Err: errInvalidOllamaURL}
 }
 
 func (h *liveSmokeHarness) requireContains(t *testing.T, got string, want string) {

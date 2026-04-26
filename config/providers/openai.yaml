@@ -1,0 +1,71 @@
+version: 2
+
+providers:
+  openai:
+    credentials:
+      api_key: ${OPENAI_API_KEY}
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use:
+        - gpt-5.5
+        - gpt-4o
+        - gpt-4o-mini
+        - gpt-image-2
+        - gpt-image-1
+        - dall-e-3
+        - tts-1
+        - tts-1-hd
+        - whisper-1
+        - gpt-4o-audio
+        - sora-2
+        - sora-2-pro
+        - text-embedding-3-small
+        - text-embedding-3-large
+      overrides:
+        gpt-5.5:
+          context_window: 1000000
+          max_output_tokens: 128000
+        gpt-4o:
+          context_window: 128000
+          max_output_tokens: 16384
+        gpt-4o-mini:
+          context_window: 128000
+          max_output_tokens: 16384
+        gpt-image-2:
+          output_formats: [png, jpeg, webp]
+        gpt-image-1:
+          output_formats: [png, webp]
+        dall-e-3:
+          output_formats: [png]
+        tts-1:
+          voices: [alloy, echo, fable, onyx, nova, shimmer]
+        tts-1-hd:
+          voices: [alloy, echo, fable, onyx, nova, shimmer]
+        whisper-1:
+          formats: [mp3, mp4, mpeg, mpga, m4a, wav, webm]
+        gpt-4o-audio:
+          voices: [alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar]
+          session_ttl: 10m
+          realtime_session:
+            transport: openai_realtime
+            model: gpt-realtime
+        sora-2:
+          allowed_durations: [4, 8, 12]
+          aspect_ratios: ["16:9", "9:16"]
+          resolutions: [720p]
+          cancelable: false
+        sora-2-pro:
+          allowed_durations: [4, 8, 12]
+          aspect_ratios: ["16:9", "9:16"]
+          resolutions: [720p]
+          cancelable: false
+        text-embedding-3-small:
+          dimensions: 1536
+        text-embedding-3-large:
+          dimensions: 3072

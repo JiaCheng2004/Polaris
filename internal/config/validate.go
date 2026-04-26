@@ -26,6 +26,45 @@ func Validate(cfg *Config) error {
 	if cfg.Server.ShutdownTimeout <= 0 {
 		problems = append(problems, errors.New("server.shutdown_timeout must be greater than zero"))
 	}
+	if cfg.Server.MaxBodyBytes <= 0 {
+		problems = append(problems, errors.New("server.max_body_bytes must be greater than zero"))
+	}
+	if cfg.Server.CORS.Enabled {
+		if len(cfg.Server.CORS.AllowedOrigins) == 0 {
+			problems = append(problems, errors.New("server.cors.allowed_origins must not be empty when cors is enabled"))
+		}
+		if len(cfg.Server.CORS.AllowedMethods) == 0 {
+			problems = append(problems, errors.New("server.cors.allowed_methods must not be empty when cors is enabled"))
+		}
+		if len(cfg.Server.CORS.AllowedHeaders) == 0 {
+			problems = append(problems, errors.New("server.cors.allowed_headers must not be empty when cors is enabled"))
+		}
+		if cfg.Server.CORS.AllowCredentials {
+			for _, origin := range cfg.Server.CORS.AllowedOrigins {
+				if strings.TrimSpace(origin) == "*" {
+					problems = append(problems, errors.New("server.cors.allow_credentials cannot be true when allowed_origins contains *"))
+				}
+			}
+		}
+		if cfg.Server.CORS.MaxAge < 0 {
+			problems = append(problems, errors.New("server.cors.max_age must not be negative"))
+		}
+		for _, method := range cfg.Server.CORS.AllowedMethods {
+			if strings.TrimSpace(method) == "" {
+				problems = append(problems, errors.New("server.cors.allowed_methods must not contain empty values"))
+			}
+		}
+		for _, header := range cfg.Server.CORS.AllowedHeaders {
+			if strings.TrimSpace(header) == "" {
+				problems = append(problems, errors.New("server.cors.allowed_headers must not contain empty values"))
+			}
+		}
+		for _, origin := range cfg.Server.CORS.AllowedOrigins {
+			if strings.TrimSpace(origin) == "" {
+				problems = append(problems, errors.New("server.cors.allowed_origins must not contain empty values"))
+			}
+		}
+	}
 
 	if !cfg.Auth.Mode.Valid() {
 		problems = append(problems, fmt.Errorf("auth.mode %q is invalid", cfg.Auth.Mode))
@@ -57,8 +96,17 @@ func Validate(cfg *Config) error {
 			problems = append(problems, errors.New("control_plane.enabled requires auth.mode=virtual_keys, external, or multi-user"))
 		}
 	}
-	if cfg.Auth.Mode == AuthModeVirtualKeys && strings.TrimSpace(cfg.Auth.BootstrapAdminKeyHash) == "" {
-		problems = append(problems, errors.New("auth.bootstrap_admin_key_hash is required when auth.mode=virtual_keys"))
+	adminKeyHash := strings.TrimSpace(cfg.Auth.AdminKeyHash)
+	if adminKeyHash != "" && !strings.HasPrefix(adminKeyHash, "sha256:") {
+		problems = append(problems, errors.New("auth.admin_key_hash must use the sha256: prefix"))
+	}
+	bootstrapAdminKeyHash := strings.TrimSpace(cfg.Auth.BootstrapAdminKeyHash)
+	if cfg.Auth.Mode == AuthModeVirtualKeys {
+		if bootstrapAdminKeyHash == "" {
+			problems = append(problems, errors.New("auth.bootstrap_admin_key_hash is required when auth.mode=virtual_keys"))
+		} else if !strings.HasPrefix(bootstrapAdminKeyHash, "sha256:") {
+			problems = append(problems, errors.New("auth.bootstrap_admin_key_hash must use the sha256: prefix"))
+		}
 	}
 	for i, key := range cfg.Auth.StaticKeys {
 		if key.Name == "" {

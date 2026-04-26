@@ -1,0 +1,12 @@
+version: 2
+
+providers:
+  ollama:
+    transport:
+      base_url: http://localhost:11434
+      timeout: 300s
+    models:
+      use: [llama3]
+      overrides:
+        llama3:
+          context_window: 8192

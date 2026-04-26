@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  glm:
+    credentials:
+      api_key: ${GLM_API_KEY}
+    transport:
+      base_url: https://open.bigmodel.cn/api/paas/v4
+      timeout: 60s
+    models:
+      use: [glm-5.1]
+      overrides:
+        glm-5.1:
+          context_window: 204800

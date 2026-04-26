@@ -1,0 +1,34 @@
+version: 2
+
+providers:
+  google:
+    credentials:
+      api_key: ${GOOGLE_API_KEY}
+    transport:
+      base_url: https://generativelanguage.googleapis.com
+      timeout: 60s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use:
+        - gemini-2.5-pro
+        - gemini-2.5-flash
+        - gemini-2.5-flash-lite
+        - nano-banana-2
+        - nano-banana-pro
+        - gemini-embedding-001
+      overrides:
+        gemini-2.5-pro:
+          context_window: 1048576
+        gemini-2.5-flash:
+          context_window: 1048576
+        gemini-2.5-flash-lite:
+          context_window: 1048576
+        nano-banana-2:
+          output_formats: [png, jpeg]
+        nano-banana-pro:
+          output_formats: [png, jpeg]
+        gemini-embedding-001:
+          dimensions: 768

@@ -164,10 +164,16 @@ func (h *ImageHandler) registry(c *gin.Context) *provider.Registry {
 func parseImageEditRequest(c *gin.Context) (*modality.ImageEditRequest, error) {
 	imageHeader, err := c.FormFile("image")
 	if err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			return nil, httputil.RequestBodyTooLargeError(0)
+		}
 		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_image", "image", "Form field 'image' is required.")
 	}
 	imageData, imageType, err := readMultipartFile(imageHeader)
 	if err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			return nil, httputil.RequestBodyTooLargeError(0)
+		}
 		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "image", "Unable to read uploaded image.")
 	}
 
@@ -199,11 +205,16 @@ func parseImageEditRequest(c *gin.Context) (*modality.ImageEditRequest, error) {
 	if maskHeader, err := c.FormFile("mask"); err == nil {
 		maskData, maskType, readErr := readMultipartFile(maskHeader)
 		if readErr != nil {
+			if httputil.IsRequestBodyTooLarge(readErr) {
+				return nil, httputil.RequestBodyTooLargeError(0)
+			}
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_mask", "mask", "Unable to read uploaded mask.")
 		}
 		req.Mask = maskData
 		req.MaskFilename = maskHeader.Filename
 		req.MaskType = maskType
+	} else if httputil.IsRequestBodyTooLarge(err) {
+		return nil, httputil.RequestBodyTooLargeError(0)
 	}
 
 	return req, nil

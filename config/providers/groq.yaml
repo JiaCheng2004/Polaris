@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  groq:
+    credentials:
+      api_key: ${GROQ_API_KEY}
+    transport:
+      base_url: https://api.groq.com/openai/v1
+      timeout: 60s
+    models:
+      use: [llama-3.3-70b-versatile]
+      overrides:
+        llama-3.3-70b-versatile:
+          context_window: 131072

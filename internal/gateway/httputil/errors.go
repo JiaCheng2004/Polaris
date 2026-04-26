@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,18 @@ func NewError(status int, typ, code, param, message string) *APIError {
 		Param:   param,
 		Message: message,
 	}
+}
+
+func RequestBodyTooLargeError(maxBytes int64) *APIError {
+	if maxBytes <= 0 {
+		return NewError(http.StatusRequestEntityTooLarge, "invalid_request_error", "request_body_too_large", "", "Request body exceeds the configured maximum size.")
+	}
+	return NewError(http.StatusRequestEntityTooLarge, "invalid_request_error", "request_body_too_large", "", fmt.Sprintf("Request body exceeds the configured maximum size of %d bytes.", maxBytes))
+}
+
+func IsRequestBodyTooLarge(err error) bool {
+	var maxBytesError *http.MaxBytesError
+	return errors.As(err, &maxBytesError)
 }
 
 func WriteError(c *gin.Context, err error) {

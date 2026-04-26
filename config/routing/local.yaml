@@ -1,0 +1,20 @@
+version: 2
+
+routing:
+  fallbacks:
+    - from: anthropic/claude-sonnet-4-6
+      to: [openai/gpt-4o]
+      on: [rate_limit, timeout, server_error]
+    - from: openai/gpt-4o
+      to: [anthropic/claude-sonnet-4-6]
+      on: [rate_limit, timeout, server_error]
+  aliases:
+    default-chat: openai/gpt-4o
+    openai-frontier-chat: openai/gpt-5.5
+    openai-image-latest: openai/gpt-image-2
+    premium-chat: anthropic/claude-opus-4-6
+  selectors:
+    tooling-chat:
+      modality: chat
+      capabilities: [streaming, function_calling]
+      providers: [openai, anthropic]

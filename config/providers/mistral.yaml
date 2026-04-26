@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  mistral:
+    credentials:
+      api_key: ${MISTRAL_API_KEY}
+    transport:
+      base_url: https://api.mistral.ai/v1
+      timeout: 60s
+    models:
+      use: [mistral-medium-latest]
+      overrides:
+        mistral-medium-latest:
+          context_window: 128000

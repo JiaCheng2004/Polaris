@@ -16,6 +16,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
 )
 
@@ -1205,11 +1206,11 @@ func resamplePCM16Mono(input []byte, fromRate int, toRate int) []byte {
 		}
 		right := left + 1
 		fraction := position - float64(left)
-		leftSample := float64(int16(uint16(input[left*2]) | uint16(input[left*2+1])<<8))
-		rightSample := float64(int16(uint16(input[right*2]) | uint16(input[right*2+1])<<8))
+		leftSample := float64(safeconv.Int16FromUint16Bits(uint16(input[left*2]) | uint16(input[left*2+1])<<8))
+		rightSample := float64(safeconv.Int16FromUint16Bits(uint16(input[right*2]) | uint16(input[right*2+1])<<8))
 		value := int16(math.Round(leftSample + (rightSample-leftSample)*fraction))
-		output[i*2] = byte(value)
-		output[i*2+1] = byte(uint16(value) >> 8)
+		output[i*2] = safeconv.LowByteFromInt16Bits(value)
+		output[i*2+1] = byte(safeconv.Uint16FromInt16Bits(value) >> 8)
 	}
 	return output
 }

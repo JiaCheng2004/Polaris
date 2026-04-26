@@ -1,0 +1,24 @@
+version: 2
+
+providers:
+  replicate:
+    credentials:
+      api_key: ${REPLICATE_API_KEY}
+    transport:
+      base_url: https://api.replicate.com/v1
+      timeout: 120s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use: [minimax/video-01, minimax/hailuo-02]
+      overrides:
+        minimax/video-01:
+          allowed_durations: [6]
+          resolutions: [720p]
+          cancelable: true
+        minimax/hailuo-02:
+          allowed_durations: [6, 10]
+          resolutions: [768p, 1080p]
+          cancelable: true

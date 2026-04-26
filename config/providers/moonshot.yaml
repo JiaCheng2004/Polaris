@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  moonshot:
+    credentials:
+      api_key: ${MOONSHOT_API_KEY}
+    transport:
+      base_url: https://api.moonshot.ai/v1
+      timeout: 60s
+    models:
+      use: [kimi-k2-turbo-preview]
+      overrides:
+        kimi-k2-turbo-preview:
+          context_window: 256000

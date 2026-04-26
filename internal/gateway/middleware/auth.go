@@ -508,10 +508,10 @@ func matchesStoredKeyHash(stored string, raw string) bool {
 	if stored == "" || raw == "" {
 		return false
 	}
-	if strings.HasPrefix(stored, "sha256:") {
-		return HashAPIKey(raw) == stored
+	if !strings.HasPrefix(stored, "sha256:") {
+		return false
 	}
-	return stored == raw
+	return HashAPIKey(raw) == stored
 }
 
 func isControlPlaneRequest(c *gin.Context) bool {

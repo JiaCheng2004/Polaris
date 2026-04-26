@@ -1,0 +1,111 @@
+version: 2
+
+providers:
+  bytedance:
+    credentials:
+      access_key_id: ${VOLCENGINE_ACCESS_KEY_ID}
+      access_key_secret: ${VOLCENGINE_SECRET_ACCESS_KEY}
+      api_key: ${VOLCENGINE_ARK_API_KEY}
+      app_id: ${VOLCENGINE_OPENSPEECH_APP_ID}
+      speech_api_key: ${VOLCENGINE_OPENSPEECH_API_KEY}
+      speech_access_token: ${VOLCENGINE_OPENSPEECH_ACCESS_TOKEN}
+    transport:
+      control_base_url: https://open.volcengineapi.com
+      timeout: 120s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 2s
+    models:
+      use:
+        - doubao-seed-2.0-pro
+        - doubao-seed-1.6-vision
+        - doubao-pro-256k
+        - doubao-tts-2.0
+        - doubao-asr-2.0
+        - doubao-notes-2.0
+        - doubao-podcast-2.0
+        - doubao-translation-2.0
+        - doubao-streaming-asr-2.0
+        - doubao-streaming-asr-2.0-concurrent
+        - doubao-interpreting-2.0
+        - doubao-audio
+        - doubao-seedance-2.0
+        - doubao-seedance-2.0-fast
+        - seedance-2.0
+        - seedance-2.0-fast
+        - doubao-seedream-5.0-lite
+        - seedream-4.5
+      overrides:
+        doubao-seed-2.0-pro:
+          context_window: 256000
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        doubao-seed-1.6-vision:
+          context_window: 256000
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        doubao-pro-256k:
+          context_window: 256000
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        doubao-tts-2.0:
+          voices: [zh_female_vv_uranus_bigtts, zh_female_xiaohe_uranus_bigtts, zh_male_m191_uranus_bigtts, zh_male_taocheng_uranus_bigtts]
+          endpoint: https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse
+        doubao-asr-2.0:
+          formats: [wav, mp3, ogg, opus]
+          endpoint: https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash
+        doubao-notes-2.0:
+          endpoint: https://openspeech.bytedance.com/api/v3/auc/lark/submit
+        doubao-podcast-2.0:
+          output_formats: [mp3, ogg_opus, pcm, aac]
+          sample_rates_hz: [16000, 24000, 48000]
+          endpoint: wss://openspeech.bytedance.com/api/v3/sami/podcasttts
+        doubao-translation-2.0:
+          endpoint: https://openspeech.bytedance.com/api/v3/machine_translation/matx_translate
+        doubao-streaming-asr-2.0:
+          session_ttl: 10m
+          endpoint: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async
+        doubao-streaming-asr-2.0-concurrent:
+          session_ttl: 10m
+          endpoint: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async
+        doubao-interpreting-2.0:
+          session_ttl: 10m
+          endpoint: wss://openspeech.bytedance.com/api/v4/ast/v2/translate
+        doubao-audio:
+          voices: [zh_female_vv_jupiter_bigtts, zh_female_xiaohe_jupiter_bigtts, zh_male_yunzhou_jupiter_bigtts, zh_male_xiaotian_jupiter_bigtts]
+          session_ttl: 10m
+          realtime_session:
+            transport: bytedance_dialog
+            auth: access_token
+            url: wss://openspeech.bytedance.com/api/v3/realtime/dialogue
+            model: 1.2.1.1
+            resource_id: volc.speech.dialog
+            app_key: PlgvMymc7f3tQnJ6
+        doubao-seedance-2.0:
+          max_duration: 15
+          allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          resolutions: [720p]
+          cancelable: true
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        doubao-seedance-2.0-fast:
+          max_duration: 15
+          allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          resolutions: [720p]
+          cancelable: true
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        seedance-2.0:
+          max_duration: 15
+          allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          resolutions: [720p]
+          cancelable: true
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        seedance-2.0-fast:
+          max_duration: 15
+          allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          resolutions: [720p]
+          cancelable: true
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        doubao-seedream-5.0-lite:
+          output_formats: [png, jpeg]
+          endpoint: https://ark.cn-beijing.volces.com/api/v3
+        seedream-4.5:
+          output_formats: [png, jpeg]
+          endpoint: https://ark.cn-beijing.volces.com/api/v3

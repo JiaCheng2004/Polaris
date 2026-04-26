@@ -1,0 +1,24 @@
+version: 2
+
+providers:
+  nvidia:
+    credentials:
+      api_key: ${NVIDIA_API_KEY}
+    transport:
+      base_url: https://integrate.api.nvidia.com/v1
+      timeout: 60s
+    models:
+      use:
+        - nvidia/Llama-3_3-Nemotron-Super-49B-v1_5
+        - nvidia/NVIDIA-Nemotron-Nano-9B-v2
+        - nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1
+        - nvidia/llama-nemotron-embed-1b-v2
+      overrides:
+        nvidia/Llama-3_3-Nemotron-Super-49B-v1_5:
+          context_window: 131072
+        nvidia/NVIDIA-Nemotron-Nano-9B-v2:
+          context_window: 131072
+        nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1:
+          context_window: 131072
+        nvidia/llama-nemotron-embed-1b-v2:
+          dimensions: 2048

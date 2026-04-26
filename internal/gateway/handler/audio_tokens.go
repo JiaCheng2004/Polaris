@@ -106,7 +106,7 @@ func parseAudioSession(snapshot *gwruntime.Snapshot, sessionID string, clientSec
 }
 
 func signAudioPayload(snapshot *gwruntime.Snapshot, providerName string, prefix string, payload any) (string, error) {
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return "", invalidAudioSessionError("session", "Audio session signing secret is unavailable.")
 	}
@@ -148,7 +148,7 @@ func parseSignedAudioPayload[T any](snapshot *gwruntime.Snapshot, prefix string,
 	default:
 		return payload, invalidAudioSessionError("session", "Audio session token is invalid.")
 	}
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return payload, invalidAudioSessionError("session", "Audio session token is invalid.")
 	}

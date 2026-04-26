@@ -146,6 +146,50 @@ func TestStaticAuthAndRateLimit(t *testing.T) {
 	}
 }
 
+func TestGatewayRejectsOversizedRequestBody(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Server.MaxBodyBytes = 16
+	engine := newTestEngine(t, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"default-chat","input":"this body is too large"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected oversized body 413, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `"request_body_too_large"`) {
+		t.Fatalf("expected request_body_too_large error, got %s", res.Body.String())
+	}
+}
+
+func TestCORSAllowsConfiguredLocalhostOrigins(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Server.CORS = config.DefaultCORSConfig()
+	engine := newTestEngine(t, cfg)
+
+	req := httptest.NewRequest(http.MethodOptions, "/v1/models", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected preflight 204, got %d body=%s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Fatalf("expected localhost CORS origin, got %q", got)
+	}
+
+	req = httptest.NewRequest(http.MethodOptions, "/v1/models", nil)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected disallowed preflight 403, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
 func TestModelsEndpointIncludesPhase3Metadata(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Providers["openai"] = config.ProviderConfig{

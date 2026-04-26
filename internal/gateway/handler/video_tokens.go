@@ -109,6 +109,29 @@ func videoJobSecret(snapshot *gwruntime.Snapshot, providerName string) ([]byte, 
 	}
 }
 
+func speechSessionSecret(snapshot *gwruntime.Snapshot, providerName string) ([]byte, error) {
+	if snapshot == nil || snapshot.Config == nil {
+		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "registry_unavailable", "", "Runtime configuration is unavailable.")
+	}
+
+	cfg, ok := snapshot.Config.Providers[providerName]
+	if !ok {
+		return nil, invalidVideoJobIDError()
+	}
+	switch {
+	case strings.TrimSpace(cfg.SecretKey) != "":
+		return []byte(cfg.SecretKey), nil
+	case strings.TrimSpace(cfg.SpeechAccessToken) != "":
+		return []byte(cfg.SpeechAccessToken), nil
+	case strings.TrimSpace(cfg.SpeechAPIKey) != "":
+		return []byte(cfg.SpeechAPIKey), nil
+	case strings.TrimSpace(cfg.APIKey) != "":
+		return []byte(cfg.APIKey), nil
+	default:
+		return nil, invalidVideoJobIDError()
+	}
+}
+
 func invalidVideoJobIDError() error {
 	return httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 }

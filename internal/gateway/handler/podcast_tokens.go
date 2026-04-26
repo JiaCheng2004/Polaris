@@ -28,7 +28,7 @@ type podcastJobToken struct {
 }
 
 func signPodcastJobID(snapshot *gwruntime.Snapshot, model provider.Model, cacheKey string, keyID string, expiresAt int64) (string, error) {
-	secret, err := videoJobSecret(snapshot, model.Provider)
+	secret, err := speechSessionSecret(snapshot, model.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +71,7 @@ func parsePodcastJobID(snapshot *gwruntime.Snapshot, token string) (podcastJobTo
 	if payload.Version != 1 || strings.TrimSpace(payload.Provider) == "" || strings.TrimSpace(payload.Model) == "" || strings.TrimSpace(payload.CacheKey) == "" || strings.TrimSpace(payload.KeyID) == "" || payload.ExpiresAt <= 0 {
 		return podcastJobToken{}, invalidPodcastJobIDError()
 	}
-	secret, err := videoJobSecret(snapshot, payload.Provider)
+	secret, err := speechSessionSecret(snapshot, payload.Provider)
 	if err != nil {
 		return podcastJobToken{}, invalidPodcastJobIDError()
 	}

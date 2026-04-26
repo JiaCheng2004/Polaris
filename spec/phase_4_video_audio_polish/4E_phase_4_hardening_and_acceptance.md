@@ -75,8 +75,8 @@ Phase 4 can be called complete only when all of the following are true:
 - the load-validation checklist in `docs/LOAD_TESTING.md` is recorded as complete
 - the `v2.0.0` tag is cut against that validated state
 
-At the time of this record:
+Phase 4 release evidence should record:
 
-- repo-local close-out work is implemented
-- release validation mechanics are committed
-- final `v2.0.0` release completion is still pending the strict live matrix and release tag
+- repo-local close-out checks
+- strict live matrix coverage when credentials, quota, and plan access are available
+- load-validation outcomes when load proof is required for the release

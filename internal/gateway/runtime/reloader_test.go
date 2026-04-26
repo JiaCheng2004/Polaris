@@ -96,25 +96,27 @@ func TestReloaderKeepsPreviousStateOnInvalidReload(t *testing.T) {
 	reloader := NewReloader(path, config.RuntimeOverrides{}, holder, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 
 	if err := os.WriteFile(path, []byte(strings.TrimSpace(`
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
-cache:
-  driver: redis
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  cache:
+    driver: redis
+  observability:
+    logging:
+      level: info
+      format: json
 providers:
   openai:
-    api_key: sk-openai
-    base_url: https://api.openai.com/v1
-    timeout: 1s
+    credentials:
+      api_key: sk-openai
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 1s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    level: info
-    format: json
+      use: [gpt-4o]
 `)), 0o600); err != nil {
 		t.Fatalf("write invalid config: %v", err)
 	}
@@ -240,56 +242,64 @@ func writeTestConfig(t *testing.T, path string, options testConfigFileOptions) {
 	}
 
 	content := strings.TrimSpace(`
-server:
-  host: 127.0.0.1
-  port: 8080
-  read_timeout: 30s
-  write_timeout: 30s
-  shutdown_timeout: 5s
-auth:
-  mode: static
-  static_keys:
-    - name: default
-      key_hash: sha256:test
-      rate_limit: ` + options.KeyRateLimit + `
-      allowed_models: ["*"]
-store:
-  driver: sqlite
-  dsn: ` + options.StoreDSN + `
-  max_connections: 1
-  log_retention_days: 30
-  log_buffer_size: 10
-  log_flush_interval: 1s
-cache:
-  driver: memory
-  rate_limit:
-    enabled: true
-    default: ` + options.DefaultRateLimit + `
-    window: sliding
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 30s
+    shutdown_timeout: 5s
+  auth:
+    mode: static
+    static_keys:
+      - name: default
+        key_hash: sha256:test
+        rate_limit: ` + options.KeyRateLimit + `
+        allowed_models: ["*"]
+  store:
+    driver: sqlite
+    dsn: ` + options.StoreDSN + `
+    max_connections: 1
+    log_retention_days: 30
+    log_buffer_size: 10
+    log_flush_interval: 1s
+  cache:
+    driver: memory
+    rate_limit:
+      enabled: true
+      default: ` + options.DefaultRateLimit + `
+      window: sliding
+  observability:
+    logging:
+      level: info
+      format: json
 providers:
   openai:
-    api_key: sk-openai
-    base_url: https://api.openai.com/v1
-    timeout: 1s
+    credentials:
+      api_key: sk-openai
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 1s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming, json_mode]
+      use: [gpt-4o]
+      overrides:
+        gpt-4o:
+          capabilities: [streaming, json_mode]
   deepseek:
-    api_key: sk-deepseek
-    base_url: https://api.deepseek.com/v1
-    timeout: 1s
+    credentials:
+      api_key: sk-deepseek
+    transport:
+      base_url: https://api.deepseek.com/v1
+      timeout: 1s
     models:
-      deepseek-chat:
-        modality: chat
-        capabilities: [streaming]
+      use: [deepseek-chat]
+      overrides:
+        deepseek-chat:
+          capabilities: [streaming]
 routing:
   aliases:
     default-chat: ` + options.AliasTarget + fallbackBlock + selectorBlock + `
-observability:
-  logging:
-    level: info
-    format: json
 `)
 
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

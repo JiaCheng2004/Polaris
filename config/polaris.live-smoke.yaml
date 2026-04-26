@@ -1,523 +1,166 @@
-server:
-  host: 127.0.0.1
-  port: 18080
-  read_timeout: 30s
-  write_timeout: 120s
-  shutdown_timeout: 15s
+# Env-driven live smoke config. It imports the same provider snippets as the
+# reference config, then narrows expensive providers to cheaper smoke models.
 
-auth:
-  mode: none
-  static_keys: []
-  admin_key_hash: ""
+version: 2
 
-store:
-  driver: sqlite
-  dsn: ./polaris-live-smoke.db
-  max_connections: 1
-  log_retention_days: 7
-  log_buffer_size: 1000
-  log_flush_interval: 1s
+imports:
+  - ./providers/openai.yaml
+  - ./providers/anthropic.yaml
+  - ./providers/google.yaml
+  - ./providers/google-vertex.yaml
+  - ./providers/deepseek.yaml
+  - ./providers/bytedance.yaml
+  - ./providers/minimax.yaml
+  - ./providers/elevenlabs.yaml
+  - ./providers/xai.yaml
+  - ./providers/openrouter.yaml
+  - ./providers/together.yaml
+  - ./providers/groq.yaml
+  - ./providers/fireworks.yaml
+  - ./providers/featherless.yaml
+  - ./providers/moonshot.yaml
+  - ./providers/glm.yaml
+  - ./providers/mistral.yaml
+  - ./providers/bedrock.yaml
+  - ./providers/nvidia.yaml
+  - ./providers/replicate.yaml
+  - ./providers/qwen.yaml
+  - ./providers/ollama.yaml
+  - ./routing/live-smoke.yaml
 
-cache:
-  driver: memory
-  rate_limit:
-    enabled: false
-    default: 60/min
-    window: sliding
-  response_cache:
-    enabled: false
-    ttl: 24h
-    max_entries_per_model: 100
-    similarity_threshold: 0.95
+runtime:
+  server:
+    host: 127.0.0.1
+    port: 18080
+    read_timeout: 30s
+    write_timeout: 120s
+    shutdown_timeout: 15s
+    max_body_bytes: 67108864
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost
+        - http://localhost:*
+        - http://127.0.0.1
+        - http://127.0.0.1:*
+      allowed_headers: [Authorization, Content-Type, X-Request-ID, X-Polaris-Admin-Key]
+      allowed_methods: [GET, POST, DELETE, OPTIONS]
+      exposed_headers: [X-Request-ID, X-RateLimit-Remaining, Retry-After, X-Polaris-Fallback, X-Polaris-Resolved-Model, X-Polaris-Resolved-Provider]
+      allow_credentials: false
+      max_age: 1h
+
+  auth:
+    mode: none
+    static_keys: []
+    admin_key_hash: ""
+
+  store:
+    driver: sqlite
+    dsn: ./polaris-live-smoke.db
+    max_connections: 1
+    log_retention_days: 7
+    log_buffer_size: 1000
+    log_flush_interval: 1s
+
+  cache:
+    driver: memory
+    rate_limit:
+      enabled: false
+      default: 60/min
+      window: sliding
+    response_cache:
+      enabled: false
+      ttl: 24h
+      max_entries_per_model: 100
+      similarity_threshold: 0.95
+
+  observability:
+    metrics:
+      enabled: true
+      path: /metrics
+    logging:
+      level: info
+      format: json
 
 providers:
   openai:
-    api_key: ${OPENAI_API_KEY}
-    base_url: https://api.openai.com/v1
-    timeout: 60s
-    retry:
-      max_attempts: 2
-      backoff: exponential
-      initial_delay: 1s
+    transport:
+      retry:
+        max_attempts: 2
+        backoff: exponential
+        initial_delay: 1s
     models:
-      gpt-5.5:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, reasoning]
-        context_window: 1000000
-        max_output_tokens: 128000
-      gpt-4o-mini:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode]
-        context_window: 128000
-        max_output_tokens: 16384
-      text-embedding-3-small:
-        modality: embed
-        dimensions: 1536
-      gpt-image-1:
-        modality: image
-        capabilities: [generation, editing]
-        output_formats: [png, webp]
-      gpt-image-2:
-        modality: image
-        capabilities: [generation, editing]
-        output_formats: [png, jpeg, webp]
-      tts-1:
-        modality: voice
-        capabilities: [tts]
-        voices: [alloy, echo, fable, onyx, nova, shimmer]
-      whisper-1:
-        modality: voice
-        capabilities: [stt]
-        formats: [mp3, mp4, mpeg, mpga, m4a, wav, webm]
-      gpt-4o-audio:
-        modality: audio
-        capabilities: [audio_input, audio_output]
-        voices: [alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar]
-        session_ttl: 10m
-        realtime_session:
-          transport: openai_realtime
-          model: gpt-realtime
-      sora-2:
-        modality: video
-        capabilities: [text_to_video, image_to_video, native_audio]
-        allowed_durations: [4, 8, 12]
-        aspect_ratios: [16:9, 9:16]
-        resolutions: [720p]
-        cancelable: false
+      use: [gpt-5.5, gpt-4o-mini, text-embedding-3-small, gpt-image-1, gpt-image-2, tts-1, whisper-1, gpt-4o-audio, sora-2]
 
   anthropic:
-    api_key: ${ANTHROPIC_API_KEY}
-    base_url: https://api.anthropic.com
-    timeout: 120s
-    retry:
-      max_attempts: 2
-      backoff: exponential
-      initial_delay: 1s
+    transport:
+      retry:
+        max_attempts: 2
+        backoff: exponential
+        initial_delay: 1s
     models:
-      claude-sonnet-4-6:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, pdf, extended_thinking]
-        context_window: 200000
-        max_output_tokens: 16000
+      use: [claude-sonnet-4-6]
 
   google:
-    api_key: ${GOOGLE_API_KEY}
-    base_url: https://generativelanguage.googleapis.com
-    timeout: 60s
-    retry:
-      max_attempts: 2
-      backoff: exponential
-      initial_delay: 1s
+    transport:
+      retry:
+        max_attempts: 2
+        backoff: exponential
+        initial_delay: 1s
     models:
-      gemini-2.5-flash-lite:
-        modality: chat
-        capabilities: [vision, streaming]
-        context_window: 1048576
-      gemini-embedding-001:
-        modality: embed
-        dimensions: 768
-      nano-banana-2:
-        modality: image
-        capabilities: [generation, editing]
-        output_formats: [png, jpeg]
+      use: [gemini-2.5-flash-lite, gemini-embedding-001, nano-banana-2]
 
   google-vertex:
-    project_id: ${GOOGLE_CLOUD_PROJECT}
-    location: ${GOOGLE_CLOUD_LOCATION}
-    secret_key: ${GOOGLE_VERTEX_JOB_SECRET}
-    timeout: 60s
     models:
-      veo-3.1-generate-001:
-        modality: video
-        capabilities: [text_to_video, image_to_video, last_frame, native_audio]
-        allowed_durations: [4, 6, 8]
-        aspect_ratios: [16:9, 9:16]
-        resolutions: [720p, 1080p]
-        cancelable: true
+      use: [veo-3.1-generate-001]
 
   deepseek:
-    api_key: ${DEEPSEEK_API_KEY}
-    base_url: https://api.deepseek.com/v1
-    timeout: 120s
-    retry:
-      max_attempts: 2
-      backoff: exponential
-      initial_delay: 1s
+    transport:
+      retry:
+        max_attempts: 2
+        backoff: exponential
+        initial_delay: 1s
     models:
-      deepseek-chat:
-        modality: chat
-        capabilities: [function_calling, streaming]
-        context_window: 64000
+      use: [deepseek-chat]
 
   bytedance:
-    access_key_id: ${VOLCENGINE_ACCESS_KEY_ID}
-    access_key_secret: ${VOLCENGINE_SECRET_ACCESS_KEY}
-    control_base_url: https://open.volcengineapi.com
-    api_key: ${VOLCENGINE_ARK_API_KEY}
-    app_id: ${VOLCENGINE_OPENSPEECH_APP_ID}
-    speech_api_key: ${VOLCENGINE_OPENSPEECH_API_KEY}
-    speech_access_token: ${VOLCENGINE_OPENSPEECH_ACCESS_TOKEN}
-    timeout: 120s
-    retry:
-      max_attempts: 2
-      backoff: exponential
-      initial_delay: 2s
+    transport:
+      retry:
+        max_attempts: 2
+        backoff: exponential
+        initial_delay: 2s
     models:
-      doubao-seed-2.0-pro:
-        modality: chat
-        capabilities: [vision, function_calling, streaming]
-        context_window: 256000
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      doubao-seed-1.6-vision:
-        modality: chat
-        capabilities: [vision, streaming]
-        context_window: 256000
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      doubao-pro-256k:
-        modality: chat
-        capabilities: [function_calling, streaming]
-        context_window: 256000
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      doubao-tts-2.0:
-        modality: voice
-        capabilities: [tts, voice_cloning, voice_design]
-        voices: [zh_female_vv_uranus_bigtts]
-        endpoint: https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse
-      doubao-asr-2.0:
-        modality: voice
-        capabilities: [stt]
-        formats: [wav, mp3, ogg, opus]
-        endpoint: https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash
-      doubao-notes-2.0:
-        modality: notes
-        capabilities: [audio_notes]
-        endpoint: https://openspeech.bytedance.com/api/v3/auc/lark/submit
-      doubao-podcast-2.0:
-        modality: podcast
-        capabilities: [podcast_generation]
-        output_formats: [mp3, ogg_opus, pcm, aac]
-        sample_rates_hz: [16000, 24000, 48000]
-        endpoint: wss://openspeech.bytedance.com/api/v3/sami/podcasttts
-      doubao-translation-2.0:
-        modality: translation
-        endpoint: https://openspeech.bytedance.com/api/v3/machine_translation/matx_translate
-      doubao-streaming-asr-2.0:
-        modality: voice
-        capabilities: [streaming]
-        session_ttl: 10m
-        endpoint: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async
-      doubao-interpreting-2.0:
-        modality: interpreting
-        capabilities: [audio_input, audio_output]
-        session_ttl: 10m
-        endpoint: wss://openspeech.bytedance.com/api/v4/ast/v2/translate
-      doubao-audio:
-        modality: audio
-        capabilities: [audio_input, audio_output]
-        voices: [zh_female_vv_jupiter_bigtts, zh_female_xiaohe_jupiter_bigtts, zh_male_yunzhou_jupiter_bigtts, zh_male_xiaotian_jupiter_bigtts]
-        session_ttl: 10m
-        realtime_session:
-          transport: bytedance_dialog
-          auth: access_token
-          url: wss://openspeech.bytedance.com/api/v3/realtime/dialogue
-          model: 1.2.1.1
-          resource_id: volc.speech.dialog
-          app_key: PlgvMymc7f3tQnJ6
-      doubao-seedance-2.0:
-        modality: video
-        capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
-        max_duration: 15
-        allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-        resolutions: [720p]
-        cancelable: true
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      doubao-seedance-2.0-fast:
-        modality: video
-        capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
-        max_duration: 15
-        allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-        resolutions: [720p]
-        cancelable: true
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      seedance-2.0:
-        modality: video
-        capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
-        max_duration: 15
-        allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-        resolutions: [720p]
-        cancelable: true
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      seedance-2.0-fast:
-        modality: video
-        capabilities: [text_to_video, image_to_video, last_frame, reference_images, video_input, audio_input, native_audio]
-        max_duration: 15
-        allowed_durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-        resolutions: [720p]
-        cancelable: true
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      doubao-seedream-5.0-lite:
-        modality: image
-        capabilities: [generation]
-        output_formats: [png, jpeg]
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-      seedream-4.5:
-        modality: image
-        capabilities: [generation, editing, multi_reference]
-        output_formats: [png, jpeg]
-        endpoint: https://ark.cn-beijing.volces.com/api/v3
-
-  minimax:
-    api_key: ${MINIMAX_API_KEY}
-    base_url: ${MINIMAX_BASE_URL}
-    timeout: 10m
-    models:
-      music-2.6:
-        modality: music
-        capabilities: [music_generation, lyrics_generation, instrumental]
-        output_formats: [mp3, wav, flac]
-        min_duration_ms: 10000
-        max_duration_ms: 180000
-        sample_rates_hz: [44100]
-      music-cover:
-        modality: music
-        capabilities: [music_editing, music_cover]
-        output_formats: [mp3, wav]
-        sample_rates_hz: [44100]
-
-  elevenlabs:
-    # Preview-only for the v2.1.0 release gate. Live smoke runs only when
-    # POLARIS_LIVE_SMOKE_ELEVENLABS=1 is set.
-    api_key: ${ELEVENLABS_API_KEY}
-    base_url: https://api.elevenlabs.io
-    timeout: 120s
-    models:
-      music_v1:
-        modality: music
-        capabilities: [music_generation, music_streaming, music_stems, composition_plans, instrumental]
-        output_formats: [mp3, pcm, opus]
-        min_duration_ms: 10000
-        max_duration_ms: 180000
-        sample_rates_hz: [44100, 48000]
-
-  xai:
-    api_key: ${XAI_API_KEY}
-    base_url: https://api.x.ai/v1
-    timeout: 60s
-    models:
-      grok-4-1-fast-reasoning:
-        modality: chat
-        capabilities: [reasoning, function_calling, streaming]
-        context_window: 2000000
-
-  openrouter:
-    api_key: ${OPENROUTER_API_KEY}
-    base_url: https://openrouter.ai/api/v1
-    timeout: 60s
-    models:
-      openai/gpt-5.4-mini:
-        modality: chat
-        capabilities: [vision, function_calling, streaming]
-        context_window: 128000
-
-  together:
-    api_key: ${TOGETHER_API_KEY}
-    base_url: https://api.together.xyz/v1
-    timeout: 60s
-    models:
-      meta-llama/Llama-3.3-70B-Instruct-Turbo:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 131072
-
-  groq:
-    api_key: ${GROQ_API_KEY}
-    base_url: https://api.groq.com/openai/v1
-    timeout: 60s
-    models:
-      llama-3.3-70b-versatile:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 131072
-
-  fireworks:
-    api_key: ${FIREWORKS_API_KEY}
-    base_url: https://api.fireworks.ai/inference/v1
-    timeout: 60s
-    models:
-      accounts/fireworks/models/llama-v3p1-8b-instruct:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 131072
-
-  featherless:
-    api_key: ${FEATHERLESS_API_KEY}
-    base_url: https://api.featherless.ai/v1
-    timeout: 60s
-    models:
-      meta-llama/Meta-Llama-3.1-8B-Instruct:
-        modality: chat
-        capabilities: [streaming]
-        context_window: 131072
-
-  moonshot:
-    api_key: ${MOONSHOT_API_KEY}
-    base_url: https://api.moonshot.ai/v1
-    timeout: 60s
-    models:
-      kimi-k2-turbo-preview:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 256000
-
-  glm:
-    api_key: ${GLM_API_KEY}
-    base_url: https://open.bigmodel.cn/api/paas/v4
-    timeout: 60s
-    models:
-      glm-5.1:
-        modality: chat
-        capabilities: [streaming, function_calling, reasoning]
-        context_window: 204800
-
-  mistral:
-    api_key: ${MISTRAL_API_KEY}
-    base_url: https://api.mistral.ai/v1
-    timeout: 60s
-    models:
-      mistral-medium-latest:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 128000
+      use:
+        - doubao-seed-2.0-pro
+        - doubao-seed-1.6-vision
+        - doubao-pro-256k
+        - doubao-tts-2.0
+        - doubao-asr-2.0
+        - doubao-notes-2.0
+        - doubao-podcast-2.0
+        - doubao-translation-2.0
+        - doubao-streaming-asr-2.0
+        - doubao-interpreting-2.0
+        - doubao-audio
+        - doubao-seedance-2.0
+        - doubao-seedance-2.0-fast
+        - seedance-2.0
+        - seedance-2.0-fast
+        - doubao-seedream-5.0-lite
+        - seedream-4.5
 
   bedrock:
-    access_key_id: ${AWS_BEDROCK_ACCESS_KEY_ID}
-    access_key_secret: ${AWS_BEDROCK_SECRET_ACCESS_KEY}
-    session_token: ${AWS_BEDROCK_SESSION_TOKEN}
-    location: ${AWS_BEDROCK_REGION}
-    timeout: 60s
-    retry:
-      max_attempts: 3
-      backoff: exponential
-      initial_delay: 500ms
     models:
-      amazon.nova-2-lite-v1:0:
-        modality: chat
-        capabilities: [vision, function_calling, streaming]
-        context_window: 300000
-      amazon.titan-embed-text-v2:0:
-        modality: embed
-        dimensions: 1024
+      use: ["amazon.nova-2-lite-v1:0", "amazon.titan-embed-text-v2:0"]
 
   nvidia:
-    api_key: ${NVIDIA_API_KEY}
-    base_url: https://integrate.api.nvidia.com/v1
-    timeout: 60s
     models:
-      nvidia/NVIDIA-Nemotron-Nano-9B-v2:
-        modality: chat
-        capabilities: [streaming, function_calling]
-        context_window: 131072
-      nvidia/llama-nemotron-embed-1b-v2:
-        modality: embed
-        dimensions: 2048
+      use: [nvidia/NVIDIA-Nemotron-Nano-9B-v2, nvidia/llama-nemotron-embed-1b-v2]
 
   replicate:
-    api_key: ${REPLICATE_API_KEY}
-    base_url: https://api.replicate.com/v1
-    timeout: 120s
-    retry:
-      max_attempts: 3
-      backoff: exponential
-      initial_delay: 1s
     models:
-      minimax/video-01:
-        modality: video
-        capabilities: [text_to_video, image_to_video]
-        allowed_durations: [6]
-        resolutions: [720p]
-        cancelable: true
+      use: [minimax/video-01]
 
   qwen:
-    api_key: ${DASHSCOPE_API_KEY}
-    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-    timeout: 60s
     models:
-      qwen-max:
-        modality: chat
-        capabilities: [vision, function_calling, streaming]
-        context_window: 131072
-      qwen-image-2.0:
-        modality: image
-        capabilities: [generation, editing]
-        output_formats: [png]
-
-  ollama:
-    base_url: http://localhost:11434
-    timeout: 300s
-    models:
-      llama3:
-        modality: chat
-        capabilities: [streaming]
-        context_window: 8192
-
-routing:
-  fallbacks: []
-  aliases:
-    openai-chat: openai/gpt-4o-mini
-    openai-frontier-chat: openai/gpt-5.5
-    openai-embed: openai/text-embedding-3-small
-    openai-image: openai/gpt-image-1
-    openai-image-latest: openai/gpt-image-2
-    openai-tts: openai/tts-1
-    openai-stt: openai/whisper-1
-    openai-audio: openai/gpt-4o-audio
-    openai-video: openai/sora-2
-    anthropic-chat: anthropic/claude-sonnet-4-6
-    google-chat: google/gemini-2.5-flash-lite
-    google-embed: google/gemini-embedding-001
-    google-image: google/nano-banana-2
-    google-video: google-vertex/veo-3.1-generate-001
-    deepseek-chat: deepseek/deepseek-chat
-    bytedance-chat: bytedance/doubao-seed-2.0-pro
-    bytedance-vision: bytedance/doubao-seed-1.6-vision
-    bytedance-image: bytedance/doubao-seedream-5.0-lite
-    bytedance-tts: bytedance/doubao-tts-2.0
-    bytedance-stt: bytedance/doubao-asr-2.0
-    bytedance-notes: bytedance/doubao-notes-2.0
-    bytedance-podcast: bytedance/doubao-podcast-2.0
-    bytedance-streaming-asr: bytedance/doubao-streaming-asr-2.0
-    bytedance-interpreting: bytedance/doubao-interpreting-2.0
-    bytedance-audio: bytedance/doubao-audio
-    bytedance-translation: bytedance/doubao-translation-2.0
-    bytedance-video: bytedance/doubao-seedance-2.0
-    bytedance-video-fast: bytedance/doubao-seedance-2.0-fast
-    minimax-music: minimax/music-2.6
-    cover-music: minimax/music-cover
-    # Preview-only aliases for the optional ElevenLabs smoke path.
-    elevenlabs-music: elevenlabs/music_v1
-    stems-music: elevenlabs/music_v1
-    xai-chat: xai/grok-4-1-fast-reasoning
-    openrouter-chat: openrouter/openai/gpt-5.4-mini
-    together-chat: together/meta-llama/Llama-3.3-70B-Instruct-Turbo
-    groq-chat: groq/llama-3.3-70b-versatile
-    fireworks-chat: fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct
-    featherless-chat: featherless/meta-llama/Meta-Llama-3.1-8B-Instruct
-    moonshot-chat: moonshot/kimi-k2-turbo-preview
-    glm-chat: glm/glm-5.1
-    mistral-chat: mistral/mistral-medium-latest
-    bedrock-chat: bedrock/amazon.nova-2-lite-v1:0
-    bedrock-embed: bedrock/amazon.titan-embed-text-v2:0
-    nvidia-chat: nvidia/nvidia/NVIDIA-Nemotron-Nano-9B-v2
-    nvidia-embed: nvidia/nvidia/llama-nemotron-embed-1b-v2
-    replicate-video: replicate/minimax/video-01
-    qwen-chat: qwen/qwen-max
-    qwen-image: qwen/qwen-image-2.0
-    ollama-chat: ollama/llama3
-
-observability:
-  metrics:
-    enabled: true
-    path: /metrics
-  logging:
-    level: info
-    format: json
+      use: [qwen-max, qwen-image-2.0]

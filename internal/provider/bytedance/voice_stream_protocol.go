@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 )
 
 const (
@@ -85,7 +87,11 @@ func encodeStreamingASRFrame(frame streamingASRFrame) ([]byte, error) {
 		}
 		writeInt32(&buf, *frame.Sequence)
 	}
-	writeUint32(&buf, uint32(len(frame.Payload)))
+	payloadSize, err := safeconv.Uint32FromInt("streaming transcription payload length", len(frame.Payload))
+	if err != nil {
+		return nil, err
+	}
+	writeUint32(&buf, payloadSize)
 	buf.Write(frame.Payload)
 	return buf.Bytes(), nil
 }
@@ -123,10 +129,14 @@ func decodeStreamingASRFrame(payload []byte) (streamingASRFrame, error) {
 		if err != nil {
 			return streamingASRFrame{}, err
 		}
-		if size > uint32(reader.Len()) {
+		payloadSize, err := safeconv.IntFromUint32("streaming transcription error payload size", size)
+		if err != nil {
+			return streamingASRFrame{}, err
+		}
+		if payloadSize > reader.Len() {
 			return streamingASRFrame{}, fmt.Errorf("streaming transcription error payload size %d exceeds remaining bytes %d", size, reader.Len())
 		}
-		frame.Payload = make([]byte, int(size))
+		frame.Payload = make([]byte, payloadSize)
 		if _, err := io.ReadFull(reader, frame.Payload); err != nil {
 			return streamingASRFrame{}, fmt.Errorf("read streaming transcription error payload: %w", err)
 		}
@@ -145,10 +155,14 @@ func decodeStreamingASRFrame(payload []byte) (streamingASRFrame, error) {
 	if err != nil {
 		return streamingASRFrame{}, err
 	}
-	if size > uint32(reader.Len()) {
+	payloadSize, err := safeconv.IntFromUint32("streaming transcription payload size", size)
+	if err != nil {
+		return streamingASRFrame{}, err
+	}
+	if payloadSize > reader.Len() {
 		return streamingASRFrame{}, fmt.Errorf("streaming transcription payload size %d exceeds remaining bytes %d", size, reader.Len())
 	}
-	frame.Payload = make([]byte, int(size))
+	frame.Payload = make([]byte, payloadSize)
 	if _, err := io.ReadFull(reader, frame.Payload); err != nil {
 		return streamingASRFrame{}, fmt.Errorf("read streaming transcription payload: %w", err)
 	}

@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  xai:
+    credentials:
+      api_key: ${XAI_API_KEY}
+    transport:
+      base_url: https://api.x.ai/v1
+      timeout: 60s
+    models:
+      use: [grok-4-1-fast-reasoning]
+      overrides:
+        grok-4-1-fast-reasoning:
+          context_window: 2000000

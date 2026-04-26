@@ -103,9 +103,7 @@ func (s *Store) ListAPIKeys(ctx context.Context, ownerID string, includeRevoked 
 	if !includeRevoked {
 		clauses = append(clauses, "is_revoked = FALSE")
 	}
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
-	}
+	query = appendWhereClauses(query, clauses)
 	query += " ORDER BY created_at DESC"
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -241,9 +239,7 @@ func (s *Store) GetUsage(ctx context.Context, filter store.UsageFilter) (store.U
 		LEFT JOIN api_keys ON api_keys.id = request_logs.key_id
 		LEFT JOIN virtual_keys ON virtual_keys.id = request_logs.key_id
 	`
-	if where != "" {
-		query += " WHERE " + where
-	}
+	query = appendWhereExpression(query, where)
 	query += " GROUP BY usage_date ORDER BY usage_date ASC"
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -280,9 +276,7 @@ func (s *Store) GetUsageByModel(ctx context.Context, filter store.UsageFilter) (
 		LEFT JOIN api_keys ON api_keys.id = request_logs.key_id
 		LEFT JOIN virtual_keys ON virtual_keys.id = request_logs.key_id
 	`
-	if where != "" {
-		query += " WHERE " + where
-	}
+	query = appendWhereExpression(query, where)
 	query += " GROUP BY request_logs.model ORDER BY request_logs.model ASC"
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -317,6 +311,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return fmt.Errorf("apply sqlite migrations: %w (upgrade fallback failed: %v)", err, upgradeErr)
 		}
 		return nil
+	}
+	if err := s.ensureControlPlaneUpgrade(ctx); err != nil {
+		return fmt.Errorf("apply sqlite control-plane upgrades: %w", err)
 	}
 	return nil
 }
@@ -625,9 +622,7 @@ func (s *Store) ListVirtualKeys(ctx context.Context, projectID string, includeRe
 	if !includeRevoked {
 		clauses = append(clauses, "is_revoked = FALSE")
 	}
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
-	}
+	query = appendWhereClauses(query, clauses)
 	query += " ORDER BY created_at DESC"
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -1084,9 +1079,7 @@ func (s *Store) ListArchivedVoices(ctx context.Context, provider string, model s
 		clauses = append(clauses, "model = ?")
 		args = append(args, model)
 	}
-	if len(clauses) > 0 {
-		query += ` WHERE ` + strings.Join(clauses, " AND ")
-	}
+	query = appendWhereClauses(query, clauses)
 	query += ` ORDER BY archived_at DESC`
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -1324,15 +1317,27 @@ func usageTotals(ctx context.Context, db *sql.DB, where string, args []any) (sto
 		LEFT JOIN api_keys ON api_keys.id = request_logs.key_id
 		LEFT JOIN virtual_keys ON virtual_keys.id = request_logs.key_id
 	`
-	if where != "" {
-		query += " WHERE " + where
-	}
+	query = appendWhereExpression(query, where)
 
 	var report store.UsageReport
 	if err := db.QueryRowContext(ctx, query, args...).Scan(&report.TotalRequests, &report.TotalTokens, &report.TotalCost); err != nil {
 		return store.UsageReport{}, fmt.Errorf("query usage totals: %w", err)
 	}
 	return report, nil
+}
+
+func appendWhereClauses(query string, clauses []string) string {
+	if len(clauses) == 0 {
+		return query
+	}
+	return query + " WHERE " + strings.Join(clauses, " AND ")
+}
+
+func appendWhereExpression(query string, where string) string {
+	if where == "" {
+		return query
+	}
+	return query + " WHERE " + where
 }
 
 func newID() string {

@@ -1,0 +1,20 @@
+version: 2
+
+providers:
+  deepseek:
+    credentials:
+      api_key: ${DEEPSEEK_API_KEY}
+    transport:
+      base_url: https://api.deepseek.com/v1
+      timeout: 120s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use: [deepseek-chat, deepseek-reasoner]
+      overrides:
+        deepseek-chat:
+          context_window: 64000
+        deepseek-reasoner:
+          context_window: 64000

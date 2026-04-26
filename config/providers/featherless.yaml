@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  featherless:
+    credentials:
+      api_key: ${FEATHERLESS_API_KEY}
+    transport:
+      base_url: https://api.featherless.ai/v1
+      timeout: 60s
+    models:
+      use: [meta-llama/Meta-Llama-3.1-8B-Instruct]
+      overrides:
+        meta-llama/Meta-Llama-3.1-8B-Instruct:
+          context_window: 131072

@@ -163,7 +163,10 @@ func (h *AudioHandler) WebSocket(c *gin.Context) {
 			select {
 			case <-done:
 				return
-			case event := <-events:
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
 				if event.Usage != nil {
 					normalizedUsage := normalizeAudioUsage(*event.Usage)
 					event.Usage = &normalizedUsage

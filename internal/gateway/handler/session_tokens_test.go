@@ -78,6 +78,62 @@ func TestStreamingTranscriptionSessionTokenRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSpeechSessionTokensUseSpeechAccessToken(t *testing.T) {
+	snapshot := &gwruntime.Snapshot{
+		Config: &config.Config{
+			Providers: map[string]config.ProviderConfig{
+				"bytedance": {
+					SpeechAccessToken: "speech-access-token",
+				},
+			},
+		},
+	}
+	model := provider.Model{
+		ID:       "bytedance/doubao-audio",
+		Provider: "bytedance",
+	}
+
+	audioIssued, err := issueAudioSession(snapshot, model, "key_audio", modality.AudioSessionConfig{Model: model.ID}, time.Minute)
+	if err != nil {
+		t.Fatalf("issueAudioSession() with speech_access_token error = %v", err)
+	}
+	if _, err := parseAudioSession(snapshot, audioIssued.ID, audioIssued.ClientSecret); err != nil {
+		t.Fatalf("parseAudioSession() with speech_access_token error = %v", err)
+	}
+
+	streamIssued, err := issueStreamingTranscriptionSession(snapshot, model, "key_stream", modality.StreamingTranscriptionSessionConfig{Model: model.ID}, time.Minute)
+	if err != nil {
+		t.Fatalf("issueStreamingTranscriptionSession() with speech_access_token error = %v", err)
+	}
+	if _, err := parseStreamingTranscriptionSession(snapshot, streamIssued.ID, streamIssued.ClientSecret); err != nil {
+		t.Fatalf("parseStreamingTranscriptionSession() with speech_access_token error = %v", err)
+	}
+
+	interpretingIssued, err := issueInterpretingSession(snapshot, model, "key_interpreting", modality.InterpretingSessionConfig{Model: model.ID}, time.Minute)
+	if err != nil {
+		t.Fatalf("issueInterpretingSession() with speech_access_token error = %v", err)
+	}
+	if _, err := parseInterpretingSession(snapshot, interpretingIssued.ID, interpretingIssued.ClientSecret); err != nil {
+		t.Fatalf("parseInterpretingSession() with speech_access_token error = %v", err)
+	}
+
+	noteID, err := signAudioNoteID(snapshot, model, "note-task-id", "key_note", time.Now().Add(time.Minute).Unix())
+	if err != nil {
+		t.Fatalf("signAudioNoteID() with speech_access_token error = %v", err)
+	}
+	if _, err := parseAudioNoteID(snapshot, noteID); err != nil {
+		t.Fatalf("parseAudioNoteID() with speech_access_token error = %v", err)
+	}
+
+	podcastID, err := signPodcastJobID(snapshot, model, "podcast:job:test", "key_podcast", time.Now().Add(time.Minute).Unix())
+	if err != nil {
+		t.Fatalf("signPodcastJobID() with speech_access_token error = %v", err)
+	}
+	if _, err := parsePodcastJobID(snapshot, podcastID); err != nil {
+		t.Fatalf("parsePodcastJobID() with speech_access_token error = %v", err)
+	}
+}
+
 func tokenTestSnapshot() *gwruntime.Snapshot {
 	return &gwruntime.Snapshot{
 		Config: &config.Config{

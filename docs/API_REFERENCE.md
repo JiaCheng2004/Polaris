@@ -1,7 +1,7 @@
 # Polaris API Reference
 
 > **Version:** 2.1.0
-> **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. The current repo state is a `v2.1.0` close-out candidate; worktree consolidation and source-of-truth alignment are complete, and final release readiness is gated by repo-local validation plus live-provider proof where credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
+> **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. Release readiness is gated by repo-local validation plus live-provider proof where credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
 > **Authority:** Per `BLUEPRINT.md` §18, every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
 
 ---
@@ -31,7 +31,7 @@
 
 ## 1. Conventions
 
-- **Base URL:** configurable via `server.host` and `server.port` in `polaris.yaml`. Default: `http://localhost:8080`.
+- **Base URL:** configurable via `runtime.server.host` and `runtime.server.port` in config v2. Default: `http://localhost:8080`.
 - **Transport:** HTTP/1.1 and HTTP/2 (Gin default). TLS terminated upstream by a reverse proxy in production.
 - **Content type:** `application/json` for request and response bodies unless otherwise noted (image/audio file uploads use `multipart/form-data`; audio responses return raw binary).
 - **Character encoding:** UTF-8.
@@ -40,6 +40,7 @@
 - **Trace IDs:** when tracing is enabled, every response also carries `X-Trace-ID`. This is the span trace identifier for correlating logs, traces, and audit events.
 - **Failover marker:** responses served from a fallback provider carry an `X-Polaris-Fallback: <provider/model>` header indicating which fallback answered.
 - **Cache marker:** cache-aware synchronous endpoints may carry `X-Polaris-Cache: hit`, `miss`, or `bypass`.
+- **Request body limit:** `runtime.server.max_body_bytes` defaults to 64 MiB. Oversized JSON or multipart requests return `413 invalid_request_error / request_body_too_large`.
 - **OpenAI compatibility:** where an endpoint is implemented, Polaris follows the OpenAI wire shape where possible. In the current build, that applies to chat, models, and the OpenAI-style administrative error envelope.
 - **Machine-readable contract:** [`spec/openapi/polaris.v1.yaml`](../spec/openapi/polaris.v1.yaml) is the OpenAPI companion for this human reference. Endpoint changes must keep the implementation, this file, the OpenAPI spec, and contract fixtures in sync.
 
@@ -47,7 +48,7 @@
 
 ## 2. Authentication
 
-Polaris supports five auth modes, selected via `auth.mode` in `polaris.yaml` (see `BLUEPRINT.md` §5.1 and §10.1):
+Polaris supports five auth modes, selected via `runtime.auth.mode` in config v2 (see `BLUEPRINT.md` §5.1 and §10.1):
 
 | Mode | Header | Key source |
 |---|---|---|
@@ -59,7 +60,7 @@ Polaris supports five auth modes, selected via `auth.mode` in `polaris.yaml` (se
 
 ### External Auth
 
-`auth.mode: external` is the integration path for platforms that already have their own authentication. Polaris does not implement Google OAuth, SMS OTP, enterprise SSO, or application sessions directly. Instead, the host platform validates the user, builds a small claims document, signs it with a shared secret, and forwards the request to Polaris.
+`runtime.auth.mode: external` is the integration path for platforms that already have their own authentication. Polaris does not implement Google OAuth, SMS OTP, enterprise SSO, or application sessions directly. Instead, the host platform validates the user, builds a small claims document, signs it with a shared secret, and forwards the request to Polaris.
 
 The built-in external provider is `signed_headers`:
 
@@ -80,7 +81,7 @@ Supported claim fields:
 | `is_admin` | boolean | Allows control-plane endpoints when true. |
 | `rate_limit` | string | Optional per-identity limit such as `60/min`. |
 | `allowed_models` | string array | Model glob allowlist. Defaults to `["*"]`. |
-| `allowed_modalities` | string array | Modality allowlist. Defaults to all modalities. |
+| `allowed_modalities` | string array | Modality allowlist. Omit or send `[]` for all modalities; invalid values return `400 invalid_allowed_modality`. |
 | `allowed_toolsets` | string array | Toolset allowlist for tool execution. |
 | `allowed_mcp_bindings` | string array | MCP binding allowlist. |
 | `policy_models` | string array | Optional additional model policy gate. |
@@ -103,11 +104,11 @@ Example claims before base64url encoding:
 }
 ```
 
-Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, `/v1/mcp/bindings`) require `control_plane.enabled: true` and admin access:
+Control-plane endpoints (`/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, `/v1/mcp/bindings`) require `runtime.control_plane.enabled: true` and admin access:
 
-- in `auth.mode: virtual_keys`, use either the configured bootstrap admin key or a virtual key with `is_admin: true`
-- in `auth.mode: external`, set `is_admin: true` in the signed claims from the trusted upstream platform
-- in `auth.mode: multi-user`, use a legacy database API key with `is_admin: true`; prefer `virtual_keys` or `external` for new deployments
+- in `runtime.auth.mode: virtual_keys`, use either the configured bootstrap admin key or a virtual key with `is_admin: true`
+- in `runtime.auth.mode: external`, set `is_admin: true` in the signed claims from the trusted upstream platform
+- in `runtime.auth.mode: multi-user`, use a legacy database API key with `is_admin: true`; prefer `virtual_keys` or `external` for new deployments
 
 `/v1/keys` remains implemented as a compatibility facade. In `virtual_keys` mode it issues Polaris virtual keys using the older response shape. In `multi-user` mode it continues to manage the legacy `api_keys` rows.
 
@@ -1817,7 +1818,7 @@ List every model registered in the running Polaris instance, with its modality a
 }
 ```
 
-The field set for each entry depends on the modality and mirrors the model's config block in `polaris.yaml`. Phase 3 modality-specific metadata includes `dimensions` for embeddings, `output_formats` for images, `voices` for TTS models, and `formats` for STT models. Video models may also expose `allowed_durations`, `aspect_ratios`, `resolutions`, `max_duration`, and `cancelable`. Music models may expose `output_formats`, `min_duration_ms`, `max_duration_ms`, and `sample_rates_hz`. Audio-session models may expose `voices` and `session_ttl`.
+The field set for each entry depends on the modality and mirrors the effective model config expanded from `providers.<name>.models.use` plus `models.overrides`. Phase 3 modality-specific metadata includes `dimensions` for embeddings, `output_formats` for images, `voices` for TTS models, and `formats` for STT models. Video models may also expose `allowed_durations`, `aspect_ratios`, `resolutions`, `max_duration`, and `cancelable`. Music models may expose `output_formats`, `min_duration_ms`, `max_duration_ms`, and `sample_rates_hz`. Audio-session models may expose `voices` and `session_ttl`.
 
 Family-aware metadata:
 - `kind`: `provider_variant`, `family`, `alias`, or `selector`
@@ -1896,7 +1897,7 @@ curl "http://localhost:8080/v1/usage?from=2026-04-01T00:00:00Z&group_by=model" \
 
 ## 14. Control Plane & API Keys
 
-The control-plane management surface is implemented, admin-only, and exposed only when `control_plane.enabled: true`. Use it in `auth.mode: virtual_keys` or `auth.mode: external`; `/v1/keys` remains available as a compatibility facade.
+The control-plane management surface is implemented, admin-only, and exposed only when `runtime.control_plane.enabled: true`. Use it in `runtime.auth.mode: virtual_keys` or `runtime.auth.mode: external`; `/v1/keys` remains available as a compatibility facade.
 
 ### `POST /v1/projects`, `GET /v1/projects`
 
@@ -1939,7 +1940,7 @@ Issue, list, or revoke Polaris virtual keys.
 | `name` | string | yes | Human-readable label. |
 | `rate_limit` | string | no | e.g. `100/min`. |
 | `allowed_models` | array | no | Glob patterns. Default `["*"]`. |
-| `allowed_modalities` | array | no | e.g. `["chat","image"]`. |
+| `allowed_modalities` | array | no | e.g. `["chat","image"]`. Omit or send `[]` for all modalities; invalid values return `400 invalid_allowed_modality`. |
 | `allowed_toolsets` | array | no | Toolset ids this key may use. |
 | `allowed_mcp_bindings` | array | no | MCP binding ids this key may use. |
 | `is_admin` | boolean | no | Grants control-plane admin access. |
@@ -1975,7 +1976,7 @@ Policies attach allowlists at the project level.
 - `name` required
 - `description` optional
 - `allowed_models` optional, defaults to `["*"]`
-- `allowed_modalities` optional
+- `allowed_modalities` optional; omit or send `[]` for all modalities, invalid values return `400 invalid_allowed_modality`
 - `allowed_toolsets` optional
 - `allowed_mcp_bindings` optional
 
@@ -2029,8 +2030,8 @@ Registers MCP broker bindings.
 
 These endpoints remain implemented for compatibility.
 
-- In `auth.mode: virtual_keys`, they read and write Polaris virtual keys using the older response shape (`owner_id` instead of `project_id`).
-- In `auth.mode: multi-user`, they still operate on the legacy `api_keys` rows.
+- In `runtime.auth.mode: virtual_keys`, they read and write Polaris virtual keys using the older response shape (`owner_id` instead of `project_id`).
+- In `runtime.auth.mode: multi-user`, they still operate on the legacy `api_keys` rows.
 
 Legacy key request fields:
 
@@ -2073,7 +2074,7 @@ For `upstream_proxy` bindings, `GET` is proxied upstream.
 
 Current runtime supports streamable HTTP MCP only.
 
-- `upstream_proxy`: Polaris forwards the incoming request to the configured `upstream_url`, preserving method, body, query string, and response body while adding any configured static headers.
+- `upstream_proxy`: Polaris forwards method, body, query string, response body, safe MCP/content-negotiation headers, and configured static binding headers. Caller credentials such as `Authorization`, cookies, API-key headers, and forwarding headers are stripped; upstream auth must be configured on the binding.
 - `local_toolset`: Polaris serves a small JSON-RPC-compatible MCP runtime with these methods:
   - `initialize`
   - `ping`
@@ -2160,7 +2161,7 @@ Response body:
 
 ### `GET /metrics`
 
-Implemented. Prometheus text-format metrics are exposed when `observability.metrics.enabled: true`. The route path is configured by `observability.metrics.path` at startup; the default is `/metrics`, and disabled runtimes return `404`.
+Implemented. Prometheus text-format metrics are exposed when `runtime.observability.metrics.enabled: true`. The route path is configured by `runtime.observability.metrics.path` at startup; the default is `/metrics`, and disabled runtimes return `404`.
 
 When OTLP tracing is enabled, request traces now include child spans for auth lookup, rate-limit and budget evaluation, cache lookup/store, provider HTTP calls, fallback attempts, and tool/MCP execution. Polaris uses stable OpenTelemetry HTTP semantics plus low-cardinality `polaris.*` attributes such as `polaris.interface_family`, `polaris.token_source`, `polaris.cache_status`, `polaris.tool_name`, and `polaris.mcp_binding_id`.
 

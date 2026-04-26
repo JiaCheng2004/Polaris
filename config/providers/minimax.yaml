@@ -1,0 +1,20 @@
+version: 2
+
+providers:
+  minimax:
+    credentials:
+      api_key: ${MINIMAX_API_KEY}
+    transport:
+      base_url: ${MINIMAX_BASE_URL}
+      timeout: 10m
+    models:
+      use: [music-2.6, music-cover]
+      overrides:
+        music-2.6:
+          output_formats: [mp3, wav, flac]
+          min_duration_ms: 10000
+          max_duration_ms: 180000
+          sample_rates_hz: [44100]
+        music-cover:
+          output_formats: [mp3, wav]
+          sample_rates_hz: [44100]

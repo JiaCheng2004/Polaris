@@ -1,111 +1,77 @@
 # Polaris local development config.
-# This file is intended for single-binary, zero-dependency local startup.
+# This file is intentionally small: runtime settings live here, while provider
+# defaults and routing aliases are imported from modular files.
 
-server:
-  host: 0.0.0.0
-  port: 8080
-  read_timeout: 30s
-  write_timeout: 120s
-  shutdown_timeout: 15s
+version: 2
 
-auth:
-  mode: none
-  static_keys: []
-  admin_key_hash: ""
+imports:
+  - ./providers/openai.yaml
+  - ./providers/anthropic.yaml
+  - ./routing/local.yaml
 
-store:
-  driver: sqlite
-  dsn: ./polaris.db
-  max_connections: 1
-  log_retention_days: 30
-  log_buffer_size: 1000
-  log_flush_interval: 5s
+runtime:
+  server:
+    host: 127.0.0.1
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 120s
+    shutdown_timeout: 15s
+    max_body_bytes: 67108864
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost
+        - http://localhost:*
+        - http://127.0.0.1
+        - http://127.0.0.1:*
+        - https://localhost
+        - https://localhost:*
+        - https://127.0.0.1
+        - https://127.0.0.1:*
+      allowed_headers: [Authorization, Content-Type, X-Request-ID, X-Polaris-Admin-Key]
+      allowed_methods: [GET, POST, DELETE, OPTIONS]
+      exposed_headers: [X-Request-ID, X-RateLimit-Remaining, Retry-After, X-Polaris-Fallback, X-Polaris-Resolved-Model, X-Polaris-Resolved-Provider]
+      allow_credentials: false
+      max_age: 1h
 
-cache:
-  driver: memory
-  rate_limit:
-    enabled: true
-    default: 60/min
-    window: sliding
-  response_cache:
-    enabled: false
-    ttl: 24h
-    max_entries_per_model: 100
-    similarity_threshold: 0.95
+  auth:
+    mode: none
+    static_keys: []
+    admin_key_hash: ""
+
+  store:
+    driver: sqlite
+    dsn: ./polaris.db
+    max_connections: 1
+    log_retention_days: 30
+    log_buffer_size: 1000
+    log_flush_interval: 5s
+
+  cache:
+    driver: memory
+    rate_limit:
+      enabled: true
+      default: 60/min
+      window: sliding
+    response_cache:
+      enabled: false
+      ttl: 24h
+      max_entries_per_model: 100
+      similarity_threshold: 0.95
+
+  observability:
+    metrics:
+      enabled: true
+      path: /metrics
+    logging:
+      level: info
+      format: json
 
 providers:
   openai:
-    api_key: ${OPENAI_API_KEY}
-    base_url: https://api.openai.com/v1
-    timeout: 60s
-    retry:
-      max_attempts: 3
-      backoff: exponential
-      initial_delay: 1s
     models:
-      gpt-5.5:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, reasoning]
-        context_window: 1000000
-        max_output_tokens: 128000
-      gpt-4o:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, audio_input, audio_output]
-        context_window: 128000
-        max_output_tokens: 16384
-      gpt-4o-mini:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode]
-        context_window: 128000
-        max_output_tokens: 16384
-      gpt-image-2:
-        modality: image
-        capabilities: [generation, editing]
-        output_formats: [png, jpeg, webp]
+      use: [gpt-5.5, gpt-4o, gpt-4o-mini, gpt-image-2]
 
   anthropic:
-    api_key: ${ANTHROPIC_API_KEY}
-    base_url: https://api.anthropic.com
-    timeout: 120s
-    retry:
-      max_attempts: 3
-      backoff: exponential
-      initial_delay: 1s
     models:
-      claude-opus-4-6:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, pdf, extended_thinking]
-        context_window: 200000
-        max_output_tokens: 32000
-      claude-sonnet-4-6:
-        modality: chat
-        capabilities: [vision, function_calling, streaming, json_mode, pdf, extended_thinking]
-        context_window: 200000
-        max_output_tokens: 16000
-
-routing:
-  fallbacks:
-    - from: anthropic/claude-sonnet-4-6
-      to: [openai/gpt-4o]
-      on: [rate_limit, timeout, server_error]
-    - from: openai/gpt-4o
-      to: [anthropic/claude-sonnet-4-6]
-      on: [rate_limit, timeout, server_error]
-  aliases:
-    default-chat: openai/gpt-4o
-    openai-frontier-chat: openai/gpt-5.5
-    openai-image-latest: openai/gpt-image-2
-    premium-chat: anthropic/claude-opus-4-6
-  selectors:
-    tooling-chat:
-      modality: chat
-      capabilities: [streaming, function_calling]
-      providers: [openai, anthropic]
-
-observability:
-  metrics:
-    enabled: true
-    path: /metrics
-  logging:
-    level: info
-    format: json
+      use: [claude-opus-4-6, claude-sonnet-4-6]

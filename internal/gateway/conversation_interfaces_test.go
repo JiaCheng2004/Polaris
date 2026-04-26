@@ -91,6 +91,83 @@ func TestResponsesEndpointUsesOpenAINativeResponses(t *testing.T) {
 	}
 }
 
+func TestResponsesEndpointFallsBackWhenNativePrimaryFails(t *testing.T) {
+	primaryCalls := 0
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		primaryCalls++
+		if r.URL.Path != "/responses" {
+			t.Fatalf("unexpected primary path %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"rate limited","type":"rate_limit_error","code":"rate_limit"}}`))
+	}))
+	defer primary.Close()
+
+	fallbackCalls := 0
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fallbackCalls++
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected fallback path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl-fallback",
+			"object":"chat.completion",
+			"created":1744329600,
+			"model":"deepseek-chat",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Fallback response"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}
+		}`))
+	}))
+	defer fallback.Close()
+
+	cfg := testConfig(t)
+	cfg.Providers = map[string]config.ProviderConfig{
+		"openai": {
+			APIKey:  "sk-openai",
+			BaseURL: primary.URL,
+			Timeout: time.Second,
+			Models: map[string]config.ModelConfig{
+				"gpt-4o": {
+					Modality:     modality.ModalityChat,
+					Capabilities: []modality.Capability{modality.CapabilityStreaming},
+				},
+			},
+		},
+		"deepseek": {
+			APIKey:  "sk-deepseek",
+			BaseURL: fallback.URL + "/v1",
+			Timeout: time.Second,
+			Models: map[string]config.ModelConfig{
+				"deepseek-chat": {
+					Modality:     modality.ModalityChat,
+					Capabilities: []modality.Capability{modality.CapabilityStreaming},
+				},
+			},
+		},
+	}
+	cfg.Routing.Aliases = map[string]string{"default-chat": "openai/gpt-4o"}
+	cfg.Routing.Fallbacks = []config.FallbackRule{{From: "openai/gpt-4o", To: []string{"deepseek/deepseek-chat"}, On: []string{"rate_limit", "server_error", "timeout"}}}
+	engine := newTestEngine(t, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"default-chat","input":"Hello"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected fallback responses 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-Polaris-Fallback"); got != "deepseek/deepseek-chat" {
+		t.Fatalf("expected fallback header, got %q", got)
+	}
+	if primaryCalls != 1 || fallbackCalls != 1 {
+		t.Fatalf("expected one primary and one fallback call, got primary=%d fallback=%d", primaryCalls, fallbackCalls)
+	}
+	if !bytes.Contains(res.Body.Bytes(), []byte("Fallback response")) {
+		t.Fatalf("expected fallback response body, got %s", res.Body.String())
+	}
+}
+
 func TestMessagesEndpointUsesAnthropicNativeMessages(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/messages" {
@@ -193,6 +270,83 @@ func TestMessagesEndpointUsesAnthropicNativeMessages(t *testing.T) {
 	}
 	if response.Model != "anthropic/claude-sonnet-4-6" {
 		t.Fatalf("expected canonical anthropic model, got %#v", response)
+	}
+}
+
+func TestMessagesEndpointFallsBackWhenNativePrimaryFails(t *testing.T) {
+	primaryCalls := 0
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		primaryCalls++
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected primary path %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"rate limited","type":"rate_limit_error"}}`))
+	}))
+	defer primary.Close()
+
+	fallbackCalls := 0
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fallbackCalls++
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected fallback path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl-fallback",
+			"object":"chat.completion",
+			"created":1744329600,
+			"model":"gpt-4o",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Fallback message"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":6,"completion_tokens":3,"total_tokens":9}
+		}`))
+	}))
+	defer fallback.Close()
+
+	cfg := testConfig(t)
+	cfg.Providers = map[string]config.ProviderConfig{
+		"anthropic": {
+			APIKey:  "sk-anthropic",
+			BaseURL: primary.URL,
+			Timeout: time.Second,
+			Models: map[string]config.ModelConfig{
+				"claude-sonnet-4-6": {
+					Modality:     modality.ModalityChat,
+					Capabilities: []modality.Capability{modality.CapabilityStreaming},
+				},
+			},
+		},
+		"openai": {
+			APIKey:  "sk-openai",
+			BaseURL: fallback.URL + "/v1",
+			Timeout: time.Second,
+			Models: map[string]config.ModelConfig{
+				"gpt-4o": {
+					Modality:     modality.ModalityChat,
+					Capabilities: []modality.Capability{modality.CapabilityStreaming},
+				},
+			},
+		},
+	}
+	cfg.Routing.Aliases = map[string]string{"default-chat": "anthropic/claude-sonnet-4-6"}
+	cfg.Routing.Fallbacks = []config.FallbackRule{{From: "anthropic/claude-sonnet-4-6", To: []string{"openai/gpt-4o"}, On: []string{"rate_limit", "server_error", "timeout"}}}
+	engine := newTestEngine(t, cfg)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"default-chat","messages":[{"role":"user","content":"Hello"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected fallback messages 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-Polaris-Fallback"); got != "openai/gpt-4o" {
+		t.Fatalf("expected fallback header, got %q", got)
+	}
+	if primaryCalls != 1 || fallbackCalls != 1 {
+		t.Fatalf("expected one primary and one fallback call, got primary=%d fallback=%d", primaryCalls, fallbackCalls)
+	}
+	if !bytes.Contains(res.Body.Bytes(), []byte("Fallback message")) {
+		t.Fatalf("expected fallback message body, got %s", res.Body.String())
 	}
 }
 

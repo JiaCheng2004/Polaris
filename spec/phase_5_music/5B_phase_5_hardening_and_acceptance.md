@@ -50,7 +50,7 @@ Preview checks:
 
 ## Load Validation
 
-Run and record the executable load-validation outcomes from `docs/LOAD_TESTING.md` here before tagging `v2.1.0`, including:
+Run and record executable load-validation outcomes from `docs/LOAD_TESTING.md` when release evidence requires load proof, including:
 
 - repeated music cache hit/miss behavior
 - concurrent async music jobs
@@ -64,9 +64,8 @@ Current close-out state:
 
 - repo-local gate: passed on 2026-04-24 with `make release-check`
 - live release-blocking music matrix: passed on 2026-04-24 with `.env` loaded and `make live-smoke-strict`
-- preview music matrix: optional / pending
+- preview music matrix: optional opt-in validation
 - reduced local load-check: passed on 2026-04-24 with chat=2, sync=2, burst=1, video=1, audio=1, music=1
 - reduced local load-check: passed on 2026-04-24 with chat=2, sync=1, burst=1, video=1, audio=1, music=1
 - targeted OpenAI Realtime audio concurrency: passed on 2026-04-24 with `POLARIS_LOAD_AUDIO_SESSIONS=2` and only `TestLoadCheckMatrix/audio_session_concurrency`
 - full local load-check: previously blocked on OpenAI Realtime quota at the default 5-session audio concurrency; a smaller 2-session targeted concurrency check now passes, but the default full load profile has not been rerun
-- `v2.1.0` release tag: pending

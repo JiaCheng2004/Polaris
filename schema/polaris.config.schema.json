@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JiaCheng2004/Polaris/schema/polaris.config.schema.json",
+  "title": "Polaris configuration",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "imports": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": { "$ref": "#/$defs/server" },
+        "auth": { "$ref": "#/$defs/auth" },
+        "store": { "$ref": "#/$defs/store" },
+        "cache": { "$ref": "#/$defs/cache" },
+        "control_plane": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "tools": { "$ref": "#/$defs/tools" },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "observability": { "$ref": "#/$defs/observability" }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/provider" }
+    },
+    "routing": { "$ref": "#/$defs/routing" }
+  },
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)([0-9]+(ns|us|µs|ms|s|m|h))*$"
+    },
+    "hashedSecret": {
+      "type": "string",
+      "pattern": "^(|sha256:.+|\\$\\{[A-Z0-9_]+\\})$"
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "read_timeout": { "$ref": "#/$defs/duration" },
+        "write_timeout": { "$ref": "#/$defs/duration" },
+        "shutdown_timeout": { "$ref": "#/$defs/duration" },
+        "max_body_bytes": { "type": "integer", "minimum": 1 },
+        "cors": { "$ref": "#/$defs/cors" }
+      }
+    },
+    "cors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allowed_origins": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allowed_headers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allowed_methods": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "exposed_headers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allow_credentials": { "type": "boolean" },
+        "max_age": { "$ref": "#/$defs/duration" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mode": { "enum": ["none", "static", "external", "virtual_keys", "multi-user"] },
+        "bootstrap_admin_key_hash": { "$ref": "#/$defs/hashedSecret" },
+        "admin_key_hash": { "$ref": "#/$defs/hashedSecret" },
+        "static_keys": { "type": "array" },
+        "external": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "const": "signed_headers" },
+            "shared_secret": { "type": "string" },
+            "max_clock_skew": { "$ref": "#/$defs/duration" },
+            "cache_ttl": { "$ref": "#/$defs/duration" }
+          }
+        }
+      }
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "driver": { "enum": ["sqlite", "postgres"] },
+        "dsn": { "type": "string" },
+        "max_connections": { "type": "integer", "minimum": 1 },
+        "log_retention_days": { "type": "integer", "minimum": 1 },
+        "log_buffer_size": { "type": "integer", "minimum": 1 },
+        "log_flush_interval": { "$ref": "#/$defs/duration" }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "driver": { "enum": ["memory", "redis"] },
+        "url": { "type": "string" }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "local": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "implementation": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "metrics": { "type": "object" },
+        "logging": { "type": "object" },
+        "traces": { "type": "object" },
+        "audit": { "type": "object" }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "api_key": { "type": "string" },
+            "access_key_id": { "type": "string" },
+            "access_key_secret": { "type": "string" },
+            "session_token": { "type": "string" },
+            "app_id": { "type": "string" },
+            "speech_api_key": { "type": "string" },
+            "speech_access_token": { "type": "string" },
+            "secret_key": { "type": "string" },
+            "project_name": { "type": "string" },
+            "project_id": { "type": "string" },
+            "location": { "type": "string" }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base_url": { "type": "string" },
+            "control_base_url": { "type": "string" },
+            "timeout": { "$ref": "#/$defs/duration" },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_attempts": { "type": "integer", "minimum": 0 },
+                "backoff": { "type": "string" },
+                "initial_delay": { "$ref": "#/$defs/duration" }
+              }
+            }
+          }
+        },
+        "models": { "$ref": "#/$defs/providerModels" }
+      }
+    },
+    "providerModels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "use": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/modelOverride" }
+        }
+      }
+    },
+    "modelOverride": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "modality": {
+          "enum": ["chat", "embed", "image", "video", "voice", "audio", "music", "notes", "podcast", "translation", "interpreting"]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "context_window": { "type": "integer", "minimum": 0 },
+        "max_output_tokens": { "type": "integer", "minimum": 0 },
+        "output_formats": { "type": "array", "items": { "type": "string" } },
+        "voices": { "type": "array", "items": { "type": "string" } },
+        "formats": { "type": "array", "items": { "type": "string" } },
+        "session_ttl": { "$ref": "#/$defs/duration" }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fallbacks": { "type": "array" },
+        "aliases": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "selectors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  }
+}

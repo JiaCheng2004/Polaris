@@ -12,20 +12,25 @@ import (
 )
 
 type Watcher struct {
-	path      string
-	dir       string
-	base      string
-	debounce  time.Duration
-	watcher   *fsnotify.Watcher
-	onReload  func(string)
-	onError   func(error)
-	closeOnce sync.Once
+	files       map[string]struct{}
+	dirs        map[string]struct{}
+	fileWatches map[string]struct{}
+	root        string
+	debounce    time.Duration
+	watcher     *fsnotify.Watcher
+	onReload    func(string)
+	onError     func(error)
+	closeOnce   sync.Once
 }
 
 func NewWatcher(path string, debounce time.Duration, onReload func(string), onError func(error)) (*Watcher, error) {
 	absolutePath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolve config path: %w", err)
+	}
+	files, err := ConfigFiles(absolutePath)
+	if err != nil {
+		return nil, err
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -43,21 +48,37 @@ func NewWatcher(path string, debounce time.Duration, onReload func(string), onEr
 		onError = func(error) {}
 	}
 
-	dir := filepath.Dir(absolutePath)
-	if err := watcher.Add(dir); err != nil {
-		_ = watcher.Close()
-		return nil, fmt.Errorf("watch config directory: %w", err)
+	watchedDirs := map[string]struct{}{}
+	fileWatches := map[string]struct{}{}
+	watchedFiles := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		cleanFile := filepath.Clean(file)
+		watchedFiles[cleanFile] = struct{}{}
+		dir := filepath.Dir(cleanFile)
+		if _, exists := watchedDirs[dir]; !exists {
+			if err := watcher.Add(dir); err != nil {
+				_ = watcher.Close()
+				return nil, fmt.Errorf("watch config directory %s: %w", dir, err)
+			}
+			watchedDirs[dir] = struct{}{}
+		}
+		if err := watcher.Add(cleanFile); err != nil {
+			_ = watcher.Close()
+			return nil, fmt.Errorf("watch config file %s: %w", cleanFile, err)
+		}
+		fileWatches[cleanFile] = struct{}{}
 	}
 
 	return &Watcher{
-		path:      absolutePath,
-		dir:       dir,
-		base:      filepath.Base(absolutePath),
-		debounce:  debounce,
-		watcher:   watcher,
-		onReload:  onReload,
-		onError:   onError,
-		closeOnce: sync.Once{},
+		files:       watchedFiles,
+		dirs:        watchedDirs,
+		fileWatches: fileWatches,
+		root:        absolutePath,
+		debounce:    debounce,
+		watcher:     watcher,
+		onReload:    onReload,
+		onError:     onError,
+		closeOnce:   sync.Once{},
 	}, nil
 }
 
@@ -86,6 +107,7 @@ func (w *Watcher) Run(ctx context.Context, signals <-chan os.Signal) {
 			}
 		}
 		timer.Reset(w.debounce)
+		timerCh = timer.C
 	}
 
 	flush := func() {
@@ -94,6 +116,9 @@ func (w *Watcher) Run(ctx context.Context, signals <-chan os.Signal) {
 		}
 		trigger := pending
 		pending = ""
+		if err := w.refreshFiles(); err != nil {
+			w.onError(err)
+		}
 		w.onReload(trigger)
 	}
 
@@ -110,6 +135,9 @@ func (w *Watcher) Run(ctx context.Context, signals <-chan os.Signal) {
 				continue
 			}
 			if sig != nil {
+				if err := w.refreshFiles(); err != nil {
+					w.onError(err)
+				}
 				w.onReload("signal:" + sig.String())
 			}
 		case <-timerCh:
@@ -119,8 +147,21 @@ func (w *Watcher) Run(ctx context.Context, signals <-chan os.Signal) {
 			if !ok {
 				return
 			}
+			if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+				delete(w.fileWatches, filepath.Clean(event.Name))
+			}
 			if w.isRelevant(event) {
 				schedule("fsnotify:" + event.Op.String())
+				continue
+			}
+			if w.shouldRefreshForUnknownEvent(event) {
+				if err := w.refreshFiles(); err != nil {
+					w.onError(err)
+					continue
+				}
+				if w.isRelevant(event) {
+					schedule("fsnotify:" + event.Op.String())
+				}
 			}
 		case err, ok := <-w.watcher.Errors:
 			if !ok {
@@ -144,19 +185,57 @@ func (w *Watcher) Close() error {
 }
 
 func (w *Watcher) isRelevant(event fsnotify.Event) bool {
-	if event.Name == "" {
+	if event.Name == "" || !isConfigWatchOp(event.Op) {
 		return false
 	}
 
 	cleanName := filepath.Clean(event.Name)
-	if cleanName == w.path {
-		return event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Chmod) != 0
+	if _, exists := w.files[cleanName]; !exists {
+		if _, dirExists := w.dirs[cleanName]; !dirExists {
+			return false
+		}
 	}
-	if filepath.Dir(cleanName) != w.dir {
+	return true
+}
+
+func (w *Watcher) shouldRefreshForUnknownEvent(event fsnotify.Event) bool {
+	if event.Name == "" || !isConfigWatchOp(event.Op) {
 		return false
 	}
-	if filepath.Base(cleanName) != w.base {
-		return false
+	_, exists := w.dirs[filepath.Dir(filepath.Clean(event.Name))]
+	return exists
+}
+
+func isConfigWatchOp(op fsnotify.Op) bool {
+	return op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) != 0
+}
+
+func (w *Watcher) refreshFiles() error {
+	files, err := ConfigFiles(w.root)
+	if err != nil {
+		return err
 	}
-	return event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Chmod) != 0
+
+	nextFiles := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		cleanFile := filepath.Clean(file)
+		nextFiles[cleanFile] = struct{}{}
+
+		dir := filepath.Dir(cleanFile)
+		if _, exists := w.dirs[dir]; !exists {
+			if err := w.watcher.Add(dir); err != nil {
+				return fmt.Errorf("watch config directory %s: %w", dir, err)
+			}
+			w.dirs[dir] = struct{}{}
+		}
+		if _, exists := w.fileWatches[cleanFile]; !exists {
+			if err := w.watcher.Add(cleanFile); err != nil {
+				return fmt.Errorf("watch config file %s: %w", cleanFile, err)
+			}
+			w.fileWatches[cleanFile] = struct{}{}
+		}
+	}
+
+	w.files = nextFiles
+	return nil
 }

@@ -106,7 +106,7 @@ func parseStreamingTranscriptionSession(snapshot *gwruntime.Snapshot, sessionID 
 }
 
 func signStreamingTranscriptionPayload(snapshot *gwruntime.Snapshot, providerName string, prefix string, payload any) (string, error) {
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return "", invalidStreamingTranscriptionSessionError("session", "Streaming transcription session signing secret is unavailable.")
 	}
@@ -148,7 +148,7 @@ func parseSignedStreamingTranscriptionPayload[T any](snapshot *gwruntime.Snapsho
 	default:
 		return payload, invalidStreamingTranscriptionSessionError("session", "Streaming transcription session token is invalid.")
 	}
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return payload, invalidStreamingTranscriptionSessionError("session", "Streaming transcription session token is invalid.")
 	}

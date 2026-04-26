@@ -14,6 +14,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
 )
 
@@ -603,7 +604,7 @@ func pcm16BytesToSamples(data []byte) []int16 {
 	sampleCount := len(data) / 2
 	samples := make([]int16, sampleCount)
 	for i := 0; i < sampleCount; i++ {
-		samples[i] = int16(binary.LittleEndian.Uint16(data[i*2:]))
+		samples[i] = safeconv.Int16FromUint16Bits(binary.LittleEndian.Uint16(data[i*2:]))
 	}
 	return samples
 }
@@ -614,7 +615,7 @@ func samplesToPCM16Bytes(samples []int16) []byte {
 	}
 	data := make([]byte, len(samples)*2)
 	for i, sample := range samples {
-		binary.LittleEndian.PutUint16(data[i*2:], uint16(sample))
+		binary.LittleEndian.PutUint16(data[i*2:], safeconv.Uint16FromInt16Bits(sample))
 	}
 	return data
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
+	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/tooling"
@@ -21,14 +22,16 @@ import (
 )
 
 type MCPHandler struct {
+	runtime *gwruntime.Holder
 	store   store.Store
 	tools   *tooling.Registry
 	metrics *metrics.Recorder
 	client  *http.Client
 }
 
-func NewMCPHandler(appStore store.Store, tools *tooling.Registry, recorder *metrics.Recorder) *MCPHandler {
+func NewMCPHandler(runtime *gwruntime.Holder, appStore store.Store, tools *tooling.Registry, recorder *metrics.Recorder) *MCPHandler {
 	return &MCPHandler{
+		runtime: runtime,
 		store:   appStore,
 		tools:   tools,
 		metrics: recorder,
@@ -93,6 +96,17 @@ func (h *MCPHandler) Serve(c *gin.Context) {
 			httputil.WriteError(c, err)
 		}
 	case store.MCPBindingKindLocalToolset:
+		snapshot := middleware.RuntimeSnapshot(c, h.runtime)
+		if snapshot == nil || snapshot.Config == nil {
+			status = "error"
+			httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "runtime_unavailable", "", "Runtime configuration is unavailable."))
+			return
+		}
+		if !snapshot.Config.Tools.Enabled {
+			status = "disabled"
+			httputil.WriteError(c, httputil.NewError(http.StatusNotFound, "invalid_request_error", "tools_disabled", "", "Local tool execution is disabled."))
+			return
+		}
 		if !middleware.StringScopeAllowed(auth.AllowedToolsets, auth.PolicyToolsets, binding.ToolsetID) {
 			status = "forbidden"
 			httputil.WriteError(c, httputil.NewError(http.StatusForbidden, "permission_error", "toolset_not_allowed", "binding_id", "API key is not permitted to use this toolset."))
@@ -127,6 +141,9 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 		payload, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			telemetry.RecordSpanError(span, err)
+			if httputil.IsRequestBodyTooLarge(err) {
+				return httputil.RequestBodyTooLargeError(0)
+			}
 			return httputil.NewError(http.StatusBadGateway, "provider_error", "mcp_proxy_read_failed", "", "Unable to read MCP request body.")
 		}
 		body = bytes.NewReader(payload)
@@ -137,7 +154,7 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 		telemetry.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadGateway, "provider_error", "mcp_proxy_build_failed", "", "Unable to build MCP upstream request.")
 	}
-	copyHeaders(req.Header, c.Request.Header)
+	copyMCPProxyHeaders(req.Header, c.Request.Header)
 	for key, value := range parseStringMap(binding.HeadersJSON) {
 		req.Header.Set(key, value)
 	}
@@ -188,6 +205,9 @@ func (h *MCPHandler) serveLocalToolset(c *gin.Context, binding store.MCPBinding)
 
 	var req mcpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			return httputil.RequestBodyTooLargeError(0)
+		}
 		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON-RPC.")
 	}
 	toolset, err := h.store.GetToolset(c.Request.Context(), binding.ToolsetID)
@@ -329,14 +349,23 @@ func rawJSON(value string) any {
 	return decoded
 }
 
-func copyHeaders(dst http.Header, src http.Header) {
+func copyMCPProxyHeaders(dst http.Header, src http.Header) {
 	for key, values := range src {
-		if strings.EqualFold(key, "Host") {
+		if !mcpProxyHeaderAllowed(key) {
 			continue
 		}
 		for _, value := range values {
 			dst.Add(key, value)
 		}
+	}
+}
+
+func mcpProxyHeaderAllowed(key string) bool {
+	switch http.CanonicalHeaderKey(key) {
+	case "Accept", "Content-Type", "Last-Event-Id", "Mcp-Protocol-Version", "Mcp-Session-Id":
+		return true
+	default:
+		return false
 	}
 }
 

@@ -141,7 +141,7 @@ type virtualKeyResponse struct {
 }
 
 func (h *ControlPlaneHandler) CreateVirtualKey(c *gin.Context) {
-	req, rawKey, key, ok := h.bindVirtualKeyCreate(c, false)
+	req, rawKey, key, ok := h.bindVirtualKeyCreate(c)
 	if !ok {
 		return
 	}
@@ -217,6 +217,11 @@ func (h *ControlPlaneHandler) CreatePolicy(c *gin.Context) {
 		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_fields", "", "Fields 'project_id' and 'name' are required."))
 		return
 	}
+	allowedModalities, err := parseAllowedModalities(req.AllowedModalities)
+	if err != nil {
+		httputil.WriteError(c, err)
+		return
+	}
 	policyID, err := newKeyID()
 	if err != nil {
 		httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "id_generation_failed", "", "Unable to generate policy identifier."))
@@ -229,7 +234,7 @@ func (h *ControlPlaneHandler) CreatePolicy(c *gin.Context) {
 		Name:              req.Name,
 		Description:       strings.TrimSpace(req.Description),
 		AllowedModels:     defaultPatterns(req.AllowedModels),
-		AllowedModalities: parseAllowedModalities(req.AllowedModalities),
+		AllowedModalities: allowedModalities,
 		AllowedToolsets:   normalizeStringList(req.AllowedToolsets),
 		AllowedMCP:        normalizeStringList(req.AllowedMCP),
 		CreatedAt:         time.Now().UTC(),
@@ -500,110 +505,21 @@ func (h *ControlPlaneHandler) ListMCPBindings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"object": "list", "data": bindings})
 }
 
-func (h *ControlPlaneHandler) CreateLegacyKey(c *gin.Context) {
-	req, rawKey, key, ok := h.bindVirtualKeyCreate(c, true)
-	if !ok {
-		return
-	}
-	if err := h.store.CreateVirtualKey(c.Request.Context(), key); err != nil {
-		httputil.WriteError(c, err)
-		return
-	}
-	if h.keyCache != nil {
-		h.keyCache.Clear()
-	}
-	h.logAudit(c, "virtual_key.created", "virtual_key", key.ID, map[string]any{"project_id": req.ProjectID, "name": key.Name, "compatibility": true})
-	response := virtualKeyToResponse(key, rawKey)
-	c.JSON(http.StatusOK, gin.H{
-		"id":             response.ID,
-		"name":           response.Name,
-		"key":            response.Key,
-		"key_prefix":     response.KeyPrefix,
-		"owner_id":       response.ProjectID,
-		"rate_limit":     response.RateLimit,
-		"allowed_models": response.AllowedModels,
-		"is_admin":       response.IsAdmin,
-		"created_at":     response.CreatedAt,
-		"expires_at":     response.ExpiresAt,
-	})
-}
-
-func (h *ControlPlaneHandler) ListLegacyKeys(c *gin.Context) {
-	includeRevoked, err := parseBoolQuery(c, "include_revoked")
-	if err != nil {
-		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_include_revoked", "include_revoked", "Query parameter 'include_revoked' must be a boolean."))
-		return
-	}
-	projectID := strings.TrimSpace(c.Query("project_id"))
-	if projectID == "" {
-		projectID = strings.TrimSpace(c.Query("owner_id"))
-	}
-	keys, err := h.store.ListVirtualKeys(c.Request.Context(), projectID, includeRevoked)
-	if err != nil {
-		httputil.WriteError(c, err)
-		return
-	}
-	data := make([]gin.H, 0, len(keys))
-	for _, key := range keys {
-		resp := virtualKeyToResponse(key, "")
-		data = append(data, gin.H{
-			"id":             resp.ID,
-			"name":           resp.Name,
-			"key_prefix":     resp.KeyPrefix,
-			"owner_id":       resp.ProjectID,
-			"rate_limit":     resp.RateLimit,
-			"allowed_models": resp.AllowedModels,
-			"is_admin":       resp.IsAdmin,
-			"created_at":     resp.CreatedAt,
-			"last_used_at":   resp.LastUsedAt,
-			"expires_at":     resp.ExpiresAt,
-			"is_revoked":     resp.IsRevoked,
-		})
-	}
-	c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
-}
-
-func (h *ControlPlaneHandler) DeleteLegacyKey(c *gin.Context) {
-	h.DeleteVirtualKey(c)
-}
-
-func (h *ControlPlaneHandler) bindVirtualKeyCreate(c *gin.Context, compatibility bool) (createVirtualKeyRequest, string, store.VirtualKey, bool) {
+func (h *ControlPlaneHandler) bindVirtualKeyCreate(c *gin.Context) (createVirtualKeyRequest, string, store.VirtualKey, bool) {
 	var req createVirtualKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON."))
 		return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
 	}
-	if compatibility && strings.TrimSpace(req.ProjectID) == "" {
-		req.ProjectID = strings.TrimSpace(c.Query("project_id"))
-	}
-	if compatibility && strings.TrimSpace(req.ProjectID) == "" {
-		req.ProjectID = strings.TrimSpace(req.OwnerID)
-	}
 	req.ProjectID = strings.TrimSpace(req.ProjectID)
 	req.Name = strings.TrimSpace(req.Name)
-	if compatibility && req.ProjectID == "" {
-		req.ProjectID = "legacy-default"
-	}
 	if req.ProjectID == "" || req.Name == "" {
 		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_fields", "", "Fields 'project_id' and 'name' are required."))
 		return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
 	}
 	if _, err := h.store.GetProject(c.Request.Context(), req.ProjectID); err != nil {
-		if compatibility && errors.Is(err, store.ErrNotFound) {
-			project := store.Project{
-				ID:          req.ProjectID,
-				Name:        req.ProjectID,
-				Description: "Compatibility project created from legacy /v1/keys flow.",
-				CreatedAt:   time.Now().UTC(),
-			}
-			if createErr := h.store.CreateProject(c.Request.Context(), project); createErr != nil {
-				httputil.WriteError(c, createErr)
-				return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
-			}
-		} else {
-			httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_project", "project_id", "Project was not found."))
-			return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
-		}
+		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_project", "project_id", "Project was not found."))
+		return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
 	}
 
 	rawKey, err := newAPIKeyValue()
@@ -626,6 +542,11 @@ func (h *ControlPlaneHandler) bindVirtualKeyCreate(c *gin.Context, compatibility
 		httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "key_generation_failed", "", "Unable to generate API key identifier."))
 		return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
 	}
+	allowedModalities, err := parseAllowedModalities(req.AllowedModalities)
+	if err != nil {
+		httputil.WriteError(c, err)
+		return createVirtualKeyRequest{}, "", store.VirtualKey{}, false
+	}
 
 	key := store.VirtualKey{
 		ID:                "vk_" + keyID,
@@ -635,7 +556,7 @@ func (h *ControlPlaneHandler) bindVirtualKeyCreate(c *gin.Context, compatibility
 		KeyPrefix:         prefixForDisplay(rawKey),
 		RateLimit:         strings.TrimSpace(req.RateLimit),
 		AllowedModels:     defaultPatterns(req.AllowedModels),
-		AllowedModalities: parseAllowedModalities(req.AllowedModalities),
+		AllowedModalities: allowedModalities,
 		AllowedToolsets:   normalizeStringList(req.AllowedToolsets),
 		AllowedMCP:        normalizeStringList(req.AllowedMCP),
 		IsAdmin:           req.IsAdmin,
@@ -665,18 +586,19 @@ func virtualKeyToResponse(key store.VirtualKey, rawKey string) virtualKeyRespons
 	}
 }
 
-func parseAllowedModalities(values []string) []modality.Modality {
+func parseAllowedModalities(values []string) ([]modality.Modality, error) {
 	if len(values) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]modality.Modality, 0, len(values))
 	for _, value := range values {
 		candidate := modality.Modality(strings.TrimSpace(value))
-		if candidate.Valid() {
-			out = append(out, candidate)
+		if strings.TrimSpace(value) == "" || !candidate.Valid() {
+			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_allowed_modality", "allowed_modalities", "Field 'allowed_modalities' contains an unsupported modality.")
 		}
+		out = append(out, candidate)
 	}
-	return out
+	return out, nil
 }
 
 func modalitiesToStrings(values []modality.Modality) []string {

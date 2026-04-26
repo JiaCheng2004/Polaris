@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 )
 
 const (
@@ -125,14 +127,26 @@ func encodeDialogFrame(frame dialogFrame) ([]byte, error) {
 		writeUint32(&buf, *frame.Event)
 	}
 	if frame.ConnectID != "" {
-		writeUint32(&buf, uint32(len(frame.ConnectID)))
+		size, err := safeconv.Uint32FromInt("realtime dialogue connect id length", len(frame.ConnectID))
+		if err != nil {
+			return nil, err
+		}
+		writeUint32(&buf, size)
 		buf.WriteString(frame.ConnectID)
 	}
 	if eventRequiresSessionID(frame.Event) {
-		writeUint32(&buf, uint32(len(frame.SessionID)))
+		size, err := safeconv.Uint32FromInt("realtime dialogue session id length", len(frame.SessionID))
+		if err != nil {
+			return nil, err
+		}
+		writeUint32(&buf, size)
 		buf.WriteString(frame.SessionID)
 	}
-	writeUint32(&buf, uint32(len(frame.Payload)))
+	payloadSize, err := safeconv.Uint32FromInt("realtime dialogue payload length", len(frame.Payload))
+	if err != nil {
+		return nil, err
+	}
+	writeUint32(&buf, payloadSize)
 	buf.Write(frame.Payload)
 	return buf.Bytes(), nil
 }
@@ -207,10 +221,14 @@ func decodeDialogFrame(payload []byte) (dialogFrame, error) {
 	if err != nil {
 		return dialogFrame{}, err
 	}
-	if size > uint32(reader.Len()) {
+	payloadSize, err := safeconv.IntFromUint32("realtime dialogue payload size", size)
+	if err != nil {
+		return dialogFrame{}, err
+	}
+	if payloadSize > reader.Len() {
 		return dialogFrame{}, fmt.Errorf("realtime dialogue payload size %d exceeds remaining bytes %d", size, reader.Len())
 	}
-	frame.Payload = make([]byte, int(size))
+	frame.Payload = make([]byte, payloadSize)
 	if _, err := io.ReadFull(reader, frame.Payload); err != nil {
 		return dialogFrame{}, fmt.Errorf("read realtime dialogue payload: %w", err)
 	}
@@ -255,7 +273,7 @@ func writeUint32(buf *bytes.Buffer, value uint32) {
 }
 
 func writeInt32(buf *bytes.Buffer, value int32) {
-	writeUint32(buf, uint32(value))
+	writeUint32(buf, safeconv.Uint32FromInt32Bits(value))
 }
 
 func readUint32(reader *bytes.Reader) (uint32, error) {
@@ -271,7 +289,7 @@ func readInt32(reader *bytes.Reader) (int32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int32(value), nil
+	return safeconv.Int32FromUint32Bits(value), nil
 }
 
 func readSizedString(reader *bytes.Reader) (string, error) {
@@ -279,10 +297,14 @@ func readSizedString(reader *bytes.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if size > uint32(reader.Len()) {
+	bufSize, err := safeconv.IntFromUint32("realtime dialogue string size", size)
+	if err != nil {
+		return "", err
+	}
+	if bufSize > reader.Len() {
 		return "", fmt.Errorf("realtime dialogue string size %d exceeds remaining bytes %d", size, reader.Len())
 	}
-	buf := make([]byte, int(size))
+	buf := make([]byte, bufSize)
 	if _, err := io.ReadFull(reader, buf); err != nil {
 		return "", fmt.Errorf("read sized string: %w", err)
 	}
@@ -294,10 +316,14 @@ func tryReadOptionalSizedString(reader *bytes.Reader) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if int(size) > reader.Len()-4 {
+	bufSize, err := safeconv.IntFromUint32("realtime dialogue optional string size", size)
+	if err != nil {
+		return "", false, err
+	}
+	if bufSize > reader.Len()-4 {
 		return "", false, nil
 	}
-	buf := make([]byte, int(size))
+	buf := make([]byte, bufSize)
 	if _, err := io.ReadFull(reader, buf); err != nil {
 		return "", false, fmt.Errorf("read optional sized string: %w", err)
 	}

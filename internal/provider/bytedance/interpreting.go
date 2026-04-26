@@ -16,6 +16,7 @@ import (
 	rpcmetapb "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/common/rpcmeta"
 	astpb "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/products/understanding/ast"
 	basepb "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/products/understanding/base"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
@@ -271,10 +272,14 @@ func (s *interpretingSession) appendAudio(encoded string) error {
 	if err := s.ensureStarted(); err != nil {
 		return err
 	}
+	sequence, err := s.nextSequence()
+	if err != nil {
+		return err
+	}
 	request := &astpb.TranslateRequest{
 		RequestMeta: &rpcmetapb.RequestMeta{
 			SessionID: s.sessionID,
-			Sequence:  s.nextSequence(),
+			Sequence:  sequence,
 		},
 		Event: eventpb.Type_TaskRequest,
 		SourceAudio: &basepb.Audio{
@@ -304,10 +309,14 @@ func (s *interpretingSession) commitAudio() error {
 	if err := s.ensureStarted(); err != nil {
 		return err
 	}
+	sequence, err := s.nextSequence()
+	if err != nil {
+		return err
+	}
 	request := &astpb.TranslateRequest{
 		RequestMeta: &rpcmetapb.RequestMeta{
 			SessionID: s.sessionID,
-			Sequence:  s.nextSequence(),
+			Sequence:  sequence,
 		},
 		Event: eventpb.Type_FinishSession,
 	}
@@ -354,10 +363,18 @@ func (s *interpretingSession) start() error {
 
 	go s.readLoop()
 
+	sequence, err := s.nextSequence()
+	if err != nil {
+		return err
+	}
+	inputRate, err := safeconv.Int32FromInt("interpreting input sample rate", s.cfg.InputSampleRateHz)
+	if err != nil {
+		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "input_sample_rate", err.Error())
+	}
 	startRequest := &astpb.TranslateRequest{
 		RequestMeta: &rpcmetapb.RequestMeta{
 			SessionID: s.sessionID,
-			Sequence:  s.nextSequence(),
+			Sequence:  sequence,
 		},
 		Event: eventpb.Type_StartSession,
 		User: &basepb.User{
@@ -367,7 +384,7 @@ func (s *interpretingSession) start() error {
 		SourceAudio: &basepb.Audio{
 			Format:  providerInterpretingInputFormat(s.cfg.InputAudioFormat),
 			Codec:   "raw",
-			Rate:    int32(s.cfg.InputSampleRateHz),
+			Rate:    inputRate,
 			Bits:    16,
 			Channel: 1,
 		},
@@ -386,9 +403,13 @@ func (s *interpretingSession) start() error {
 		}
 	}
 	if s.cfg.Mode == modality.InterpretingModeSpeechToSpeech {
+		outputRate, err := safeconv.Int32FromInt("interpreting output sample rate", s.cfg.OutputSampleRateHz)
+		if err != nil {
+			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "output_sample_rate", err.Error())
+		}
 		startRequest.TargetAudio = &basepb.Audio{
 			Format:  providerInterpretingOutputFormat(s.cfg.OutputAudioFormat),
-			Rate:    int32(s.cfg.OutputSampleRateHz),
+			Rate:    outputRate,
 			Bits:    providerInterpretingOutputBits(s.cfg.OutputAudioFormat),
 			Channel: 1,
 		}
@@ -582,8 +603,8 @@ func (s *interpretingSession) currentConn() *websocket.Conn {
 	return s.conn
 }
 
-func (s *interpretingSession) nextSequence() int32 {
-	return int32(atomic.AddUint64(&s.counter, 1))
+func (s *interpretingSession) nextSequence() (int32, error) {
+	return safeconv.Int32FromUint64("interpreting sequence", atomic.AddUint64(&s.counter, 1))
 }
 
 func (s *interpretingSession) nextEventID() string {

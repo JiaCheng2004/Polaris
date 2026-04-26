@@ -1,0 +1,60 @@
+{
+  "entries": [
+    {
+      "rule_id": "G115",
+      "file": "internal/provider/common/safeconv/safeconv.go",
+      "symbol": "Uint32FromInt32Bits",
+      "snippet": "return uint32(value)",
+      "rationale": "Intentional protocol two's-complement bit reinterpretation; callers use this only for signed 32-bit wire fields."
+    },
+    {
+      "rule_id": "G115",
+      "file": "internal/provider/common/safeconv/safeconv.go",
+      "symbol": "Int32FromUint32Bits",
+      "snippet": "return int32(value)",
+      "rationale": "Intentional protocol two's-complement bit reinterpretation when decoding signed 32-bit wire fields."
+    },
+    {
+      "rule_id": "G115",
+      "file": "internal/provider/common/safeconv/safeconv.go",
+      "symbol": "Int16FromUint16Bits",
+      "snippet": "return int16(value)",
+      "rationale": "Intentional PCM16 two's-complement reinterpretation from little-endian unsigned bytes to signed samples."
+    },
+    {
+      "rule_id": "G115",
+      "file": "internal/provider/common/safeconv/safeconv.go",
+      "symbol": "Uint16FromInt16Bits",
+      "snippet": "return uint16(value)",
+      "rationale": "Intentional PCM16 two's-complement reinterpretation from signed samples to little-endian unsigned bytes."
+    },
+    {
+      "rule_id": "G115",
+      "file": "internal/provider/common/safeconv/safeconv.go",
+      "symbol": "LowByteFromInt16Bits",
+      "snippet": "return byte(value)",
+      "rationale": "Intentional low-byte extraction while serializing PCM16 samples; high byte is written separately."
+    },
+    {
+      "rule_id": "G304",
+      "file": "scripts/securitycheck/main.go",
+      "symbol": "readRepoFile",
+      "snippet": "return os.ReadFile(cleanPath)",
+      "rationale": "Developer-only security checker reads paths only after cleanRepoPath confines them to the repository root."
+    },
+    {
+      "rule_id": "G704",
+      "file": "tests/e2e/live_smoke_harness.go",
+      "symbol": "requireOllama",
+      "snippet": "req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+\"/api/tags\", nil)",
+      "rationale": "E2E harness validates OLLAMA_BASE_URL as localhost, loopback, or private-network before constructing the dev-only request."
+    },
+    {
+      "rule_id": "G704",
+      "file": "tests/e2e/live_smoke_harness.go",
+      "symbol": "requireOllama",
+      "snippet": "resp, err := http.DefaultClient.Do(req)",
+      "rationale": "E2E harness validates OLLAMA_BASE_URL as localhost, loopback, or private-network before executing the dev-only request."
+    }
+  ]
+}

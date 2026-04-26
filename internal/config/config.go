@@ -32,6 +32,18 @@ type ServerConfig struct {
 	ReadTimeout     time.Duration `yaml:"read_timeout"`
 	WriteTimeout    time.Duration `yaml:"write_timeout"`
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+	MaxBodyBytes    int64         `yaml:"max_body_bytes"`
+	CORS            CORSConfig    `yaml:"cors"`
+}
+
+type CORSConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	AllowedOrigins   []string      `yaml:"allowed_origins"`
+	AllowedHeaders   []string      `yaml:"allowed_headers"`
+	AllowedMethods   []string      `yaml:"allowed_methods"`
+	ExposedHeaders   []string      `yaml:"exposed_headers"`
+	AllowCredentials bool          `yaml:"allow_credentials"`
+	MaxAge           time.Duration `yaml:"max_age"`
 }
 
 type AuthMode string
@@ -235,14 +247,18 @@ type RuntimeOverrides struct {
 
 var envPattern = regexp.MustCompile(`\$\{([A-Z0-9_]+)\}`)
 
+const DefaultMaxBodyBytes int64 = 64 * 1024 * 1024
+
 func Default() Config {
 	return Config{
 		Server: ServerConfig{
-			Host:            "0.0.0.0",
+			Host:            "127.0.0.1",
 			Port:            8080,
 			ReadTimeout:     30 * time.Second,
 			WriteTimeout:    120 * time.Second,
 			ShutdownTimeout: 15 * time.Second,
+			MaxBodyBytes:    DefaultMaxBodyBytes,
+			CORS:            DefaultCORSConfig(),
 		},
 		Auth: AuthConfig{
 			Mode:       AuthModeNone,
@@ -304,15 +320,58 @@ func Default() Config {
 	}
 }
 
+func DefaultCORSConfig() CORSConfig {
+	return CORSConfig{
+		Enabled: true,
+		AllowedOrigins: []string{
+			"http://localhost",
+			"http://localhost:*",
+			"http://127.0.0.1",
+			"http://127.0.0.1:*",
+			"https://localhost",
+			"https://localhost:*",
+			"https://127.0.0.1",
+			"https://127.0.0.1:*",
+		},
+		AllowedHeaders: []string{
+			"Authorization",
+			"Content-Type",
+			"X-Request-ID",
+			"X-Polaris-Admin-Key",
+		},
+		AllowedMethods: []string{
+			"GET",
+			"POST",
+			"DELETE",
+			"OPTIONS",
+		},
+		ExposedHeaders: []string{
+			"X-Request-ID",
+			"X-RateLimit-Remaining",
+			"Retry-After",
+			"X-Polaris-Fallback",
+			"X-Polaris-Resolved-Model",
+			"X-Polaris-Resolved-Provider",
+		},
+		MaxAge: time.Hour,
+	}
+}
+
+func EffectiveMaxBodyBytes(value int64) int64 {
+	if value <= 0 {
+		return DefaultMaxBodyBytes
+	}
+	return value
+}
+
 func Load(path string) (*Config, []string, error) {
 	cfg := Default()
-	data, err := os.ReadFile(path)
+	data, warnings, err := loadV2(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read config: %w", err)
+		return nil, warnings, err
 	}
 
-	expanded, warnings := expandEnv(string(data))
-	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, warnings, fmt.Errorf("decode config yaml: %w", err)
 	}
 
@@ -349,6 +408,13 @@ func ApplyEnvOverrides(cfg *Config) error {
 			return fmt.Errorf("parse POLARIS_PORT: %w", err)
 		}
 		cfg.Server.Port = port
+	}
+	if value := os.Getenv("POLARIS_MAX_BODY_BYTES"); value != "" {
+		maxBodyBytes, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_MAX_BODY_BYTES: %w", err)
+		}
+		cfg.Server.MaxBodyBytes = maxBodyBytes
 	}
 	if value := os.Getenv("POLARIS_LOG_LEVEL"); value != "" {
 		cfg.Observability.Logging.Level = value

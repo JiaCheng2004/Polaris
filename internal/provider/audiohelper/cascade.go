@@ -13,6 +13,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 )
 
 type Transcriber func(ctx context.Context, req *modality.STTRequest) (*modality.TranscriptResponse, error)
@@ -266,7 +267,10 @@ func (s *CascadeSession) commitAudio() error {
 	s.pendingPCM = nil
 	s.mu.Unlock()
 
-	wav := pcm16ToWAV(pcm, 16000)
+	wav, err := pcm16ToWAV(pcm, 16000)
+	if err != nil {
+		return httputil.NewError(400, "invalid_request_error", "invalid_audio", "audio", err.Error())
+	}
 	resp, err := s.transcribe(s.ctx, &modality.STTRequest{
 		Model:          s.sttModel,
 		File:           wav,
@@ -515,24 +519,38 @@ func firstChoiceText(response *modality.ChatResponse) string {
 	return builder.String()
 }
 
-func pcm16ToWAV(pcm []byte, sampleRate int) []byte {
-	dataSize := uint32(len(pcm))
-	byteRate := uint32(sampleRate * 2)
+func pcm16ToWAV(pcm []byte, sampleRate int) ([]byte, error) {
+	dataSize, err := safeconv.Uint32FromInt("wav pcm data size", len(pcm))
+	if err != nil {
+		return nil, err
+	}
+	byteRate, err := safeconv.Uint32FromInt("wav byte rate", sampleRate*2)
+	if err != nil {
+		return nil, err
+	}
+	headerSize, err := safeconv.Uint32FromInt("wav riff payload size", 36+len(pcm))
+	if err != nil {
+		return nil, err
+	}
+	sampleRateValue, err := safeconv.Uint32FromInt("wav sample rate", sampleRate)
+	if err != nil {
+		return nil, err
+	}
 	blockAlign := uint16(2)
 	buf := bytes.NewBuffer(make([]byte, 0, 44+len(pcm)))
 	buf.WriteString("RIFF")
-	_ = binary.Write(buf, binary.LittleEndian, uint32(36)+dataSize)
+	_ = binary.Write(buf, binary.LittleEndian, headerSize)
 	buf.WriteString("WAVE")
 	buf.WriteString("fmt ")
 	_ = binary.Write(buf, binary.LittleEndian, uint32(16))
 	_ = binary.Write(buf, binary.LittleEndian, uint16(1))
 	_ = binary.Write(buf, binary.LittleEndian, uint16(1))
-	_ = binary.Write(buf, binary.LittleEndian, uint32(sampleRate))
+	_ = binary.Write(buf, binary.LittleEndian, sampleRateValue)
 	_ = binary.Write(buf, binary.LittleEndian, byteRate)
 	_ = binary.Write(buf, binary.LittleEndian, blockAlign)
 	_ = binary.Write(buf, binary.LittleEndian, uint16(16))
 	buf.WriteString("data")
 	_ = binary.Write(buf, binary.LittleEndian, dataSize)
 	buf.Write(pcm)
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }

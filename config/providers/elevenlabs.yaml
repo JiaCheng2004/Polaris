@@ -1,0 +1,17 @@
+version: 2
+
+providers:
+  elevenlabs:
+    credentials:
+      api_key: ${ELEVENLABS_API_KEY}
+    transport:
+      base_url: https://api.elevenlabs.io
+      timeout: 120s
+    models:
+      use: [music_v1]
+      overrides:
+        music_v1:
+          output_formats: [mp3, pcm, opus]
+          min_duration_ms: 10000
+          max_duration_ms: 180000
+          sample_rates_hz: [44100, 48000]

@@ -1,0 +1,54 @@
+version: 2
+
+routing:
+  fallbacks: []
+  aliases:
+    openai-chat: openai/gpt-4o-mini
+    openai-frontier-chat: openai/gpt-5.5
+    openai-embed: openai/text-embedding-3-small
+    openai-image: openai/gpt-image-1
+    openai-image-latest: openai/gpt-image-2
+    openai-tts: openai/tts-1
+    openai-stt: openai/whisper-1
+    openai-audio: openai/gpt-4o-audio
+    openai-video: openai/sora-2
+    anthropic-chat: anthropic/claude-sonnet-4-6
+    google-chat: google/gemini-2.5-flash-lite
+    google-embed: google/gemini-embedding-001
+    google-image: google/nano-banana-2
+    google-video: google-vertex/veo-3.1-generate-001
+    deepseek-chat: deepseek/deepseek-chat
+    bytedance-chat: bytedance/doubao-seed-2.0-pro
+    bytedance-vision: bytedance/doubao-seed-1.6-vision
+    bytedance-image: bytedance/doubao-seedream-5.0-lite
+    bytedance-tts: bytedance/doubao-tts-2.0
+    bytedance-stt: bytedance/doubao-asr-2.0
+    bytedance-notes: bytedance/doubao-notes-2.0
+    bytedance-podcast: bytedance/doubao-podcast-2.0
+    bytedance-streaming-asr: bytedance/doubao-streaming-asr-2.0
+    bytedance-interpreting: bytedance/doubao-interpreting-2.0
+    bytedance-audio: bytedance/doubao-audio
+    bytedance-translation: bytedance/doubao-translation-2.0
+    bytedance-video: bytedance/doubao-seedance-2.0
+    bytedance-video-fast: bytedance/doubao-seedance-2.0-fast
+    minimax-music: minimax/music-2.6
+    cover-music: minimax/music-cover
+    elevenlabs-music: elevenlabs/music_v1
+    stems-music: elevenlabs/music_v1
+    xai-chat: xai/grok-4-1-fast-reasoning
+    openrouter-chat: openrouter/openai/gpt-5.4-mini
+    together-chat: together/meta-llama/Llama-3.3-70B-Instruct-Turbo
+    groq-chat: groq/llama-3.3-70b-versatile
+    fireworks-chat: fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct
+    featherless-chat: featherless/meta-llama/Meta-Llama-3.1-8B-Instruct
+    moonshot-chat: moonshot/kimi-k2-turbo-preview
+    glm-chat: glm/glm-5.1
+    mistral-chat: mistral/mistral-medium-latest
+    bedrock-chat: bedrock/amazon.nova-2-lite-v1:0
+    bedrock-embed: bedrock/amazon.titan-embed-text-v2:0
+    nvidia-chat: nvidia/nvidia/NVIDIA-Nemotron-Nano-9B-v2
+    nvidia-embed: nvidia/nvidia/llama-nemotron-embed-1b-v2
+    replicate-video: replicate/minimax/video-01
+    qwen-chat: qwen/qwen-max
+    qwen-image: qwen/qwen-image-2.0
+    ollama-chat: ollama/llama3

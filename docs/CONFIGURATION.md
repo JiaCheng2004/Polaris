@@ -1,6 +1,8 @@
 # Polaris Configuration
 
-`config/polaris.yaml` is the local-development default. `config/polaris.example.yaml` is the full reference file that documents the intended production topology and the full provider catalog described in `BLUEPRINT.md`.
+Polaris uses YAML configuration `version: 2`. `config/polaris.yaml` is the local-development default, `config/polaris.example.yaml` is the full reference file, and `config/polaris.live-smoke.yaml` is the env-driven real-provider smoke config.
+
+Root config files can import modular snippets from `config/providers/` and `config/routing/`. Imports are resolved relative to the importing file, loaded in listed order, and then overridden by the importing file. Maps deep-merge; arrays and scalars replace.
 
 ## Precedence
 
@@ -8,7 +10,7 @@ Configuration is resolved in this order:
 
 1. CLI flags
 2. Environment variables
-3. YAML config
+3. YAML config, including imported files
 4. Built-in defaults
 
 Supported CLI flags from the blueprint:
@@ -20,50 +22,103 @@ Supported CLI flags from the blueprint:
 ## File Roles
 
 - `config/polaris.yaml`: single-binary development defaults, centered on SQLite and in-memory cache.
-- `config/polaris.example.yaml`: full reference config for real deployments and future phases.
+- `config/polaris.example.yaml`: full reference config for real deployments and shipped provider families.
+- `config/polaris.live-smoke.yaml`: release-validation config for the env-gated live-provider matrix.
+- `config/providers/*.yaml`: provider credentials, transport defaults, model use lists, and model overrides.
+- `config/routing/*.yaml`: aliases, selectors, and fallback rules.
+- `schema/polaris.config.schema.json`: JSON Schema Draft 2020-12 tooling contract.
+- `schema/cue/polaris.config.cue`: optional CUE validation contract.
 
 ## Sections
 
-- `server`: listener address and request/shutdown timeouts.
-- `auth`: auth mode, static keys, external signed-claim auth, legacy multi-user compatibility, and virtual-key bootstrap settings.
-- `store`: backing database driver, DSN, and async log writer tuning.
-- `cache`: driver selection, Redis connection settings, rate limiting, and response-cache settings.
-- `providers`: provider credentials, base URLs, retry policy, and model catalog.
+- `version`: currently `2`.
+- `imports`: optional ordered list of YAML snippets.
+- `runtime.server`: listener address and request/shutdown timeouts.
+- `runtime.auth`: auth mode, static keys, external signed-claim auth, legacy multi-user compatibility, and virtual-key bootstrap settings.
+- `runtime.store`: backing database driver, DSN, and async log writer tuning.
+- `runtime.cache`: driver selection, Redis connection settings, rate limiting, and response-cache settings.
+- `providers`: provider credentials, transport policy, and model catalog references.
 - `routing`: static aliases, capability-driven selector aliases, and provider failover order.
-- `control_plane`: project / virtual-key control-plane enablement.
-- `tools`: local tool registration metadata for the tool runtime.
-- `mcp`: MCP broker enablement.
-- `observability`: metrics, structured logging, tracing, and audit-event settings.
+- `runtime.control_plane`: project / virtual-key control-plane enablement.
+- `runtime.tools`: local tool registration metadata for the tool runtime.
+- `runtime.mcp`: MCP broker enablement.
+- `runtime.observability`: metrics, structured logging, tracing, and audit-event settings.
 
-The current runtime intentionally keeps `control_plane`, `tools`, and `mcp` YAML small. Detailed projects, virtual keys, policies, budgets, toolsets, and MCP bindings are managed through the database-backed control-plane API instead of being preloaded from YAML. Token-accounting provenance is always emitted by the runtime and does not currently have a separate `token_accounting` YAML section.
+The current runtime intentionally keeps `runtime.control_plane`, `runtime.tools`, and `runtime.mcp` YAML small. Detailed projects, virtual keys, policies, budgets, toolsets, and MCP bindings are managed through the database-backed control-plane API instead of being preloaded from YAML. Token-accounting provenance is always emitted by the runtime and does not currently have a separate `token_accounting` YAML section.
+
+## Runtime Server Safety
+
+Local defaults bind Polaris to `127.0.0.1` with `auth.mode: none`. Use `0.0.0.0` only when a real auth mode, reverse proxy, or private network boundary is in place.
+
+`runtime.server.max_body_bytes` caps JSON and multipart request bodies. The default is `67108864` bytes (64 MiB). Oversized requests return `413 invalid_request_error / request_body_too_large`.
+
+`runtime.server.cors` is config-driven. The local default allows localhost and 127.0.0.1 browser origins, including wildcard ports such as `http://localhost:*`. Production configs should list exact application origins. `allow_credentials: true` is rejected when `allowed_origins` contains `*`.
+
+## Provider Model References
+
+Provider config uses this shape:
+
+```yaml
+providers:
+  openai:
+    credentials:
+      api_key: ${OPENAI_API_KEY}
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use: [gpt-5.5, gpt-4o, gpt-image-2]
+      overrides:
+        gpt-5.5:
+          context_window: 1000000
+          max_output_tokens: 128000
+        gpt-image-2:
+          output_formats: [png, jpeg, webp]
+```
+
+`models.use` is the enabled provider-native model list. Known models are expanded from `internal/provider/catalog/models.yaml`. `models.overrides` adds runtime fields that do not belong in the global catalog, such as deployment-specific endpoints, context windows, durations, voice IDs, output formats, or realtime-session settings.
+
+Custom or private models are allowed, but they must appear in `models.use` and define `models.overrides.<model>.modality`.
+
+Run config validation with:
+
+```bash
+make config-check
+```
 
 ## Secret Handling
 
 - Provider credentials must come from environment variables via `${VAR_NAME}` references.
 - Do not commit plaintext API keys, admin keys, TLS material, or local `.env` files.
-- Static and admin gateway keys must be stored as hashes, not plaintext values.
+- Static and admin gateway keys must be stored as `sha256:` hashes, not plaintext values.
 - `auth.external.shared_secret` must come from an environment variable such as `${POLARIS_EXTERNAL_AUTH_SECRET}` and must not be committed as a literal.
+- Generate local key material with `go run ./scripts/generate-key.go`; commit only the emitted `sha256:` hash, never the raw key.
 
 ## Authentication Modes
 
 Choose the smallest auth mode that matches the deployment:
 
-- `auth.mode: none`: local-only development path. Polaris accepts every request and applies wildcard model access.
-- `auth.mode: static`: simple fixed API keys defined in YAML. Good for private demos or one trusted service.
-- `auth.mode: external`: bring-your-own-auth path. Your app owns Google OAuth, SMS OTP, SSO, sessions, and user lifecycle; Polaris verifies signed request claims.
-- `auth.mode: virtual_keys`: Polaris-owned production key plane with projects, policies, budgets, toolsets, MCP bindings, and audit records.
-- `auth.mode: multi-user`: compatibility path for older database-backed `api_keys` rows.
+- `runtime.auth.mode: none`: local-only development path. Polaris accepts every request and applies wildcard model access.
+- `runtime.auth.mode: static`: simple fixed API keys defined in YAML. Good for private demos or one trusted service.
+- `runtime.auth.mode: external`: bring-your-own-auth path. Your app owns Google OAuth, SMS OTP, SSO, sessions, and user lifecycle; Polaris verifies signed request claims.
+- `runtime.auth.mode: virtual_keys`: Polaris-owned production key plane with projects, policies, budgets, toolsets, MCP bindings, and audit records.
+- `runtime.auth.mode: multi-user`: compatibility path for older database-backed `api_keys` rows.
 
 External auth uses the built-in `signed_headers` provider:
 
 ```yaml
-auth:
-  mode: external
-  external:
-    provider: signed_headers
-    shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}
-    max_clock_skew: 60s
-    cache_ttl: 60s
+runtime:
+  auth:
+    mode: external
+    external:
+      provider: signed_headers
+      shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}
+      max_clock_skew: 60s
+      cache_ttl: 60s
 ```
 
 Equivalent environment overrides are:
@@ -132,15 +187,15 @@ Phase 5 music hardening is current. The shipped runtime supports:
 - `store.driver: sqlite|postgres`
 - `cache.driver: memory|redis`
 - `routing.aliases`, `routing.selectors`, and `routing.fallbacks`
-- `control_plane.enabled`
-- `tools.enabled`
-- `mcp.enabled`
-- `observability.metrics`
-- `observability.traces`
-- `observability.audit`
-- `auth.mode: virtual_keys`
-- `auth.mode: external`
-- compatibility `auth.mode: multi-user`
+- `runtime.control_plane.enabled`
+- `runtime.tools.enabled`
+- `runtime.mcp.enabled`
+- `runtime.observability.metrics`
+- `runtime.observability.traces`
+- `runtime.observability.audit`
+- `runtime.auth.mode: virtual_keys`
+- `runtime.auth.mode: external`
+- compatibility `runtime.auth.mode: multi-user`
 - control-plane management via `/v1/projects`, `/v1/virtual_keys`, `/v1/policies`, `/v1/budgets`, `/v1/tools`, `/v1/toolsets`, and `/v1/mcp/bindings`
 - legacy key management compatibility via `/v1/keys`
 
@@ -150,11 +205,12 @@ Phase 5 music hardening is current. The shipped runtime supports:
 
 The chat-first expansion families OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, and Mistral all use the shared provider-common OpenAI-compatible adapter base. Their Polaris config shape is intentionally uniform:
 
-- `api_key`
-- optional `base_url`
-- `timeout`
-- `retry`
-- `models`
+- `credentials.api_key`
+- optional `transport.base_url`
+- `transport.timeout`
+- `transport.retry`
+- `models.use`
+- optional `models.overrides`
 
 The provider model matrix lives in `internal/provider/catalog/models.yaml`, is embedded into the binary at build time, and adds `/v1/models` metadata for provider variants, canonical model families, human aliases, and routing hints such as `cost_tier` and `latency_tier` for configured models. Exact `provider/model` requests always execute directly; family IDs and family aliases resolve to one enabled provider variant by deterministic policy.
 
@@ -171,28 +227,28 @@ Model-taking API requests may also include a request-level `routing` object. Pol
 
 Amazon Bedrock is intentionally separate from the OpenAI-compatible family. Configure:
 
-- `providers.bedrock.access_key_id`
-- `providers.bedrock.access_key_secret`
-- optional `providers.bedrock.session_token`
-- `providers.bedrock.location`
-- optional `providers.bedrock.base_url`
-- `models`
+- `providers.bedrock.credentials.access_key_id`
+- `providers.bedrock.credentials.access_key_secret`
+- optional `providers.bedrock.credentials.session_token`
+- `providers.bedrock.credentials.location`
+- optional `providers.bedrock.transport.base_url`
+- `providers.bedrock.models.use`
 
 The Bedrock adapter uses the native runtime `Converse` / `ConverseStream` APIs for chat, the native `InvokeModel` path for Titan embeddings, signs every request with SigV4, and expects official Bedrock model IDs such as `amazon.nova-2-lite-v1:0` or `amazon.titan-embed-text-v2:0`.
 
 NVIDIA NIM uses the shared OpenAI-compatible provider base. Configure:
 
-- `providers.nvidia.api_key`
-- optional `providers.nvidia.base_url`
-- `models`
+- `providers.nvidia.credentials.api_key`
+- optional `providers.nvidia.transport.base_url`
+- `providers.nvidia.models.use`
 
 For official NVIDIA-hosted models, prefer the official wire model IDs in config, for example `nvidia/NVIDIA-Nemotron-Nano-9B-v2` for chat and `nvidia/llama-nemotron-embed-1b-v2` for embeddings. Polaris also treats the short form without the leading `nvidia/` as a local alias when you configure the model that way.
 
 Replicate is currently a native async video provider family. Configure:
 
-- `providers.replicate.api_key`
-- optional `providers.replicate.base_url`
-- `models`
+- `providers.replicate.credentials.api_key`
+- optional `providers.replicate.transport.base_url`
+- `providers.replicate.models.use`
 
 Replicate models should use official `owner/model` identifiers in config, for example `minimax/video-01`. The first Polaris scope is the Predictions API for async video jobs, so Replicate models should currently be configured with `modality: video`.
 
@@ -229,8 +285,8 @@ Current runtime limits for audio sessions:
 Preferred auth mode for production is `virtual_keys`. In that mode:
 
 - bearer tokens are Polaris virtual keys stored in the database
-- `auth.bootstrap_admin_key_hash` is required when `auth.mode: virtual_keys`
-- the bootstrap admin key can manage control-plane endpoints only when `control_plane.enabled: true`, but it is not valid for inference endpoints
+- `runtime.auth.bootstrap_admin_key_hash` is required when `runtime.auth.mode: virtual_keys` and must be a `sha256:` hash generated by `go run ./scripts/generate-key.go`
+- the bootstrap admin key can manage control-plane endpoints only when `runtime.control_plane.enabled: true`, but it is not valid for inference endpoints
 - project policies gate models, modalities, toolsets, and MCP bindings
 - hard budgets can block requests once the current budget window is already exceeded
 
@@ -241,9 +297,9 @@ Preferred auth mode for embedding Polaris behind another platform is `external`.
 - signed claims become the same request `AuthContext` used by rate limits, model policy, modality policy, tools, MCP, audit, and budgets
 - `is_admin: true` in the signed claims is required for control-plane endpoints
 
-`auth.mode: multi-user` remains as a compatibility path for older database-backed key rows and the legacy `/v1/keys` surface.
+`runtime.auth.mode: multi-user` remains as a compatibility path for older database-backed key rows and the legacy `/v1/keys` surface.
 
-When `control_plane.enabled` is true, Polaris exposes the database-backed control-plane management routes:
+When `runtime.control_plane.enabled` is true, Polaris exposes the database-backed control-plane management routes:
 
 - `/v1/projects`
 - `/v1/virtual_keys`
@@ -255,25 +311,27 @@ When `control_plane.enabled` is true, Polaris exposes the database-backed contro
 
 `/v1/keys` remains implemented as a compatibility facade. In `virtual_keys` mode it issues Polaris virtual keys with the legacy response shape; in `multi-user` mode it still uses the older `api_keys` rows.
 
-When `control_plane.enabled` is false, those management routes return `404 invalid_request_error / control_plane_disabled` even for admin callers. The `/mcp/:binding_id` broker surface is separate and remains governed by `mcp.enabled`, auth, and project/key policy.
+When `runtime.control_plane.enabled` is false, those management routes return `404 invalid_request_error / control_plane_disabled` even for admin callers. The `/mcp/:binding_id` broker surface is separate and remains governed by `runtime.mcp.enabled`, auth, and project/key policy.
 
-When `tools.enabled` is true, local tool implementations registered in `tools.local` can be attached to toolsets and exposed through MCP bindings. Polaris does not upload arbitrary code; it only executes implementations already registered in the runtime.
+When `runtime.tools.enabled` is false, MCP `local_toolset` bindings return `404 invalid_request_error / tools_disabled`. When it is true, local tool implementations registered in `runtime.tools.local` can be attached to toolsets and exposed through MCP bindings. Polaris does not upload arbitrary code; it only executes implementations already registered in the runtime.
 
-When `mcp.enabled` is true, Polaris exposes streamable HTTP MCP broker paths under `/mcp/:binding_id`. Current binding kinds are:
+When `runtime.mcp.enabled` is false, `/mcp/:binding_id` returns `404 invalid_request_error / mcp_disabled`. When it is true, Polaris exposes streamable HTTP MCP broker paths under `/mcp/:binding_id`. Current binding kinds are:
 
 - `upstream_proxy`
 - `local_toolset`
 
-When `observability.traces.enabled` is true, Polaris exports OTLP traces using:
+`upstream_proxy` bindings forward method, body, query string, safe MCP/content-negotiation headers, and configured static binding headers. Caller credentials such as `Authorization`, cookies, API-key headers, and forwarding headers are never proxied upstream; upstream auth must be configured on the binding.
 
-- `observability.traces.endpoint`
-- `observability.traces.insecure`
-- `observability.traces.service_name`
-- `observability.traces.sample_ratio`
+When `runtime.observability.traces.enabled` is true, Polaris exports OTLP traces using:
+
+- `runtime.observability.traces.endpoint`
+- `runtime.observability.traces.insecure`
+- `runtime.observability.traces.service_name`
+- `runtime.observability.traces.sample_ratio`
 
 The emitted trace tree is deeper than a single HTTP span. Polaris adds child spans for auth lookup, rate-limit and budget checks, cache lookup/store, provider HTTP calls, fallback attempts, and MCP/tool execution, while keeping prompts, raw bodies, and secret material out of trace attributes.
 
-When `observability.audit.enabled` is true, Polaris records audit events for project, virtual-key, policy, budget, tool, toolset, and MCP-binding changes. Audit writes are buffered off the hot path.
+When `runtime.observability.audit.enabled` is true, Polaris records audit events for project, virtual-key, policy, budget, tool, toolset, and MCP-binding changes. Audit writes are buffered off the hot path.
 
 When `cache.driver` is `redis`, set `cache.url` to a `redis://` connection URL. The reference config does this through `${REDIS_URL}` so the production and dev stack files can inject Redis without committing environment-specific values.
 
@@ -281,16 +339,16 @@ When ByteDance TTS is enabled on the new Doubao Speech control plane, set `provi
 
 When provider-backed ByteDance voice catalog listing is enabled, set:
 
-- `providers.bytedance.access_key_id`
-- `providers.bytedance.access_key_secret`
+- `providers.bytedance.credentials.access_key_id`
+- `providers.bytedance.credentials.access_key_secret`
 
 Polaris uses those control-plane credentials to sign `speech_saas_prod` OpenAPI requests against `providers.bytedance.control_base_url`, which defaults to `https://open.volcengineapi.com`. The current provider-backed catalog path powers `GET /v1/voices?scope=provider&provider=bytedance` and returns built-in 2.0 voice metadata from `ListBigModelTTSTimbres`.
 
 When ByteDance voice assets are enabled, set:
 
 - `providers.bytedance.speech_api_key`
-- `providers.bytedance.access_key_id`
-- `providers.bytedance.access_key_secret`
+- `providers.bytedance.credentials.access_key_id`
+- `providers.bytedance.credentials.access_key_secret`
 
 Polaris uses `speech_api_key` for data-plane clone, design, and retrain requests, and uses the signed control-plane credentials for custom-voice status lookup. The current ByteDance voice-asset surface powers:
 
@@ -373,7 +431,7 @@ The audio session model itself should define:
 
 When ByteDance audio sessions use the legacy cascaded `audio_pipeline` path instead, all three fields are required together:
 
-- `providers.bytedance.api_key`
+- `providers.bytedance.credentials.api_key`
 - `providers.bytedance.app_id`
 - `providers.bytedance.speech_api_key`
 
@@ -381,13 +439,13 @@ When `providers.google-vertex` is enabled, set `project_id`, `location`, and `se
 
 When OpenAI native realtime audio sessions are enabled, the audio model should use `realtime_session.transport: openai_realtime`. Older cascaded compatibility sessions can still use `audio_pipeline` pointing at an OpenAI chat model plus the STT/TTS models you want Polaris to use for the session turns.
 
-When MiniMax music is enabled, set `providers.minimax.base_url` explicitly to either `https://api.minimax.io` or `https://api.minimaxi.com`. Token Plan / global accounts typically use `https://api.minimax.io`; China mainland accounts use `https://api.minimaxi.com`. Real MiniMax generation can take minutes, so the release-facing configs use a `10m` timeout and production callers should prefer `mode=async` for long-running music jobs.
+When MiniMax music is enabled, set `providers.minimax.transport.base_url` explicitly to either `https://api.minimax.io` or `https://api.minimaxi.com`. Token Plan / global accounts typically use `https://api.minimax.io`; China mainland accounts use `https://api.minimaxi.com`. Real MiniMax generation can take minutes, so the release-facing configs use a `10m` timeout and production callers should prefer `mode=async` for long-running music jobs.
 
 ## Hot Reload Behavior
 
 Phase 2 hot reload updates the runtime routing layer without restarting the HTTP server. Reloadable settings include:
 
-- provider credentials, base URLs, retry policy, and model catalog
+- provider credentials, base URLs, retry policy, and model catalog references
 - `routing.aliases`
 - `routing.fallbacks`
 - auth mode and static-key configuration
@@ -396,15 +454,15 @@ Phase 2 hot reload updates the runtime routing layer without restarting the HTTP
 
 Hot reload intentionally rejects changes to non-runtime infrastructure settings. A restart is required for:
 
-- `server.*`
-- `store.*`
-- cache connection settings such as `cache.driver` and `cache.url`
-- `logging.format`
-- `observability.metrics.path`
+- `runtime.server.*`
+- `runtime.store.*`
+- cache connection settings such as `runtime.cache.driver` and `runtime.cache.url`
+- `runtime.observability.logging.format`
+- `runtime.observability.metrics.path`
 
 ## Metrics
 
-Set `observability.metrics.enabled: true` to expose Prometheus metrics. The path is configured by `observability.metrics.path` at startup and defaults to `/metrics`.
+Set `runtime.observability.metrics.enabled: true` to expose Prometheus metrics. The path is configured by `runtime.observability.metrics.path` at startup and defaults to `/metrics`.
 
 The stable metric labels are:
 
@@ -417,32 +475,34 @@ The stable metric labels are:
 
 Recommended production/auth baseline:
 
-- `auth.mode: virtual_keys`
-- `auth.bootstrap_admin_key_hash: ${POLARIS_BOOTSTRAP_ADMIN_KEY_HASH}`
-- `control_plane.enabled: true`
-- `tools.enabled: true`
-- `mcp.enabled: true`
-- `observability.audit.enabled: true`
-- `observability.traces.enabled: true` when OTLP export is available
+- `runtime.auth.mode: virtual_keys`
+- `runtime.auth.bootstrap_admin_key_hash: ${POLARIS_BOOTSTRAP_ADMIN_KEY_HASH}`
+- `runtime.control_plane.enabled: true`
+- `runtime.tools.enabled: true`
+- `runtime.mcp.enabled: true`
+- `runtime.observability.audit.enabled: true`
+- `runtime.observability.traces.enabled: true` when OTLP export is available
 
 Recommended embedded-platform auth baseline:
 
-- `auth.mode: external`
-- `auth.external.provider: signed_headers`
-- `auth.external.shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}`
-- `control_plane.enabled: true` only if the upstream platform signs `is_admin: true` for trusted operators
+- `runtime.auth.mode: external`
+- `runtime.auth.external.provider: signed_headers`
+- `runtime.auth.external.shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}`
+- `runtime.control_plane.enabled: true` only if the upstream platform signs `is_admin: true` for trusted operators
 
 Compatibility/local options still exist:
 
-- `auth.mode: none` for local development
-- `auth.mode: static` for simple fixed-key deployments
-- `auth.mode: multi-user` only when you still need the older key-row model
+- `runtime.auth.mode: none` for local development
+- `runtime.auth.mode: static` for simple fixed-key deployments
+- `runtime.auth.mode: multi-user` only when you still need the older key-row model
 
 ## Close-Out Commands
 
-Use these during the `v2.1.0` release close-out:
+Use these for repo-local release validation:
 
 - `make release-check`: repo-local validation gate
+- `make security-check`: pinned gosec scan with exact audited allowlist
+- `make config-check`: config loader, schema-adjacent examples, and model catalog validation
 - `make stack-validate STACK=local|prod|dev`: validate Compose config without rendering interpolated values
 - `make stack-config STACK=local|prod|dev`: render Compose config for local debugging
 - `make live-smoke`: env-gated live provider smoke matrix

@@ -96,6 +96,8 @@ func TestTracingRecordsMCPLocalToolsetSpans(t *testing.T) {
 
 	cfg := testConfig(t)
 	cfg.Auth.Mode = config.AuthModeNone
+	cfg.MCP.Enabled = true
+	cfg.Tools.Enabled = true
 
 	sqliteStore := testSQLiteStore(t)
 	now := time.Now().UTC()

@@ -700,6 +700,7 @@ func (h *MusicHandler) runAsyncMusicJob(c *gin.Context, token *musicJobToken, fn
 	h.cancelMu.Unlock()
 
 	go func() {
+		defer cancel()
 		defer func() {
 			h.cancelMu.Lock()
 			delete(h.cancels, token.CacheKey)
@@ -986,11 +987,16 @@ func parseMusicEditMultipart(c *gin.Context) (*musicEditEnvelope, error) {
 	if fileHeader, err := c.FormFile("file"); err == nil {
 		data, contentType, readErr := readMultipartFile(fileHeader)
 		if readErr != nil {
+			if httputil.IsRequestBodyTooLarge(readErr) {
+				return nil, httputil.RequestBodyTooLargeError(0)
+			}
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "file", "Unable to read uploaded audio file.")
 		}
 		req.File = data
 		req.Filename = fileHeader.Filename
 		req.ContentType = contentType
+	} else if httputil.IsRequestBodyTooLarge(err) {
+		return nil, httputil.RequestBodyTooLargeError(0)
 	}
 	return req, nil
 }
@@ -1015,11 +1021,16 @@ func parseMusicStemMultipart(c *gin.Context) (*musicStemEnvelope, error) {
 	if fileHeader, err := c.FormFile("file"); err == nil {
 		data, contentType, readErr := readMultipartFile(fileHeader)
 		if readErr != nil {
+			if httputil.IsRequestBodyTooLarge(readErr) {
+				return nil, httputil.RequestBodyTooLargeError(0)
+			}
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "file", "Unable to read uploaded audio file.")
 		}
 		req.File = data
 		req.Filename = fileHeader.Filename
 		req.ContentType = contentType
+	} else if httputil.IsRequestBodyTooLarge(err) {
+		return nil, httputil.RequestBodyTooLargeError(0)
 	}
 	return req, nil
 }

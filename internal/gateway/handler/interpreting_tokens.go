@@ -106,7 +106,7 @@ func parseInterpretingSession(snapshot *gwruntime.Snapshot, sessionID string, cl
 }
 
 func signInterpretingPayload(snapshot *gwruntime.Snapshot, providerName string, prefix string, payload any) (string, error) {
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return "", invalidInterpretingSessionError("session", "Interpreting session signing secret is unavailable.")
 	}
@@ -148,7 +148,7 @@ func parseSignedInterpretingPayload[T any](snapshot *gwruntime.Snapshot, prefix 
 	default:
 		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
 	}
-	secret, err := videoJobSecret(snapshot, providerName)
+	secret, err := speechSessionSecret(snapshot, providerName)
 	if err != nil {
 		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
 	}

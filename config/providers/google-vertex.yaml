@@ -1,0 +1,23 @@
+version: 2
+
+providers:
+  google-vertex:
+    credentials:
+      project_id: ${GOOGLE_CLOUD_PROJECT}
+      location: ${GOOGLE_CLOUD_LOCATION}
+      secret_key: ${GOOGLE_VERTEX_JOB_SECRET}
+    transport:
+      timeout: 60s
+    models:
+      use: [veo-3.1-generate-001, veo-3.1-fast-generate-001]
+      overrides:
+        veo-3.1-generate-001:
+          allowed_durations: [4, 6, 8]
+          aspect_ratios: ["16:9", "9:16"]
+          resolutions: [720p, 1080p]
+          cancelable: true
+        veo-3.1-fast-generate-001:
+          allowed_durations: [4, 6, 8]
+          aspect_ratios: ["16:9", "9:16"]
+          resolutions: [720p, 1080p]
+          cancelable: true

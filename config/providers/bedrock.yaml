@@ -1,0 +1,30 @@
+version: 2
+
+providers:
+  bedrock:
+    credentials:
+      access_key_id: ${AWS_BEDROCK_ACCESS_KEY_ID}
+      access_key_secret: ${AWS_BEDROCK_SECRET_ACCESS_KEY}
+      session_token: ${AWS_BEDROCK_SESSION_TOKEN}
+      location: ${AWS_BEDROCK_REGION}
+    transport:
+      timeout: 60s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 500ms
+    models:
+      use:
+        - "amazon.nova-2-lite-v1:0"
+        - amazon.nova-2-lite-omni-v1
+        - "amazon.nova-2-pro-preview-20251202-v1:0"
+        - "amazon.titan-embed-text-v2:0"
+      overrides:
+        "amazon.nova-2-lite-v1:0":
+          context_window: 300000
+        amazon.nova-2-lite-omni-v1:
+          context_window: 300000
+        "amazon.nova-2-pro-preview-20251202-v1:0":
+          context_window: 300000
+        "amazon.titan-embed-text-v2:0":
+          dimensions: 1024

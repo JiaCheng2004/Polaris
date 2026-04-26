@@ -12,7 +12,8 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 		middleware.RequestID(),
 		middleware.Tracing(),
 		middleware.Runtime(deps.Runtime),
-		middleware.CORS(),
+		middleware.BodyLimit(deps.Runtime),
+		middleware.CORS(deps.Runtime),
 		middleware.Logger(deps.Logger),
 		middleware.Metrics(deps.Metrics),
 	)
@@ -24,7 +25,7 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 	imageHandler := handler.NewImageHandler(deps.Runtime, deps.Cache)
 	interpretingHandler := handler.NewInterpretingHandler(deps.Runtime)
 	keysHandler := handler.NewKeysHandler(deps.Runtime, deps.Store, deps.AuthCache, deps.VirtualKeyCache)
-	mcpHandler := handler.NewMCPHandler(deps.Store, deps.ToolRegistry, deps.Metrics)
+	mcpHandler := handler.NewMCPHandler(deps.Runtime, deps.Store, deps.ToolRegistry, deps.Metrics)
 	musicHandler := handler.NewMusicHandler(deps.Runtime, deps.Cache, deps.RequestLogger)
 	metricsHandler := handler.NewMetricsHandler(deps.Runtime, deps.Metrics)
 	modelsHandler := handler.NewModelsHandler(deps.Runtime)
@@ -56,6 +57,7 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 
 	mcp := engine.Group("/mcp")
 	mcp.Use(
+		middleware.MCPEnabled(deps.Runtime),
 		middleware.Auth(deps.Runtime, deps.Store, deps.AuthCache, deps.VirtualKeyCache, deps.Logger),
 		middleware.Budget(deps.Runtime, deps.Store, deps.Metrics, deps.AuditLogger, deps.Logger),
 	)

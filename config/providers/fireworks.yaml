@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  fireworks:
+    credentials:
+      api_key: ${FIREWORKS_API_KEY}
+    transport:
+      base_url: https://api.fireworks.ai/inference/v1
+      timeout: 60s
+    models:
+      use: [accounts/fireworks/models/llama-v3p1-8b-instruct]
+      overrides:
+        accounts/fireworks/models/llama-v3p1-8b-instruct:
+          context_window: 131072

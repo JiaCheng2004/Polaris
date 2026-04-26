@@ -1,0 +1,14 @@
+version: 2
+
+providers:
+  together:
+    credentials:
+      api_key: ${TOGETHER_API_KEY}
+    transport:
+      base_url: https://api.together.xyz/v1
+      timeout: 60s
+    models:
+      use: [meta-llama/Llama-3.3-70B-Instruct-Turbo]
+      overrides:
+        meta-llama/Llama-3.3-70B-Instruct-Turbo:
+          context_window: 131072

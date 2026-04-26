@@ -196,6 +196,7 @@ func (h *PodcastHandler) runAsyncPodcastJob(token *podcastJobToken, fn func(cont
 	h.cancelMu.Unlock()
 
 	go func() {
+		defer cancel()
 		defer func() {
 			h.cancelMu.Lock()
 			delete(h.cancels, token.CacheKey)

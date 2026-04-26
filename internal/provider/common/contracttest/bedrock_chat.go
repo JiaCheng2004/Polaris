@@ -12,6 +12,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 )
 
 type NativeChatAdapterFactory func(cfg config.ProviderConfig, model string) modality.ChatAdapter
@@ -124,8 +125,12 @@ func encodeBedrockEventFrame(t *testing.T, payload []byte) []byte {
 	t.Helper()
 
 	totalLength := 16 + len(payload)
+	totalLengthUint32, err := safeconv.Uint32FromInt("bedrock event frame length", totalLength)
+	if err != nil {
+		t.Fatalf("encode bedrock event frame: %v", err)
+	}
 	frame := make([]byte, totalLength)
-	binary.BigEndian.PutUint32(frame[0:4], uint32(totalLength))
+	binary.BigEndian.PutUint32(frame[0:4], totalLengthUint32)
 	binary.BigEndian.PutUint32(frame[4:8], 0)
 	binary.BigEndian.PutUint32(frame[8:12], crc32.ChecksumIEEE(frame[0:8]))
 	copy(frame[12:12+len(payload)], payload)

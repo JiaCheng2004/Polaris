@@ -148,7 +148,10 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 			select {
 			case <-done:
 				return
-			case event := <-events:
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
 				if event.Error != nil && strings.TrimSpace(event.Error.Type) != "" {
 					lastErrorTyp = event.Error.Type
 					outcome.StatusCode = http.StatusBadGateway

@@ -69,6 +69,10 @@ type responsesUsage struct {
 func (h *ChatHandler) Responses(c *gin.Context) {
 	rawBody, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			httputil.WriteError(c, httputil.RequestBodyTooLargeError(0))
+			return
+		}
 		httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON."))
 		return
 	}
@@ -95,14 +99,43 @@ func (h *ChatHandler) Responses(c *gin.Context) {
 		c.Header(cacheHeader, "bypass")
 	}
 
-	if primary, _, prepErr := h.prepareConversation(c, chatReq); prepErr == nil {
+	if primary, fallbacks, prepErr := h.prepareConversation(c, chatReq); prepErr == nil {
 		applyResolvedRoutingHeaders(c, primary.resolution)
 		if adapter, ok := primary.adapter.(modality.NativeResponsesAdapter); ok {
 			if req.Stream {
-				h.streamNativeResponses(c, adapter, primary, rawBody)
+				if err := h.streamNativeResponses(c, adapter, primary, rawBody); err == nil {
+					return
+				} else if shouldRetryWithFallback(apiErrorFrom(err)) && len(fallbacks) > 0 {
+					stream, selected, outcome, fallbackModel, fallbackErr := h.openFallbackConversationStream(c, primary, fallbacks, chatReq, "responses")
+					if fallbackErr != nil {
+						middleware.SetRequestOutcome(c, outcome)
+						writeConversationTargetError(c, "responses", fallbackErr)
+						return
+					}
+					writeConversationFallbackHeaders(c, h, primary.model.ID, outcome, fallbackModel)
+					h.streamResponses(c, selected, stream, outcome, chatReq, req.Metadata)
+					return
+				} else {
+					writeNativeConversationError(c, primary, "responses", err)
+				}
 				return
 			}
-			h.nativeResponses(c, adapter, primary, rawBody)
+			if err := h.nativeResponses(c, adapter, primary, rawBody); err == nil {
+				return
+			} else if shouldRetryWithFallback(apiErrorFrom(err)) && len(fallbacks) > 0 {
+				response, outcome, fallbackModel, fallbackErr := h.completeFallbackConversation(c, primary, fallbacks, chatReq, "responses")
+				if fallbackErr != nil {
+					middleware.SetRequestOutcome(c, outcome)
+					writeConversationTargetError(c, "responses", fallbackErr)
+					return
+				}
+				writeConversationFallbackHeaders(c, h, primary.model.ID, outcome, fallbackModel)
+				middleware.SetRequestOutcome(c, outcome)
+				c.JSON(http.StatusOK, renderResponsesResponse(response, req.Metadata))
+				return
+			} else {
+				writeNativeConversationError(c, primary, "responses", err)
+			}
 			return
 		}
 	}
@@ -139,7 +172,7 @@ func (h *ChatHandler) Responses(c *gin.Context) {
 	c.JSON(http.StatusOK, renderResponsesResponse(response, req.Metadata))
 }
 
-func (h *ChatHandler) nativeResponses(c *gin.Context, adapter modality.NativeResponsesAdapter, target chatTarget, rawBody json.RawMessage) {
+func (h *ChatHandler) nativeResponses(c *gin.Context, adapter modality.NativeResponsesAdapter, target chatTarget, rawBody json.RawMessage) error {
 	response, err := adapter.CreateResponse(c.Request.Context(), rawBody, target.model.ID)
 	outcome := middleware.RequestOutcome{
 		Model:           target.model.ID,
@@ -149,12 +182,7 @@ func (h *ChatHandler) nativeResponses(c *gin.Context, adapter modality.NativeRes
 		StatusCode:      http.StatusOK,
 	}
 	if err != nil {
-		apiErr := apiErrorFrom(err)
-		outcome.StatusCode = apiErr.Status
-		outcome.ErrorType = apiErr.Type
-		middleware.SetRequestOutcome(c, outcome)
-		writeConversationTargetError(c, "responses", err)
-		return
+		return err
 	}
 	if response.Usage != nil {
 		outcome.PromptTokens = response.Usage.PromptTokens
@@ -164,9 +192,10 @@ func (h *ChatHandler) nativeResponses(c *gin.Context, adapter modality.NativeRes
 	}
 	middleware.SetRequestOutcome(c, outcome)
 	c.Data(http.StatusOK, "application/json; charset=utf-8", response.Payload)
+	return nil
 }
 
-func (h *ChatHandler) streamNativeResponses(c *gin.Context, adapter modality.NativeResponsesAdapter, target chatTarget, rawBody json.RawMessage) {
+func (h *ChatHandler) streamNativeResponses(c *gin.Context, adapter modality.NativeResponsesAdapter, target chatTarget, rawBody json.RawMessage) error {
 	stream, err := adapter.StreamResponse(c.Request.Context(), rawBody, target.model.ID)
 	outcome := middleware.RequestOutcome{
 		Model:           target.model.ID,
@@ -176,12 +205,7 @@ func (h *ChatHandler) streamNativeResponses(c *gin.Context, adapter modality.Nat
 		StatusCode:      http.StatusOK,
 	}
 	if err != nil {
-		apiErr := apiErrorFrom(err)
-		outcome.StatusCode = apiErr.Status
-		outcome.ErrorType = apiErr.Type
-		middleware.SetRequestOutcome(c, outcome)
-		writeConversationTargetError(c, "responses", err)
-		return
+		return err
 	}
 
 	c.Header("Content-Type", "text/event-stream")
@@ -196,9 +220,9 @@ func (h *ChatHandler) streamNativeResponses(c *gin.Context, adapter modality.Nat
 			outcome.ErrorType = apiErr.Type
 			middleware.SetRequestOutcome(c, outcome)
 			if err := writeSSEErrorEvent(c, "error", apiErr); err != nil {
-				return
+				return nil
 			}
-			return
+			return nil
 		}
 		if event.Usage != nil {
 			outcome.PromptTokens = event.Usage.PromptTokens
@@ -208,11 +232,12 @@ func (h *ChatHandler) streamNativeResponses(c *gin.Context, adapter modality.Nat
 		}
 		if err := writeRawSSEEvent(c, event.Event, event.Payload); err != nil {
 			middleware.SetRequestOutcome(c, outcome)
-			return
+			return nil
 		}
 	}
 
 	middleware.SetRequestOutcome(c, outcome)
+	return nil
 }
 
 func normalizeResponsesRequest(req *responsesRequest) (*modality.ChatRequest, error) {

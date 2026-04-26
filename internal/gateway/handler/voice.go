@@ -176,10 +176,16 @@ func (h *VoiceHandler) registry(c *gin.Context) *provider.Registry {
 func parseSTTRequest(c *gin.Context) (*modality.STTRequest, error) {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			return nil, httputil.RequestBodyTooLargeError(0)
+		}
 		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "Form field 'file' is required.")
 	}
 	data, contentType, err := readMultipartFile(fileHeader)
 	if err != nil {
+		if httputil.IsRequestBodyTooLarge(err) {
+			return nil, httputil.RequestBodyTooLargeError(0)
+		}
 		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "file", "Unable to read uploaded audio file.")
 	}
 

@@ -142,3 +142,58 @@ func TestSQLiteStoreCRUDAndUsage(t *testing.T) {
 		t.Fatalf("expected key to be revoked")
 	}
 }
+
+func TestSQLiteMigrateUpgradesExistingRequestLogsSchema(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "legacy.db")
+	sqliteStore, err := New(config.StoreConfig{
+		Driver:           "sqlite",
+		DSN:              dbPath,
+		MaxConnections:   1,
+		LogRetentionDays: 30,
+		LogBufferSize:    10,
+		LogFlushInterval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() {
+		_ = sqliteStore.Close()
+	}()
+
+	_, err = sqliteStore.db.ExecContext(ctx, `
+		CREATE TABLE request_logs (
+			id TEXT PRIMARY KEY,
+			request_id TEXT NOT NULL,
+			key_id TEXT NOT NULL,
+			project_id TEXT,
+			model TEXT NOT NULL,
+			modality TEXT NOT NULL,
+			provider_latency_ms INTEGER,
+			total_latency_ms INTEGER,
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			total_tokens INTEGER,
+			estimated_cost REAL,
+			status_code INTEGER NOT NULL,
+			error_type TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		t.Fatalf("create legacy request_logs: %v", err)
+	}
+
+	if err := sqliteStore.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate() error = %v", err)
+	}
+	for _, column := range []string{"interface_family", "token_source", "cache_status", "fallback_model", "trace_id", "toolset", "mcp_binding"} {
+		exists, err := sqliteStore.sqliteColumnExists(ctx, "request_logs", column)
+		if err != nil {
+			t.Fatalf("sqliteColumnExists(%s) error = %v", column, err)
+		}
+		if !exists {
+			t.Fatalf("expected migrated request_logs column %s", column)
+		}
+	}
+}

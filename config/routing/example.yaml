@@ -1,0 +1,58 @@
+version: 2
+
+routing:
+  fallbacks:
+    - from: anthropic/claude-sonnet-4-6
+      to: [openai/gpt-4o, deepseek/deepseek-chat]
+      on: [rate_limit, timeout, server_error]
+    - from: openai/gpt-4o
+      to: [anthropic/claude-sonnet-4-6, deepseek/deepseek-chat]
+      on: [rate_limit, timeout, server_error]
+  aliases:
+    default-chat: openai/gpt-4o
+    openai-frontier-chat: openai/gpt-5.5
+    budget-chat: deepseek/deepseek-chat
+    premium-chat: anthropic/claude-opus-4-6
+    default-image: google/nano-banana-pro
+    openai-image-latest: openai/gpt-image-2
+    default-video: bytedance/doubao-seedance-2.0
+    fast-video: bytedance/doubao-seedance-2.0-fast
+    sora-video: openai/sora-2
+    veo-video: google-vertex/veo-3.1-generate-001
+    default-music: minimax/music-2.6
+    cover-music: minimax/music-cover
+    elevenlabs-music: elevenlabs/music_v1
+    stems-music: elevenlabs/music_v1
+    default-voice-tts: openai/tts-1
+    default-voice-stt: openai/whisper-1
+    default-voice-stream: bytedance/doubao-streaming-asr-2.0
+    default-audio: openai/gpt-4o-audio
+    bytedance-chat: bytedance/doubao-seed-2.0-pro
+    bytedance-vision: bytedance/doubao-seed-1.6-vision
+    bytedance-image: bytedance/doubao-seedream-5.0-lite
+    bytedance-video: bytedance/doubao-seedance-2.0
+    bytedance-audio: bytedance/doubao-audio
+    bytedance-notes: bytedance/doubao-notes-2.0
+    bytedance-podcast: bytedance/doubao-podcast-2.0
+    bytedance-streaming-asr: bytedance/doubao-streaming-asr-2.0
+    bytedance-streaming-asr-concurrent: bytedance/doubao-streaming-asr-2.0-concurrent
+    bytedance-interpreting: bytedance/doubao-interpreting-2.0
+    bytedance-translation: bytedance/doubao-translation-2.0
+    default-embed: openai/text-embedding-3-small
+    bedrock-embed: bedrock/amazon.titan-embed-text-v2:0
+    nvidia-embed: nvidia/nvidia/llama-nemotron-embed-1b-v2
+  selectors:
+    tooling-chat:
+      modality: chat
+      capabilities: [streaming, function_calling]
+      providers: [openai, anthropic, deepseek]
+      verification_classes: [strict]
+    budget-tooling-chat:
+      modality: chat
+      capabilities: [streaming, function_calling]
+      providers: [deepseek, openrouter, together]
+      statuses: [ga, preview]
+    reasoning-chat:
+      modality: chat
+      capabilities: [streaming]
+      providers: [openai, anthropic, xai]

@@ -29,7 +29,7 @@ type audioNoteToken struct {
 }
 
 func signAudioNoteID(snapshot *gwruntime.Snapshot, model provider.Model, providerTaskID string, keyID string, expiresAt int64) (string, error) {
-	secret, err := videoJobSecret(snapshot, model.Provider)
+	secret, err := speechSessionSecret(snapshot, model.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -72,7 +72,7 @@ func parseAudioNoteID(snapshot *gwruntime.Snapshot, token string) (audioNoteToke
 	if payload.Version != 1 || strings.TrimSpace(payload.Provider) == "" || strings.TrimSpace(payload.Model) == "" || strings.TrimSpace(payload.ProviderTaskID) == "" || strings.TrimSpace(payload.KeyID) == "" || payload.ExpiresAt <= 0 {
 		return audioNoteToken{}, invalidAudioNoteIDError()
 	}
-	secret, err := videoJobSecret(snapshot, payload.Provider)
+	secret, err := speechSessionSecret(snapshot, payload.Provider)
 	if err != nil {
 		return audioNoteToken{}, invalidAudioNoteIDError()
 	}

@@ -14,22 +14,24 @@ func TestLoadAppliesEnvAndRuntimeOverrides(t *testing.T) {
 	t.Setenv("POLARIS_EXTERNAL_AUTH_SECRET", "external-secret")
 
 	configPath := writeTempConfig(t, `
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  observability:
+    logging:
+      format: json
 providers:
   openai:
-    api_key: ${OPENAI_API_KEY}
-    base_url: https://api.openai.com/v1
-    timeout: 60s
+    credentials:
+      api_key: ${OPENAI_API_KEY}
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    format: json
+      use: [gpt-4o]
 `)
 
 	cfg, warnings, err := Load(configPath)
@@ -68,22 +70,24 @@ func TestLoadCanEnableExternalAuthFromEnvironment(t *testing.T) {
 	t.Setenv("POLARIS_EXTERNAL_AUTH_CACHE_TTL", "15s")
 
 	configPath := writeTempConfig(t, `
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  observability:
+    logging:
+      format: json
 providers:
   openai:
-    api_key: sk-test
-    base_url: https://api.openai.com/v1
-    timeout: 60s
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    format: json
+      use: [gpt-4o]
 `)
 
 	cfg, warnings, err := Load(configPath)
@@ -106,22 +110,24 @@ observability:
 
 func TestLoadWarnsOnMissingEnvironmentVariables(t *testing.T) {
 	configPath := writeTempConfig(t, `
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  observability:
+    logging:
+      format: json
 providers:
   openai:
-    api_key: ${MISSING_OPENAI_KEY}
-    base_url: https://api.openai.com/v1
-    timeout: 60s
+    credentials:
+      api_key: ${MISSING_OPENAI_KEY}
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    format: json
+      use: [gpt-4o]
 `)
 
 	_, warnings, err := Load(configPath)
@@ -138,24 +144,26 @@ observability:
 
 func TestLoadRequiresRedisURLWhenRedisCacheIsEnabled(t *testing.T) {
 	configPath := writeTempConfig(t, `
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
-cache:
-  driver: redis
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  cache:
+    driver: redis
+  observability:
+    logging:
+      format: json
 providers:
   openai:
-    api_key: sk-test
-    base_url: https://api.openai.com/v1
-    timeout: 60s
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    format: json
+      use: [gpt-4o]
 `)
 
 	_, _, err := Load(configPath)
@@ -164,29 +172,63 @@ observability:
 	}
 }
 
+func TestLoadRejectsWildcardCORSWithCredentials(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+    cors:
+      enabled: true
+      allowed_origins: ["*"]
+      allow_credentials: true
+  auth:
+    mode: none
+  observability:
+    logging:
+      format: json
+providers:
+  openai:
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
+    models:
+      use: [gpt-4o]
+`)
+
+	_, _, err := Load(configPath)
+	if err == nil || !strings.Contains(err.Error(), "allow_credentials cannot be true") {
+		t.Fatalf("expected wildcard CORS validation error, got %v", err)
+	}
+}
+
 func TestLoadExpandsRedisURLFromEnvironment(t *testing.T) {
 	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
 
 	configPath := writeTempConfig(t, `
-server:
-  host: 127.0.0.1
-auth:
-  mode: none
-cache:
-  driver: redis
-  url: ${REDIS_URL}
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+  cache:
+    driver: redis
+    url: ${REDIS_URL}
+  observability:
+    logging:
+      format: json
 providers:
   openai:
-    api_key: sk-test
-    base_url: https://api.openai.com/v1
-    timeout: 60s
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
     models:
-      gpt-4o:
-        modality: chat
-        capabilities: [streaming]
-observability:
-  logging:
-    format: json
+      use: [gpt-4o]
 `)
 
 	cfg, warnings, err := Load(configPath)
@@ -198,6 +240,200 @@ observability:
 	}
 	if cfg.Cache.URL != "redis://localhost:6379/0" {
 		t.Fatalf("expected redis url expansion, got %q", cfg.Cache.URL)
+	}
+}
+
+func TestLoadMergesImportsAndRootOverrides(t *testing.T) {
+	dir := t.TempDir()
+	importPath := filepath.Join(dir, "provider.yaml")
+	if err := os.WriteFile(importPath, []byte(strings.TrimSpace(`
+version: 2
+providers:
+  openai:
+    credentials:
+      api_key: sk-imported
+    transport:
+      base_url: https://imported.example/v1
+      timeout: 30s
+    models:
+      use: [gpt-4o-mini]
+`)), 0o600); err != nil {
+		t.Fatalf("write imported config: %v", err)
+	}
+	rootPath := filepath.Join(dir, "polaris.yaml")
+	if err := os.WriteFile(rootPath, []byte(strings.TrimSpace(`
+version: 2
+imports:
+  - ./provider.yaml
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+providers:
+  openai:
+    transport:
+      timeout: 90s
+    models:
+      use: [gpt-4o]
+`)), 0o600); err != nil {
+		t.Fatalf("write root config: %v", err)
+	}
+
+	cfg, warnings, err := Load(rootPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+	provider := cfg.Providers["openai"]
+	if provider.APIKey != "sk-imported" {
+		t.Fatalf("expected imported credential, got %q", provider.APIKey)
+	}
+	if provider.BaseURL != "https://imported.example/v1" {
+		t.Fatalf("expected imported base_url, got %q", provider.BaseURL)
+	}
+	if provider.Timeout.String() != "1m30s" {
+		t.Fatalf("expected root timeout override, got %s", provider.Timeout)
+	}
+	if _, ok := provider.Models["gpt-4o"]; !ok {
+		t.Fatalf("expected root model use list to replace imported models")
+	}
+	if _, ok := provider.Models["gpt-4o-mini"]; ok {
+		t.Fatalf("did not expect imported model use list after root override")
+	}
+}
+
+func TestLoadRejectsImportCycles(t *testing.T) {
+	dir := t.TempDir()
+	firstPath := filepath.Join(dir, "first.yaml")
+	secondPath := filepath.Join(dir, "second.yaml")
+	if err := os.WriteFile(firstPath, []byte("version: 2\nimports:\n  - ./second.yaml\n"), 0o600); err != nil {
+		t.Fatalf("write first config: %v", err)
+	}
+	if err := os.WriteFile(secondPath, []byte("version: 2\nimports:\n  - ./first.yaml\n"), 0o600); err != nil {
+		t.Fatalf("write second config: %v", err)
+	}
+
+	_, _, err := Load(firstPath)
+	if err == nil || !strings.Contains(err.Error(), "import cycle") {
+		t.Fatalf("expected import cycle error, got %v", err)
+	}
+}
+
+func TestLoadExpandsCatalogModelRefs(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+providers:
+  anthropic:
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.anthropic.com
+      timeout: 60s
+    models:
+      use: [claude-sonnet-4-6]
+`)
+
+	cfg, _, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	model := cfg.Providers["anthropic"].Models["claude-sonnet-4-6"]
+	if model.Modality != "chat" {
+		t.Fatalf("expected catalog modality chat, got %q", model.Modality)
+	}
+	if len(model.Capabilities) == 0 {
+		t.Fatalf("expected catalog capabilities")
+	}
+}
+
+func TestLoadRejectsUnknownModelRefWithoutModality(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+providers:
+  openai:
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
+    models:
+      use: [private-model]
+      overrides:
+        private-model:
+          capabilities: [streaming]
+`)
+
+	_, _, err := Load(configPath)
+	if err == nil || !strings.Contains(err.Error(), "must define overrides.private-model.modality") {
+		t.Fatalf("expected unknown model modality error, got %v", err)
+	}
+}
+
+func TestLoadAllowsUnknownModelRefWithOverrideModality(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 2
+runtime:
+  server:
+    host: 127.0.0.1
+  auth:
+    mode: none
+providers:
+  openai:
+    credentials:
+      api_key: sk-test
+    transport:
+      base_url: https://api.openai.com/v1
+      timeout: 60s
+    models:
+      use: [private-model]
+      overrides:
+        private-model:
+          modality: chat
+          capabilities: [streaming]
+`)
+
+	cfg, _, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Providers["openai"].Models["private-model"].Modality != "chat" {
+		t.Fatalf("expected custom model to load")
+	}
+}
+
+func TestConfigFilesReturnsRootAndImports(t *testing.T) {
+	dir := t.TempDir()
+	importPath := filepath.Join(dir, "provider.yaml")
+	if err := os.WriteFile(importPath, []byte("version: 2\n"), 0o600); err != nil {
+		t.Fatalf("write imported config: %v", err)
+	}
+	rootPath := filepath.Join(dir, "polaris.yaml")
+	if err := os.WriteFile(rootPath, []byte("version: 2\nimports:\n  - ./provider.yaml\n"), 0o600); err != nil {
+		t.Fatalf("write root config: %v", err)
+	}
+
+	files, err := ConfigFiles(rootPath)
+	if err != nil {
+		t.Fatalf("ConfigFiles() error = %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected root plus one import, got %v", files)
+	}
+	if files[0] != filepath.Clean(rootPath) || files[1] != filepath.Clean(importPath) {
+		t.Fatalf("unexpected files: %v", files)
 	}
 }
 
