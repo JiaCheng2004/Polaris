@@ -20,6 +20,3 @@ jobs:
 
       - name: Build release binary
         run: go build -trimpath -ldflags="-s -w" -o polaris ./cmd/polaris
-
-      - name: Build container image
-        run: docker build -f deployments/Dockerfile .
