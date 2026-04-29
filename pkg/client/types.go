@@ -1201,13 +1201,14 @@ type ModelUsage struct {
 }
 
 type UsageReport struct {
-	From          string       `json:"from"`
-	To            string       `json:"to"`
-	TotalRequests int64        `json:"total_requests"`
-	TotalTokens   int64        `json:"total_tokens"`
-	TotalCostUSD  float64      `json:"total_cost_usd"`
-	ByDay         []DailyUsage `json:"by_day,omitempty"`
-	ByModel       []ModelUsage `json:"by_model,omitempty"`
+	From                string           `json:"from"`
+	To                  string           `json:"to"`
+	TotalRequests       int64            `json:"total_requests"`
+	TotalTokens         int64            `json:"total_tokens"`
+	TotalCostUSD        float64          `json:"total_cost_usd"`
+	CostSourceBreakdown map[string]int64 `json:"cost_source_breakdown,omitempty"`
+	ByDay               []DailyUsage     `json:"by_day,omitempty"`
+	ByModel             []ModelUsage     `json:"by_model,omitempty"`
 }
 
 type CreateKeyRequest struct {

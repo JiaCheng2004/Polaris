@@ -25,11 +25,11 @@ func (h *ChatHandler) prepareConversation(c *gin.Context, req *modality.ChatRequ
 		return chatTarget{}, nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "registry_unavailable", "model", "Model registry is unavailable.")
 	}
 
-	primary, err := h.resolveChatTarget(c.Request.Context(), registry, auth, req.Model, req.Routing, requiredCapabilities)
+	primary, err := h.resolveChatTarget(c, registry, auth, req.Model, req.Routing, requiredCapabilities)
 	if err != nil {
 		return chatTarget{}, nil, err
 	}
-	fallbacks := h.resolveFallbackTargets(c.Request.Context(), registry, auth, primary.model.ID, requiredCapabilities)
+	fallbacks := h.resolveFallbackTargets(c, registry, auth, primary.model.ID, requiredCapabilities)
 	return primary, fallbacks, nil
 }
 

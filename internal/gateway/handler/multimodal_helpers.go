@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +19,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-func resolveEndpointModel(ctx context.Context, registry *provider.Registry, auth middleware.AuthContext, name string, routing *modality.RoutingOptions, requiredModality modality.Modality, requiredCapabilities ...modality.Capability) (provider.Resolution, error) {
+func resolveEndpointModel(c *gin.Context, registry *provider.Registry, auth middleware.AuthContext, name string, routing *modality.RoutingOptions, requiredModality modality.Modality, requiredCapabilities ...modality.Capability) (provider.Resolution, error) {
+	ctx := c.Request.Context()
 	_, span := telemetry.StartInternalSpan(ctx, "policy.resolve_model",
 		attribute.String("polaris.requested_model", name),
 		attribute.String("polaris.modality", string(requiredModality)),
@@ -48,11 +48,33 @@ func resolveEndpointModel(ctx context.Context, registry *provider.Registry, auth
 		telemetry.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
+	if err := enforcePricingPolicy(c, model.ID); err != nil {
+		telemetry.RecordSpanError(span, err)
+		return provider.Resolution{}, err
+	}
 	span.SetAttributes(
 		attribute.String("polaris.model", model.ID),
 		attribute.String("polaris.provider", model.Provider),
 	)
 	return resolution, nil
+}
+
+// enforcePricingPolicy is invoked from resolveEndpointModel above and from
+// conversation_execution.go (the chat path that does not flow through
+// resolveEndpointModel). Every other model-resolving entrypoint routes
+// through resolveEndpointModel, so those two call sites cover the gateway.
+func enforcePricingPolicy(c *gin.Context, modelID string) error {
+	snapshot, ok := middleware.GetRuntimeSnapshot(c)
+	if !ok || snapshot == nil || snapshot.Config == nil || !snapshot.Config.Pricing.FailOnMissing {
+		return nil
+	}
+	if snapshot.Pricing == nil {
+		return httputil.NewError(http.StatusBadRequest, "model_not_priced", "pricing_unavailable", "model", "Pricing catalog is unavailable.")
+	}
+	if _, ok := snapshot.Pricing.Lookup(modelID); !ok {
+		return httputil.NewError(http.StatusBadRequest, "model_not_priced", "model_not_priced", "model", "Requested model does not have a pricing entry.")
+	}
+	return nil
 }
 
 func writeModalityTargetError(c *gin.Context, err error, endpointName string) {

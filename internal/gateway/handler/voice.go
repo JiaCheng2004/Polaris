@@ -41,7 +41,7 @@ func (h *VoiceHandler) Speech(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityTTS)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityTTS)
 	if err != nil {
 		writeModalityTargetError(c, err, "audio speech")
 		return
@@ -79,6 +79,7 @@ func (h *VoiceHandler) Speech(c *gin.Context) {
 		Provider:   model.Provider,
 		Modality:   modality.ModalityVoice,
 		StatusCode: http.StatusOK,
+		Characters: len([]rune(req.Input)),
 	})
 	if cacheCtl != nil && response != nil {
 		cacheCtl.storeRaw(c, cacheKey, http.StatusOK, response.ContentType, response.Data)
@@ -104,7 +105,7 @@ func (h *VoiceHandler) Transcribe(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilitySTT)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilitySTT)
 	if err != nil {
 		writeModalityTargetError(c, err, "audio transcription")
 		return
@@ -146,10 +147,11 @@ func (h *VoiceHandler) Transcribe(c *gin.Context) {
 		return
 	}
 	middleware.SetRequestOutcome(c, middleware.RequestOutcome{
-		Model:      model.ID,
-		Provider:   model.Provider,
-		Modality:   modality.ModalityVoice,
-		StatusCode: http.StatusOK,
+		Model:        model.ID,
+		Provider:     model.Provider,
+		Modality:     modality.ModalityVoice,
+		StatusCode:   http.StatusOK,
+		AudioSeconds: transcriptDuration(response),
 	})
 	if cacheCtl != nil && response != nil {
 		if req.ResponseFormat == "json" {
@@ -171,6 +173,13 @@ func (h *VoiceHandler) registry(c *gin.Context) *provider.Registry {
 		return nil
 	}
 	return snapshot.Registry
+}
+
+func transcriptDuration(response *modality.TranscriptResponse) float64 {
+	if response == nil || response.Duration <= 0 {
+		return 0
+	}
+	return response.Duration
 }
 
 func parseSTTRequest(c *gin.Context) (*modality.STTRequest, error) {

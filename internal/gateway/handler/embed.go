@@ -40,7 +40,7 @@ func (h *EmbedHandler) Create(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityEmbed)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityEmbed)
 	if err != nil {
 		writeModalityTargetError(c, err, "embeddings")
 		return

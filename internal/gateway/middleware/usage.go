@@ -37,6 +37,7 @@ func Usage(requestLogger *store.AsyncRequestLogger, logger *slog.Logger) gin.Han
 		if outcome.TotalTokens == 0 {
 			outcome.TotalTokens = outcome.PromptTokens + outcome.CompletionTokens
 		}
+		cost := estimateOutcomeCost(c, outcome, logger)
 
 		entry := store.RequestLog{
 			RequestID:         GetRequestID(c),
@@ -56,7 +57,8 @@ func Usage(requestLogger *store.AsyncRequestLogger, logger *slog.Logger) gin.Han
 			InputTokens:       outcome.PromptTokens,
 			OutputTokens:      outcome.CompletionTokens,
 			TotalTokens:       outcome.TotalTokens,
-			EstimatedCost:     EstimateCostUSD(outcome.Model, outcome.PromptTokens, outcome.CompletionTokens),
+			EstimatedCost:     cost.TotalUSD,
+			CostSource:        cost.Source,
 			StatusCode:        outcome.StatusCode,
 			ErrorType:         outcome.ErrorType,
 			CreatedAt:         time.Now().UTC(),

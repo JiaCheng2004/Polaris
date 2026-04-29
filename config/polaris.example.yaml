@@ -93,6 +93,12 @@ runtime:
   mcp:
     enabled: true
 
+  pricing:
+    # Optional operator overrides. Bundled defaults are always loaded first.
+    file: "" # e.g. ./pricing.yaml
+    reload_interval_seconds: 30
+    fail_on_missing: false
+
   observability:
     metrics:
       enabled: true

@@ -39,7 +39,7 @@ func (h *NotesHandler) Create(c *gin.Context) {
 		return
 	}
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityNotes, modality.CapabilityAudioNotes)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityNotes, modality.CapabilityAudioNotes)
 	if err != nil {
 		writeModalityTargetError(c, err, "audio notes")
 		return
@@ -143,7 +143,7 @@ func (h *NotesHandler) resolveAuthorizedNote(c *gin.Context, registry *provider.
 	if token.KeyID != "" && auth.KeyID != "" && token.KeyID != auth.KeyID {
 		return audioNoteToken{}, provider.Model{}, nil, invalidAudioNoteIDError()
 	}
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, token.Model, nil, modality.ModalityNotes, modality.CapabilityAudioNotes)
+	resolved, err := resolveEndpointModel(c, registry, auth, token.Model, nil, modality.ModalityNotes, modality.CapabilityAudioNotes)
 	if err != nil {
 		return audioNoteToken{}, provider.Model{}, nil, translateNoteTargetError(err)
 	}

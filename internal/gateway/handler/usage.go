@@ -78,12 +78,13 @@ func (h *UsageHandler) Get(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"from":           from.Format(time.RFC3339),
-		"to":             to.Format(time.RFC3339),
-		"total_requests": report.TotalRequests,
-		"total_tokens":   report.TotalTokens,
-		"total_cost_usd": report.TotalCost,
-		"by_day":         report.ByDay,
-		"by_model":       report.ByModel,
+		"from":                  from.Format(time.RFC3339),
+		"to":                    to.Format(time.RFC3339),
+		"total_requests":        report.TotalRequests,
+		"total_tokens":          report.TotalTokens,
+		"total_cost_usd":        report.TotalCost,
+		"cost_source_breakdown": report.CostSourceBreakdown,
+		"by_day":                report.ByDay,
+		"by_model":              report.ByModel,
 	})
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/JiaCheng2004/Polaris/internal/modality"
@@ -160,6 +161,16 @@ func Validate(cfg *Config) error {
 	}
 	if cfg.Cache.ResponseCache.SimilarityThreshold < 0 || cfg.Cache.ResponseCache.SimilarityThreshold > 1 {
 		problems = append(problems, errors.New("cache.response_cache.similarity_threshold must be between 0 and 1"))
+	}
+	if cfg.Pricing.ReloadIntervalSeconds < 0 {
+		problems = append(problems, errors.New("pricing.reload_interval_seconds must not be negative"))
+	}
+	if strings.TrimSpace(cfg.Pricing.File) != "" {
+		if info, err := os.Stat(cfg.Pricing.File); err != nil {
+			problems = append(problems, fmt.Errorf("pricing.file must be readable: %w", err))
+		} else if info.IsDir() {
+			problems = append(problems, errors.New("pricing.file must be a file, not a directory"))
+		}
 	}
 
 	for providerName, provider := range cfg.Providers {

@@ -17,6 +17,7 @@ type Recorder struct {
 	providerLatency *prometheus.HistogramVec
 	tokensTotal     *prometheus.CounterVec
 	estimatedCost   *prometheus.CounterVec
+	pricingLookups  *prometheus.CounterVec
 	rateLimitHits   *prometheus.CounterVec
 	budgetDenials   *prometheus.CounterVec
 	providerErrors  *prometheus.CounterVec
@@ -53,7 +54,11 @@ func NewRecorder() *Recorder {
 		estimatedCost: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "polaris_estimated_cost_usd",
 			Help: "Estimated cost in USD.",
-		}, []string{"model", "provider"}),
+		}, []string{"model", "provider", "cost_source"}),
+		pricingLookups: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_pricing_lookups_total",
+			Help: "Pricing catalog lookups by model and lookup status.",
+		}, []string{"model", "status"}),
 		rateLimitHits: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "polaris_rate_limit_hits_total",
 			Help: "Total rate-limit rejections by key.",
@@ -94,6 +99,7 @@ func NewRecorder() *Recorder {
 		recorder.providerLatency,
 		recorder.tokensTotal,
 		recorder.estimatedCost,
+		recorder.pricingLookups,
 		recorder.rateLimitHits,
 		recorder.budgetDenials,
 		recorder.providerErrors,
@@ -114,7 +120,7 @@ func (r *Recorder) Handler() http.Handler {
 	return promhttp.HandlerFor(r.registry, promhttp.HandlerOpts{})
 }
 
-func (r *Recorder) ObserveRequest(interfaceFamily string, model string, modality string, provider string, statusCode int, totalLatency time.Duration, providerLatencyMs int, promptTokens int, completionTokens int, tokenSource string, estimatedCost float64, errorType string) {
+func (r *Recorder) ObserveRequest(interfaceFamily string, model string, modality string, provider string, statusCode int, totalLatency time.Duration, providerLatencyMs int, promptTokens int, completionTokens int, tokenSource string, estimatedCost float64, costSource string, errorType string) {
 	if r == nil {
 		return
 	}
@@ -136,8 +142,21 @@ func (r *Recorder) ObserveRequest(interfaceFamily string, model string, modality
 		r.tokensTotal.WithLabelValues(model, provider, "output", tokenSource).Add(float64(completionTokens))
 	}
 	if estimatedCost > 0 {
-		r.estimatedCost.WithLabelValues(model, provider).Add(estimatedCost)
+		if costSource == "" {
+			costSource = "unknown"
+		}
+		r.estimatedCost.WithLabelValues(model, provider, costSource).Add(estimatedCost)
 	}
+}
+
+func (r *Recorder) IncPricingLookup(model string, status string) {
+	if r == nil || model == "" {
+		return
+	}
+	if status == "" {
+		status = "unknown"
+	}
+	r.pricingLookups.WithLabelValues(model, status).Inc()
 }
 
 func (r *Recorder) IncRateLimit(keyID string) {

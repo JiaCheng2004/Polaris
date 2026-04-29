@@ -46,7 +46,7 @@ func (h *ImageHandler) Generate(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityImage, required...)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityImage, required...)
 	if err != nil {
 		writeModalityTargetError(c, err, "images")
 		return
@@ -80,6 +80,7 @@ func (h *ImageHandler) Generate(c *gin.Context) {
 		Provider:   model.Provider,
 		Modality:   modality.ModalityImage,
 		StatusCode: http.StatusOK,
+		Images:     imageCount(response, req.N),
 	})
 	if cacheCtl != nil {
 		cacheCtl.storeJSON(c, cacheKey, http.StatusOK, response)
@@ -105,7 +106,7 @@ func (h *ImageHandler) Edit(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityImage, modality.CapabilityEditing)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityImage, modality.CapabilityEditing)
 	if err != nil {
 		writeModalityTargetError(c, err, "images")
 		return
@@ -146,6 +147,7 @@ func (h *ImageHandler) Edit(c *gin.Context) {
 		Provider:   model.Provider,
 		Modality:   modality.ModalityImage,
 		StatusCode: http.StatusOK,
+		Images:     imageCount(response, req.N),
 	})
 	if cacheCtl != nil {
 		cacheCtl.storeJSON(c, cacheKey, http.StatusOK, response)
@@ -159,6 +161,16 @@ func (h *ImageHandler) registry(c *gin.Context) *provider.Registry {
 		return nil
 	}
 	return snapshot.Registry
+}
+
+func imageCount(response *modality.ImageResponse, fallback int) int {
+	if response != nil && len(response.Data) > 0 {
+		return len(response.Data)
+	}
+	if fallback > 0 {
+		return fallback
+	}
+	return 1
 }
 
 func parseImageEditRequest(c *gin.Context) (*modality.ImageEditRequest, error) {

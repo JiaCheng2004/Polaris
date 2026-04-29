@@ -33,7 +33,7 @@ func (h *VoiceHandler) CreateStreamingTranscriptionSession(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityStreaming)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityStreaming)
 	if err != nil {
 		writeModalityTargetError(c, err, "streaming transcription")
 		return

@@ -18,17 +18,28 @@ func TestEstimateCostUSDEmbeddingModel(t *testing.T) {
 	}
 }
 
-func TestEstimateCostUSDUnknownPhase3ModelsDefaultToZero(t *testing.T) {
-	cases := []string{
-		"google/gemini-embedding-001",
-		"openai/gpt-image-1",
-		"openai/tts-1",
-		"bytedance/doubao-asr-2.0",
+func TestEstimateCostUSDOriginalHardcodedModelsRemainCompatible(t *testing.T) {
+	cases := []struct {
+		model      string
+		prompt     int
+		completion int
+		want       float64
+	}{
+		{"openai/gpt-4o-mini", 1000, 500, 0.00045},
+		{"openai/text-embedding-3-large", 1000, 0, 0.00013},
+		{"anthropic/claude-sonnet-4-6", 1000, 500, 0.0105},
+		{"anthropic/claude-opus-4-6", 1000, 500, 0.0525},
 	}
 
-	for _, model := range cases {
-		if got := EstimateCostUSD(model, 100, 50); got != 0 {
-			t.Fatalf("expected zero cost for %s, got %.8f", model, got)
+	for _, tc := range cases {
+		if got := EstimateCostUSD(tc.model, tc.prompt, tc.completion); got != tc.want {
+			t.Fatalf("expected %.8f for %s, got %.8f", tc.want, tc.model, got)
 		}
+	}
+}
+
+func TestEstimateCostUSDUnknownModelDefaultsToZero(t *testing.T) {
+	if got := EstimateCostUSD("unknown/model", 100, 50); got != 0 {
+		t.Fatalf("expected zero cost for unknown model, got %.8f", got)
 	}
 }

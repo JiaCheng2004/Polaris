@@ -16,6 +16,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/pricing"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/provider/verification"
 	"github.com/JiaCheng2004/Polaris/internal/store"
@@ -113,7 +114,16 @@ func run() error {
 	for _, warning := range registryWarnings {
 		logger.Warn("registry warning", "warning", warning)
 	}
-	runtimeHolder := gwruntime.NewHolder(cfg, registry)
+
+	pricingCatalog, pricingWarnings, err := pricing.Load(cfg.Pricing.File)
+	if err != nil {
+		return fmt.Errorf("load pricing catalog: %w", err)
+	}
+	for _, warning := range pricingWarnings {
+		logger.Warn("pricing warning", "warning", warning)
+	}
+	pricingHolder := pricing.NewHolder(pricingCatalog)
+	runtimeHolder := gwruntime.NewHolderWithPricing(cfg, registry, pricingHolder)
 
 	requestLogger := store.NewAsyncRequestLogger(appStore, logger, store.NewLoggerConfig(cfg.Store.LogBufferSize, cfg.Store.LogFlushInterval))
 	defer func() {
@@ -191,6 +201,7 @@ func run() error {
 	signal.Notify(reloadSignals, syscall.SIGHUP)
 	defer signal.Stop(reloadSignals)
 	go configWatcher.Run(watcherCtx, reloadSignals)
+	go pricing.WatchFile(watcherCtx, pricingHolder, cfg.Pricing.File, time.Duration(cfg.Pricing.ReloadIntervalSeconds)*time.Second, logger)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

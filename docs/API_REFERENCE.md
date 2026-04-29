@@ -1869,6 +1869,10 @@ Return usage statistics for the authenticated key over a time range.
   "total_requests": 1423,
   "total_tokens": 892145,
   "total_cost_usd": 18.42,
+  "cost_source_breakdown": {
+    "table": 1390,
+    "missing": 33
+  },
   "by_day": [
     { "date": "2026-04-10", "requests": 62, "tokens": 41203, "cost_usd": 0.84 }
   ],
@@ -1878,7 +1882,7 @@ Return usage statistics for the authenticated key over a time range.
 
 When `group_by=model`, `by_day` is `null` and `by_model` contains an array of `{ "model": "...", "requests": N, "tokens": N, "cost_usd": N }` entries.
 
-`cost_usd` is an *estimate* computed from the cost tables in `internal/gateway/middleware/pricing.go`. It is NOT an authoritative bill. Unknown model costs default to `0` rather than blocking usage reporting.
+`cost_usd` is an *estimate* computed by the YAML-driven pricing catalog in `internal/pricing`. It is NOT an authoritative bill. Unknown model costs default to `0` rather than blocking usage reporting. `cost_source_breakdown` counts request logs by `table`, `missing`, `fallback_zero`, or `unknown` provenance.
 
 For the Phase 5A runtime, `modality=music` is supported alongside `chat`, `image`, `video`, `voice`, `audio`, and `embed`.
 

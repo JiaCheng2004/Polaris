@@ -1,0 +1,9 @@
+version: 1
+models:
+  ollama/*:
+    mode: chat
+    currency: USD
+    source: https://ollama.com/
+    effective_from: 2026-04-01
+    notes: Local Ollama runtime requests are treated as zero marginal provider cost by default.
+    pricing: { input_per_mtok: 0, output_per_mtok: 0 }

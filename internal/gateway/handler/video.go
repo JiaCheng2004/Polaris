@@ -65,7 +65,7 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVideo, required...)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVideo, required...)
 	if err != nil {
 		writeModalityTargetError(c, err, "video")
 		return
@@ -108,10 +108,11 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 	}
 
 	middleware.SetRequestOutcome(c, middleware.RequestOutcome{
-		Model:      model.ID,
-		Provider:   model.Provider,
-		Modality:   modality.ModalityVideo,
-		StatusCode: http.StatusOK,
+		Model:        model.ID,
+		Provider:     model.Provider,
+		Modality:     modality.ModalityVideo,
+		StatusCode:   http.StatusOK,
+		VideoSeconds: float64(req.Duration),
 	})
 	c.JSON(http.StatusOK, job)
 }
@@ -288,7 +289,7 @@ func (h *VideoHandler) resolveAuthorizedJob(c *gin.Context) (*videoJobToken, pro
 		return nil, provider.Model{}, nil, httputil.NewError(http.StatusForbidden, "permission_error", "job_not_owned", "id", "Video job was created by a different API key.")
 	}
 
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, jobToken.Model, nil, modality.ModalityVideo)
+	resolved, err := resolveEndpointModel(c, registry, auth, jobToken.Model, nil, modality.ModalityVideo)
 	if err != nil {
 		writeModalityTargetError(c, err, "video")
 		return nil, provider.Model{}, nil, errVideoResponseWritten

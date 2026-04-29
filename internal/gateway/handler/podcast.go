@@ -66,7 +66,7 @@ func (h *PodcastHandler) Create(c *gin.Context) {
 		return
 	}
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityPodcast, modality.CapabilityPodcastGeneration)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityPodcast, modality.CapabilityPodcastGeneration)
 	if err != nil {
 		writeModalityTargetError(c, err, "audio podcasts")
 		return
@@ -250,7 +250,7 @@ func (h *PodcastHandler) resolveAuthorizedPodcast(c *gin.Context) (podcastJobRec
 	if token.KeyID != "" && auth.KeyID != "" && token.KeyID != auth.KeyID {
 		return podcastJobRecord{}, nil, invalidPodcastJobIDError()
 	}
-	if _, err := resolveEndpointModel(c.Request.Context(), registry, auth, token.Model, nil, modality.ModalityPodcast, modality.CapabilityPodcastGeneration); err != nil {
+	if _, err := resolveEndpointModel(c, registry, auth, token.Model, nil, modality.ModalityPodcast, modality.CapabilityPodcastGeneration); err != nil {
 		return podcastJobRecord{}, nil, translatePodcastTargetError(err)
 	}
 	record, err := h.getPodcastJob(c.Request.Context(), token.CacheKey)

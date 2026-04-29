@@ -1,0 +1,125 @@
+version: 1
+models:
+  anthropic/claude-opus-4-7:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 5.00, output_per_mtok: 25.00, cache_read_per_mtok: 0.50, cache_write_5m_per_mtok: 6.25, cache_write_1h_per_mtok: 10.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deployments:
+      us: { multiplier: 1.10 }
+      fast: { multiplier: 6.00 }
+    additional_units:
+      web_search_per_1k_calls: 10.00
+      code_exec_per_container_hour: 0.05
+
+  anthropic/claude-opus-4-6:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 15.00, output_per_mtok: 75.00, cache_read_per_mtok: 1.50, cache_write_5m_per_mtok: 18.75, cache_write_1h_per_mtok: 30.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deployments:
+      us: { multiplier: 1.10 }
+      fast: { multiplier: 6.00 }
+    additional_units:
+      web_search_per_1k_calls: 10.00
+      code_exec_per_container_hour: 0.05
+
+  anthropic/claude-opus-4-5:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 15.00, output_per_mtok: 75.00, cache_read_per_mtok: 1.50, cache_write_5m_per_mtok: 18.75, cache_write_1h_per_mtok: 30.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-opus-4-6 }
+
+  anthropic/claude-opus-4-1:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 15.00, output_per_mtok: 75.00, cache_read_per_mtok: 1.50, cache_write_5m_per_mtok: 18.75, cache_write_1h_per_mtok: 30.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-opus-4-6 }
+
+  anthropic/claude-sonnet-4-6:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 3.00, output_per_mtok: 15.00, cache_read_per_mtok: 0.30, cache_write_5m_per_mtok: 3.75, cache_write_1h_per_mtok: 6.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deployments:
+      us: { multiplier: 1.10 }
+      fast: { multiplier: 6.00 }
+    additional_units:
+      web_search_per_1k_calls: 10.00
+      code_exec_per_container_hour: 0.05
+
+  anthropic/claude-sonnet-4-5:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 3.00, output_per_mtok: 15.00, cache_read_per_mtok: 0.30, cache_write_5m_per_mtok: 3.75, cache_write_1h_per_mtok: 6.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-sonnet-4-6 }
+
+  anthropic/claude-haiku-4-5:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.00, output_per_mtok: 5.00, cache_read_per_mtok: 0.10, cache_write_5m_per_mtok: 1.25, cache_write_1h_per_mtok: 2.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  anthropic/claude-haiku-3-5:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.80, output_per_mtok: 4.00, cache_read_per_mtok: 0.08, cache_write_5m_per_mtok: 1.00, cache_write_1h_per_mtok: 1.60 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-haiku-4-5 }
+
+  anthropic/claude-3-opus:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 15.00, output_per_mtok: 75.00, cache_read_per_mtok: 1.50, cache_write_5m_per_mtok: 18.75, cache_write_1h_per_mtok: 30.00 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-opus-4-6 }
+
+  anthropic/claude-3-haiku:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.claude.com/docs/en/docs/about-claude/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.25, output_per_mtok: 1.25, cache_read_per_mtok: 0.025, cache_write_5m_per_mtok: 0.3125, cache_write_1h_per_mtok: 0.50 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    deprecation: { replacement: anthropic/claude-haiku-4-5 }

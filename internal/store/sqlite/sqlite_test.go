@@ -187,7 +187,7 @@ func TestSQLiteMigrateUpgradesExistingRequestLogsSchema(t *testing.T) {
 	if err := sqliteStore.Migrate(ctx); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
-	for _, column := range []string{"interface_family", "token_source", "cache_status", "fallback_model", "trace_id", "toolset", "mcp_binding"} {
+	for _, column := range []string{"interface_family", "token_source", "cache_status", "fallback_model", "trace_id", "toolset", "mcp_binding", "cost_source"} {
 		exists, err := sqliteStore.sqliteColumnExists(ctx, "request_logs", column)
 		if err != nil {
 			t.Fatalf("sqliteColumnExists(%s) error = %v", column, err)

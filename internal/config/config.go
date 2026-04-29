@@ -23,6 +23,7 @@ type Config struct {
 	ControlPlane  ControlPlaneConfig        `yaml:"control_plane"`
 	Tools         ToolsConfig               `yaml:"tools"`
 	MCP           MCPConfig                 `yaml:"mcp"`
+	Pricing       PricingConfig             `yaml:"pricing"`
 	Observability ObservabilityConfig       `yaml:"observability"`
 }
 
@@ -205,6 +206,12 @@ type MCPConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type PricingConfig struct {
+	File                  string `yaml:"file"`
+	ReloadIntervalSeconds int    `yaml:"reload_interval_seconds"`
+	FailOnMissing         bool   `yaml:"fail_on_missing"`
+}
+
 type FallbackRule struct {
 	From string   `yaml:"from"`
 	To   []string `yaml:"to"`
@@ -300,6 +307,9 @@ func Default() Config {
 			Local: map[string]LocalToolConfig{},
 		},
 		MCP: MCPConfig{},
+		Pricing: PricingConfig{
+			ReloadIntervalSeconds: 30,
+		},
 		Observability: ObservabilityConfig{
 			Metrics: MetricsConfig{
 				Enabled: true,
@@ -487,6 +497,10 @@ func ApplyRuntimeOverrides(cfg *Config, overrides RuntimeOverrides) {
 	if overrides.LogLevel != "" {
 		cfg.Observability.Logging.Level = overrides.LogLevel
 	}
+}
+
+func ExpandEnv(input string) (string, []string) {
+	return expandEnv(input)
 }
 
 func expandEnv(input string) (string, []string) {

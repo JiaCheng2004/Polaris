@@ -1,0 +1,76 @@
+version: 1
+models:
+  qwen/qwen-max:
+    mode: chat
+    currency: USD
+    context_window: 32000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.60, output_per_mtok: 6.40 }
+
+  qwen/qwen-plus:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.40, output_per_mtok: 1.20 }
+
+  qwen/qwen-turbo:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.05, output_per_mtok: 0.20 }
+
+  qwen/qwen3.5-flash:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.029, output_per_mtok: 0.287 }
+
+  qwen/qwen3-max:
+    mode: chat
+    currency: USD
+    context_window: 252000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_32k
+        range: [0, 32000]
+        input_per_mtok: 1.20
+        output_per_mtok: 6.00
+      - id: lte_128k
+        range: [32000, 128000]
+        input_per_mtok: 2.40
+        output_per_mtok: 12.00
+      - id: lte_252k
+        range: [128000, 252000]
+        input_per_mtok: 3.00
+        output_per_mtok: 15.00
+
+  qwen/qwen3-vl-plus:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_32k
+        range: [0, 32000]
+        input_per_mtok: 0.40
+        output_per_mtok: 1.20
+      - id: lte_128k
+        range: [32000, 128000]
+        input_per_mtok: 0.80
+        output_per_mtok: 2.40
+
+  qwen/qwen-image-2.0:
+    mode: image_generation
+    currency: USD
+    source: https://www.alibabacloud.com/help/en/model-studio/billing-for-model-studio
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.02 }

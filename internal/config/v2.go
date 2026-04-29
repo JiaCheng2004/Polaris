@@ -159,7 +159,7 @@ func normalizeV2Config(raw map[string]any) (map[string]any, error) {
 
 	normalized := map[string]any{}
 	if runtime, ok := stringMap(raw["runtime"]); ok {
-		for _, section := range []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "observability"} {
+		for _, section := range []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "pricing", "observability"} {
 			if value, exists := runtime[section]; exists {
 				normalized[section] = value
 			}
