@@ -44,6 +44,8 @@ Polaris is not a workflow orchestrator, prompt framework, RAG engine, model host
 
 The current codebase ships a broad multi-provider runtime with local validation gates. Real-provider proof depends on credentials, quota, billing, regional availability, and provider plan access.
 
+Signed multi-architecture container images are published to GitHub Container Registry on every `main` push and on every `v*.*.*` tag. See [Container Image](./docs/CONFIGURATION.md#container-image) for tag policy, supported platforms, and how to verify the cosign signature and SLSA build provenance.
+
 Use this rule of thumb:
 
 - `make release-check` proves the repository builds, tests, contracts, configs, security checks, and Docker image locally.
@@ -67,7 +69,14 @@ cd Polaris
 make build
 ```
 
-The binary is written to `./bin/polaris`.
+The binary is written to `./bin/polaris`. Confirm the build with `./bin/polaris --version`.
+
+If you do not need to modify the source, pull a published image instead:
+
+```bash
+docker pull ghcr.io/jiacheng2004/polaris:edge      # rolling main
+docker pull ghcr.io/jiacheng2004/polaris:vX.Y.Z    # immutable release
+```
 
 ### 3. Run The Local Gateway
 
