@@ -25,7 +25,7 @@ func Metrics(recorder *metrics.Recorder) gin.HandlerFunc {
 		if outcome.StatusCode != 0 {
 			statusCode = outcome.StatusCode
 		}
-		cost := EstimateCostUSD(model, outcome.PromptTokens, outcome.CompletionTokens)
+		cost := estimateOutcomeCost(c, outcome, nil)
 		interfaceFamily := firstNonEmpty(outcome.InterfaceFamily, interfaceFamilyFromPath(c.FullPath()))
 		tokenSource := usageTokenSource(outcome)
 
@@ -40,9 +40,11 @@ func Metrics(recorder *metrics.Recorder) gin.HandlerFunc {
 			outcome.PromptTokens,
 			outcome.CompletionTokens,
 			tokenSource,
-			cost,
+			cost.TotalUSD,
+			cost.Source,
 			outcome.ErrorType,
 		)
+		recorder.IncPricingLookup(model, cost.LookupStatus)
 		if cacheStatus := strings.TrimSpace(c.Writer.Header().Get("X-Polaris-Cache")); cacheStatus != "" {
 			recorder.IncCacheEvent(cacheStatus, model)
 		}

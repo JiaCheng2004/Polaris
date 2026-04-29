@@ -1,0 +1,243 @@
+version: 1
+models:
+  bytedance/doubao-seed-2-0-pro:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_32k
+        range: [0, 32000]
+        input_per_mtok: 0.80
+        output_per_mtok: 2.40
+      - id: lte_128k
+        range: [32000, 128000]
+        input_per_mtok: 1.20
+        output_per_mtok: 3.60
+      - id: lte_256k
+        range: [128000, 256000]
+        input_per_mtok: 2.40
+        output_per_mtok: 7.20
+
+  bytedance/doubao-seed-2.0-pro:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_32k
+        range: [0, 32000]
+        input_per_mtok: 0.80
+        output_per_mtok: 2.40
+      - id: lte_128k
+        range: [32000, 128000]
+        input_per_mtok: 1.20
+        output_per_mtok: 3.60
+      - id: lte_256k
+        range: [128000, 256000]
+        input_per_mtok: 2.40
+        output_per_mtok: 7.20
+
+  bytedance/doubao-seed-2-0-lite:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_32k
+        range: [0, 32000]
+        input_per_mtok: 0.15
+        output_per_mtok: 0.60
+      - id: lte_128k
+        range: [32000, 128000]
+        input_per_mtok: 0.30
+        output_per_mtok: 1.20
+      - id: lte_256k
+        range: [128000, 256000]
+        input_per_mtok: 0.60
+        output_per_mtok: 2.40
+
+  bytedance/doubao-seed-1.6-vision:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.80, output_per_mtok: 2.40 }
+
+  bytedance/doubao-seed-2-0-mini:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.03, output_per_mtok: 0.12 }
+
+  bytedance/doubao-pro:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    notes: Legacy configured model retained for compatibility.
+    pricing: { input_per_mtok: 0.80, output_per_mtok: 2.40 }
+    deprecation: { replacement: bytedance/doubao-seed-2-0-pro }
+
+  bytedance/doubao-pro-256k:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.80, output_per_mtok: 2.40 }
+    deprecation: { replacement: bytedance/doubao-seed-2.0-pro }
+
+  bytedance/doubao-lite:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    notes: Legacy configured model retained for compatibility.
+    pricing: { input_per_mtok: 0.15, output_per_mtok: 0.60 }
+    deprecation: { replacement: bytedance/doubao-seed-2-0-lite }
+
+  bytedance/doubao-1.5:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    notes: Legacy configured model retained for compatibility.
+    pricing: { input_per_mtok: 0.80, output_per_mtok: 2.40 }
+    deprecation: { replacement: bytedance/doubao-seed-2-0-pro }
+
+  bytedance/seedance-2-0:
+    mode: video
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.14 }
+
+  bytedance/doubao-seedance-2.0:
+    mode: video
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.14 }
+
+  bytedance/doubao-seedance-2.0-fast:
+    mode: video
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.07 }
+
+  bytedance/seedance-2.0:
+    mode: video
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.14 }
+
+  bytedance/seedance-2.0-fast:
+    mode: video
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.07 }
+
+  bytedance/doubao-seedream-5.0-lite:
+    mode: image_generation
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.02 }
+
+  bytedance/seedream-4.5:
+    mode: image_generation
+    currency: USD
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.04 }
+
+  bytedance/doubao-embedding:
+    mode: embedding
+    currency: USD
+    context_window: 8192
+    source: https://www.volcengine.com/docs/82379
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.02 }
+
+  bytedance/doubao-asr-2.0:
+    mode: audio_transcription
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00008 }
+
+  bytedance/doubao-tts:
+    mode: audio_speech
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_character: 0.000004 }
+
+  bytedance/doubao-tts-2.0:
+    mode: audio_speech
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_character: 0.000004 }
+
+  bytedance/doubao-streaming-asr-2.0:
+    mode: audio_transcription
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00008 }
+
+  bytedance/doubao-streaming-asr-2.0-concurrent:
+    mode: audio_transcription
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00008 }
+
+  bytedance/doubao-audio:
+    mode: audio
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00008, output_per_audio_second: 0.00008 }
+
+  bytedance/doubao-interpreting-2.0:
+    mode: interpreting
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00010, output_per_audio_second: 0.00010 }
+
+  bytedance/doubao-translation-2.0:
+    mode: translation
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.20, output_per_mtok: 0.20 }
+
+  bytedance/doubao-notes-2.0:
+    mode: notes
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.00008 }
+
+  bytedance/doubao-podcast-2.0:
+    mode: podcast
+    currency: USD
+    source: https://www.volcengine.com/docs/6561
+    effective_from: 2026-04-01
+    pricing: { input_per_character: 0.000004 }

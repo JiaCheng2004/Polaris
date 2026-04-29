@@ -1,0 +1,8 @@
+version: 1
+models:
+  elevenlabs/music_v1:
+    mode: music
+    currency: USD
+    source: https://elevenlabs.io/music-api
+    effective_from: 2026-04-01
+    pricing: { per_call: 0.06 }

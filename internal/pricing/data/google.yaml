@@ -1,0 +1,165 @@
+version: 1
+models:
+  google/gemini-2.5-pro:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lt_200k
+        range: [0, 200000]
+        input_per_mtok: 1.25
+        output_per_mtok: 10.00
+        cache_read_per_mtok: 0.125
+      - id: gte_200k
+        range: [200000, 1000000]
+        input_per_mtok: 2.50
+        output_per_mtok: 15.00
+        cache_read_per_mtok: 0.25
+    additional_units:
+      google_search_grounding_per_1k_calls: 35.00
+
+  google/gemini-2.5-flash:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.30, output_per_mtok: 2.50, output_reasoning_per_mtok: 2.50, cache_read_per_mtok: 0.03 }
+    tiers:
+      batch: { multiplier: 0.5 }
+    additional_units:
+      google_search_grounding_per_1k_calls: 35.00
+
+  google/gemini-2.5-flash-lite:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.10, output_per_mtok: 0.40, output_reasoning_per_mtok: 0.40, cache_read_per_mtok: 0.025 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  google/gemini-2.0-flash:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.10, output_per_mtok: 0.40, cache_read_per_mtok: 0.025 }
+    deprecation: { replacement: google/gemini-2.5-flash }
+
+  google/gemini-1.5-pro:
+    mode: chat
+    currency: USD
+    context_window: 2000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    notes: Legacy model retained for existing configs.
+    tiered_pricing:
+      - id: lt_128k
+        range: [0, 128000]
+        input_per_mtok: 1.25
+        output_per_mtok: 5.00
+      - id: gte_128k
+        range: [128000, 2000000]
+        input_per_mtok: 2.50
+        output_per_mtok: 10.00
+    deprecation: { replacement: google/gemini-2.5-pro }
+
+  google/gemini-1.5-flash:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    notes: Legacy model retained for existing configs.
+    tiered_pricing:
+      - id: lt_128k
+        range: [0, 128000]
+        input_per_mtok: 0.075
+        output_per_mtok: 0.30
+      - id: gte_128k
+        range: [128000, 1000000]
+        input_per_mtok: 0.15
+        output_per_mtok: 0.60
+    deprecation: { replacement: google/gemini-2.5-flash }
+
+  google/text-embedding-004:
+    mode: embedding
+    currency: USD
+    context_window: 2048
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.01 }
+
+  google/gemini-embedding-001:
+    mode: embedding
+    currency: USD
+    context_window: 8192
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.15 }
+
+  google/imagen-4:
+    mode: image_generation
+    currency: USD
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.04 }
+
+  google/imagen-4-ultra:
+    mode: image_generation
+    currency: USD
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.06 }
+
+  google/imagen-3:
+    mode: image_generation
+    currency: USD
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    notes: Legacy Imagen rate retained for older configs.
+    pricing: { output_per_image: 0.04 }
+    deprecation: { replacement: google/imagen-4 }
+
+  google/gemini-flash-image:
+    mode: image_generation
+    currency: USD
+    context_window: 32000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.30, output_per_image: 0.039 }
+
+  google/nano-banana-2:
+    mode: image_generation
+    currency: USD
+    context_window: 32000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.30, output_per_image: 0.039 }
+
+  google/nano-banana-pro:
+    mode: image_generation
+    currency: USD
+    context_window: 32000
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.25, output_per_image: 0.060 }
+
+  google-vertex/veo-3.1-generate-001:
+    mode: video
+    currency: USD
+    source: https://cloud.google.com/vertex-ai/generative-ai/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.35 }
+
+  google-vertex/veo-3.1-fast-generate-001:
+    mode: video
+    currency: USD
+    source: https://cloud.google.com/vertex-ai/generative-ai/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.15 }

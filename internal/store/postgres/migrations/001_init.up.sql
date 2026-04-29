@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     output_tokens        INTEGER,
     total_tokens         INTEGER,
     estimated_cost       DOUBLE PRECISION,
+    cost_source          TEXT,
     status_code          INTEGER NOT NULL,
     error_type           TEXT,
     created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

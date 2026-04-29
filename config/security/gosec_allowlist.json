@@ -43,6 +43,13 @@
       "rationale": "Developer-only security checker reads paths only after cleanRepoPath confines them to the repository root."
     },
     {
+      "rule_id": "G304",
+      "file": "internal/pricing/loader.go",
+      "symbol": "Load",
+      "snippet": "data, err := os.ReadFile(path)",
+      "rationale": "Operator-supplied pricing override path from config; same trust model as the gateway's own config file. Loaded once at startup and on hot-reload via the file watcher."
+    },
+    {
       "rule_id": "G704",
       "file": "tests/e2e/live_smoke_harness.go",
       "symbol": "requireOllama",

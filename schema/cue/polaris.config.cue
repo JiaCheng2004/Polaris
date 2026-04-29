@@ -54,6 +54,11 @@ package polaris
 		mcp?: {
 			enabled?: bool
 		}
+		pricing?: {
+			file?: string
+			reload_interval_seconds?: int & >=0
+			fail_on_missing?: bool
+		}
 		observability?: _
 	}
 

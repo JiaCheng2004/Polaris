@@ -1,0 +1,69 @@
+version: 1
+models:
+  xai/grok-4:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 3.00, output_per_mtok: 15.00, cache_read_per_mtok: 0.75 }
+
+  xai/grok-3:
+    mode: chat
+    currency: USD
+    context_window: 131000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 3.00, output_per_mtok: 15.00, cache_read_per_mtok: 0.75 }
+    deprecation: { replacement: xai/grok-4 }
+
+  xai/grok-3-mini:
+    mode: chat
+    currency: USD
+    context_window: 131000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.30, output_per_mtok: 0.50, cache_read_per_mtok: 0.075 }
+
+  xai/grok-2:
+    mode: chat
+    currency: USD
+    context_window: 131000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 2.00, output_per_mtok: 10.00 }
+    deprecation: { replacement: xai/grok-4 }
+
+  xai/grok-4-fast-reasoning:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    tiered_pricing:
+      - id: lte_128k
+        range: [0, 128000]
+        input_per_mtok: 0.20
+        output_per_mtok: 0.50
+        output_reasoning_per_mtok: 0.50
+      - id: gt_128k
+        range: [128000, 256000]
+        input_per_mtok: 0.40
+        output_per_mtok: 1.00
+        output_reasoning_per_mtok: 1.00
+
+  xai/grok-4.1-fast:
+    mode: chat
+    currency: USD
+    context_window: 256000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.20, output_per_mtok: 0.50, output_reasoning_per_mtok: 0.50 }
+
+  xai/grok-4-1-fast-reasoning:
+    mode: chat
+    currency: USD
+    context_window: 2000000
+    source: https://docs.x.ai/docs/models
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.20, output_per_mtok: 0.50, output_reasoning_per_mtok: 0.50 }

@@ -172,8 +172,8 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 		INSERT INTO request_logs (
 			id, request_id, key_id, project_id, model, modality, interface_family, token_source,
 			cache_status, fallback_model, trace_id, toolset, mcp_binding, provider_latency_ms, total_latency_ms,
-			input_tokens, output_tokens, total_tokens, estimated_cost, status_code, error_type, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			input_tokens, output_tokens, total_tokens, estimated_cost, cost_source, status_code, error_type, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare request log batch: %w", err)
@@ -209,6 +209,7 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 			entry.OutputTokens,
 			entry.TotalTokens,
 			entry.EstimatedCost,
+			nullableString(entry.CostSource),
 			entry.StatusCode,
 			nullableString(entry.ErrorType),
 			entry.CreatedAt,
@@ -436,6 +437,7 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 		"trace_id":         "TEXT",
 		"toolset":          "TEXT",
 		"mcp_binding":      "TEXT",
+		"cost_source":      "TEXT",
 	}
 	for column, columnType := range requestLogColumns {
 		exists, err := s.sqliteColumnExists(ctx, "request_logs", column)
@@ -1323,7 +1325,43 @@ func usageTotals(ctx context.Context, db *sql.DB, where string, args []any) (sto
 	if err := db.QueryRowContext(ctx, query, args...).Scan(&report.TotalRequests, &report.TotalTokens, &report.TotalCost); err != nil {
 		return store.UsageReport{}, fmt.Errorf("query usage totals: %w", err)
 	}
+	breakdown, err := usageCostSourceBreakdown(ctx, db, where, args)
+	if err != nil {
+		return store.UsageReport{}, err
+	}
+	report.CostSourceBreakdown = breakdown
 	return report, nil
+}
+
+func usageCostSourceBreakdown(ctx context.Context, db *sql.DB, where string, args []any) (map[string]int64, error) {
+	query := `
+		SELECT COALESCE(NULLIF(cost_source, ''), 'unknown') AS cost_source,
+		       COUNT(*) AS requests
+		FROM request_logs
+		LEFT JOIN api_keys ON api_keys.id = request_logs.key_id
+		LEFT JOIN virtual_keys ON virtual_keys.id = request_logs.key_id
+	`
+	query = appendWhereExpression(query, where)
+	query += " GROUP BY COALESCE(NULLIF(cost_source, ''), 'unknown')"
+
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query usage cost source breakdown: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	breakdown := map[string]int64{}
+	for rows.Next() {
+		var source string
+		var requests int64
+		if err := rows.Scan(&source, &requests); err != nil {
+			return nil, fmt.Errorf("scan usage cost source breakdown: %w", err)
+		}
+		breakdown[source] = requests
+	}
+	return breakdown, rows.Err()
 }
 
 func appendWhereClauses(query string, clauses []string) string {

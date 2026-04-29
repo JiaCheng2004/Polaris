@@ -35,22 +35,35 @@ type AuthContext struct {
 }
 
 type RequestOutcome struct {
-	Model             string
-	Provider          string
-	Modality          modality.Modality
-	InterfaceFamily   string
-	TokenSource       modality.TokenCountSource
-	CacheStatus       string
-	FallbackModel     string
-	Toolset           string
-	MCPBinding        string
-	StatusCode        int
-	ErrorType         string
-	ProviderLatencyMs int
-	TotalLatencyMs    int
-	PromptTokens      int
-	CompletionTokens  int
-	TotalTokens       int
+	Model              string
+	Provider           string
+	Modality           modality.Modality
+	InterfaceFamily    string
+	TokenSource        modality.TokenCountSource
+	CacheStatus        string
+	FallbackModel      string
+	Toolset            string
+	MCPBinding         string
+	StatusCode         int
+	ErrorType          string
+	ProviderLatencyMs  int
+	TotalLatencyMs     int
+	PromptTokens       int
+	CompletionTokens   int
+	TotalTokens        int
+	Tier               string
+	Deployment         string
+	CachedInputTokens  int
+	CacheWrite5mTokens int
+	CacheWrite1hTokens int
+	ReasoningTokens    int
+	InputImageTokens   int
+	OutputImageTokens  int
+	AudioSeconds       float64
+	VideoSeconds       float64
+	Characters         int
+	Images             int
+	UnitCounts         map[string]int
 }
 
 func SetAuthContext(c *gin.Context, auth AuthContext) {

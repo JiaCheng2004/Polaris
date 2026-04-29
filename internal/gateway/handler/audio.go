@@ -47,7 +47,7 @@ func (h *AudioHandler) Create(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityAudio, modality.CapabilityAudioInput, modality.CapabilityAudioOutput)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityAudio, modality.CapabilityAudioInput, modality.CapabilityAudioOutput)
 	if err != nil {
 		writeModalityTargetError(c, err, "audio sessions")
 		return
@@ -241,6 +241,7 @@ func (h *AudioHandler) WebSocket(c *gin.Context) {
 	outcome.PromptTokens = usage.InputTextTokens
 	outcome.CompletionTokens = usage.OutputTextTokens
 	outcome.TotalTokens = usage.TotalTokens
+	outcome.AudioSeconds = usage.InputAudioSeconds + usage.OutputAudioSeconds
 	outcome.TokenSource = countsTokenSource(usage.InputTextTokens, usage.OutputTextTokens, usage.TotalTokens)
 	middleware.SetRequestOutcome(c, outcome)
 }

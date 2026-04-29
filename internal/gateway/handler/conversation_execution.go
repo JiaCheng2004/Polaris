@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -81,7 +80,8 @@ func (h *ChatHandler) completeWithFailover(c *gin.Context, primary chatTarget, f
 	return nil, lastOutcome, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No available provider could serve this request.")
 }
 
-func (h *ChatHandler) resolveChatTarget(ctx context.Context, registry *provider.Registry, auth middleware.AuthContext, name string, routing *modality.RoutingOptions, requiredCapabilities []modality.Capability) (chatTarget, error) {
+func (h *ChatHandler) resolveChatTarget(c *gin.Context, registry *provider.Registry, auth middleware.AuthContext, name string, routing *modality.RoutingOptions, requiredCapabilities []modality.Capability) (chatTarget, error) {
+	ctx := c.Request.Context()
 	_, span := telemetry.StartInternalSpan(ctx, "policy.resolve_chat_target",
 		attribute.String("polaris.requested_model", name),
 		attribute.String("polaris.modality", string(modality.ModalityChat)),
@@ -113,6 +113,10 @@ func (h *ChatHandler) resolveChatTarget(ctx context.Context, registry *provider.
 		telemetry.RecordSpanError(span, err)
 		return chatTarget{}, err
 	}
+	if err := enforcePricingPolicy(c, model.ID); err != nil {
+		telemetry.RecordSpanError(span, err)
+		return chatTarget{}, err
+	}
 	span.SetAttributes(
 		attribute.String("polaris.model", model.ID),
 		attribute.String("polaris.provider", model.Provider),
@@ -120,10 +124,10 @@ func (h *ChatHandler) resolveChatTarget(ctx context.Context, registry *provider.
 	return chatTarget{adapter: adapter, model: model, resolution: resolution}, nil
 }
 
-func (h *ChatHandler) resolveFallbackTargets(ctx context.Context, registry *provider.Registry, auth middleware.AuthContext, primaryModelID string, requiredCapabilities []modality.Capability) []chatTarget {
+func (h *ChatHandler) resolveFallbackTargets(c *gin.Context, registry *provider.Registry, auth middleware.AuthContext, primaryModelID string, requiredCapabilities []modality.Capability) []chatTarget {
 	var targets []chatTarget
 	for _, candidate := range registry.GetFallbacks(primaryModelID) {
-		target, err := h.resolveChatTarget(ctx, registry, auth, candidate, nil, requiredCapabilities)
+		target, err := h.resolveChatTarget(c, registry, auth, candidate, nil, requiredCapabilities)
 		if err != nil {
 			continue
 		}

@@ -283,8 +283,11 @@ components:
         archived_at: {type: string}
     UsageReport:
       type: object
-      required: [total_requests, total_tokens, total_cost]
+      required: [total_requests, total_tokens, total_cost_usd]
       properties:
         total_requests: {type: integer}
         total_tokens: {type: integer}
-        total_cost: {type: number}
+        total_cost_usd: {type: number}
+        cost_source_breakdown:
+          type: object
+          additionalProperties: {type: integer}

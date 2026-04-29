@@ -38,7 +38,7 @@ func (h *TranslationHandler) Translate(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityTranslation)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityTranslation)
 	if err != nil {
 		writeModalityTargetError(c, err, "translations")
 		return

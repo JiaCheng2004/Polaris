@@ -1,0 +1,254 @@
+version: 1
+models:
+  openai/gpt-5.5:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 5.00, output_per_mtok: 20.00, output_reasoning_per_mtok: 20.00, cache_read_per_mtok: 1.25 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-5.4:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 3.00, output_per_mtok: 12.00, output_reasoning_per_mtok: 12.00, cache_read_per_mtok: 0.75 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-5.4-mini:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.60, output_per_mtok: 2.40, output_reasoning_per_mtok: 2.40, cache_read_per_mtok: 0.15 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-5.4-nano:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.15, output_per_mtok: 0.60, output_reasoning_per_mtok: 0.60, cache_read_per_mtok: 0.0375 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-5.3-codex:
+    mode: chat
+    currency: USD
+    context_window: 400000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.25, output_per_mtok: 10.00, output_reasoning_per_mtok: 10.00, cache_read_per_mtok: 0.125 }
+
+  openai/gpt-4o:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 5.00, output_per_mtok: 15.00, cache_read_per_mtok: 2.50 }
+    tiers:
+      batch: { multiplier: 0.5 }
+      flex: { input_per_mtok: 2.50, output_per_mtok: 7.50, cache_read_per_mtok: 1.25 }
+      priority: { input_per_mtok: 8.50, output_per_mtok: 25.50 }
+
+  openai/gpt-4o-mini:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.15, output_per_mtok: 0.60, cache_read_per_mtok: 0.075 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-4.1:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 2.00, output_per_mtok: 8.00, cache_read_per_mtok: 0.50 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-4.1-mini:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.40, output_per_mtok: 1.60, cache_read_per_mtok: 0.10 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/gpt-4.1-nano:
+    mode: chat
+    currency: USD
+    context_window: 1000000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.10, output_per_mtok: 0.40, cache_read_per_mtok: 0.025 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/o1:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 15.00, output_per_mtok: 60.00, output_reasoning_per_mtok: 60.00, cache_read_per_mtok: 7.50 }
+
+  openai/o1-mini:
+    mode: chat
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    notes: Conservative legacy rate retained for configured aliases.
+    pricing: { input_per_mtok: 1.10, output_per_mtok: 4.40, output_reasoning_per_mtok: 4.40, cache_read_per_mtok: 0.55 }
+    deprecation: { replacement: openai/o3-mini }
+
+  openai/o3:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 2.00, output_per_mtok: 8.00, output_reasoning_per_mtok: 8.00, cache_read_per_mtok: 0.50 }
+    tiers:
+      flex: { input_per_mtok: 1.00, output_per_mtok: 4.00, output_reasoning_per_mtok: 4.00, cache_read_per_mtok: 0.25 }
+      priority: { input_per_mtok: 3.50, output_per_mtok: 14.00, output_reasoning_per_mtok: 14.00 }
+
+  openai/o3-mini:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.10, output_per_mtok: 4.40, output_reasoning_per_mtok: 4.40, cache_read_per_mtok: 0.55 }
+
+  openai/o4-mini:
+    mode: chat
+    currency: USD
+    context_window: 200000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 1.10, output_per_mtok: 4.40, output_reasoning_per_mtok: 4.40, cache_read_per_mtok: 0.275 }
+    tiers:
+      flex: { input_per_mtok: 0.55, output_per_mtok: 2.20, output_reasoning_per_mtok: 2.20 }
+      priority: { input_per_mtok: 1.925, output_per_mtok: 7.70, output_reasoning_per_mtok: 7.70 }
+
+  openai/text-embedding-3-small:
+    mode: embedding
+    currency: USD
+    context_window: 8191
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.02 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/text-embedding-3-large:
+    mode: embedding
+    currency: USD
+    context_window: 8191
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.13 }
+    tiers:
+      batch: { multiplier: 0.5 }
+
+  openai/text-embedding-ada-002:
+    mode: embedding
+    currency: USD
+    context_window: 8191
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 0.10 }
+    deprecation: { replacement: openai/text-embedding-3-small }
+
+  openai/dall-e-3:
+    mode: image_generation
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { output_per_image: 0.04 }
+
+  openai/gpt-image-1:
+    mode: image_generation
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing:
+      input_per_mtok: 5.00
+      input_image_token_per_mtok: 10.00
+      output_image_token_per_mtok: 40.00
+      cache_read_per_mtok: 1.25
+      output_per_image: 0.04
+
+  openai/gpt-image-2:
+    mode: image_generation
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing:
+      input_per_mtok: 5.00
+      input_image_token_per_mtok: 10.00
+      output_image_token_per_mtok: 40.00
+      cache_read_per_mtok: 1.25
+      output_per_image: 0.06
+
+  openai/whisper-1:
+    mode: audio_transcription
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_audio_second: 0.0001 }
+
+  openai/tts-1:
+    mode: audio_speech
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_character: 0.000015 }
+
+  openai/tts-1-hd:
+    mode: audio_speech
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_character: 0.000030 }
+
+  openai/gpt-4o-audio:
+    mode: audio
+    currency: USD
+    context_window: 128000
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_mtok: 5.00, output_per_mtok: 20.00, input_per_audio_second: 0.0001, output_per_audio_second: 0.0002, cache_read_per_mtok: 2.50 }
+
+  openai/sora-2:
+    mode: video
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.10 }
+
+  openai/sora-2-pro:
+    mode: video
+    currency: USD
+    source: https://platform.openai.com/docs/pricing
+    effective_from: 2026-04-01
+    pricing: { input_per_video_second: 0.30 }

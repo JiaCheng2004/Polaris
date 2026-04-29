@@ -39,6 +39,7 @@
             "enabled": { "type": "boolean" }
           }
         },
+        "pricing": { "$ref": "#/$defs/pricing" },
         "observability": { "$ref": "#/$defs/observability" }
       }
     },
@@ -150,6 +151,15 @@
             }
           }
         }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string" },
+        "reload_interval_seconds": { "type": "integer", "minimum": 0 },
+        "fail_on_missing": { "type": "boolean" }
       }
     },
     "observability": {

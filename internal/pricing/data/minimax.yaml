@@ -1,0 +1,15 @@
+version: 1
+models:
+  minimax/music-2.6:
+    mode: music
+    currency: USD
+    source: https://platform.minimax.io/docs/guides/music-generation-api-refer
+    effective_from: 2026-04-01
+    pricing: { per_call: 0.06 }
+
+  minimax/music-cover:
+    mode: music
+    currency: USD
+    source: https://platform.minimax.io/docs/guides/music-generation-api-refer
+    effective_from: 2026-04-01
+    pricing: { per_call: 0.06 }

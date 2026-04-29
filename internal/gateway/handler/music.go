@@ -98,7 +98,7 @@ func (h *MusicHandler) Generate(c *gin.Context) {
 	if env.Instrumental {
 		required = append(required, modality.CapabilityInstrumental)
 	}
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, env.Model, env.Routing, modality.ModalityMusic, required...)
+	resolved, err := resolveEndpointModel(c, registry, auth, env.Model, env.Routing, modality.ModalityMusic, required...)
 	if err != nil {
 		writeModalityTargetError(c, err, "music")
 		return
@@ -149,7 +149,7 @@ func (h *MusicHandler) Edit(c *gin.Context) {
 
 	auth := middleware.GetAuthContext(c)
 	required := requiredMusicEditCapabilities(env)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, env.Model, env.Routing, modality.ModalityMusic, required...)
+	resolved, err := resolveEndpointModel(c, registry, auth, env.Model, env.Routing, modality.ModalityMusic, required...)
 	if err != nil {
 		writeModalityTargetError(c, err, "music edits")
 		return
@@ -203,7 +203,7 @@ func (h *MusicHandler) Stems(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, env.Model, env.Routing, modality.ModalityMusic, modality.CapabilityMusicStems)
+	resolved, err := resolveEndpointModel(c, registry, auth, env.Model, env.Routing, modality.ModalityMusic, modality.CapabilityMusicStems)
 	if err != nil {
 		writeModalityTargetError(c, err, "music stems")
 		return
@@ -255,7 +255,7 @@ func (h *MusicHandler) Lyrics(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityMusic, modality.CapabilityLyricsGeneration)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityMusic, modality.CapabilityLyricsGeneration)
 	if err != nil {
 		writeModalityTargetError(c, err, "music lyrics")
 		return
@@ -314,7 +314,7 @@ func (h *MusicHandler) Plans(c *gin.Context) {
 	}
 
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityMusic, modality.CapabilityCompositionPlans)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityMusic, modality.CapabilityCompositionPlans)
 	if err != nil {
 		writeModalityTargetError(c, err, "music plans")
 		return
@@ -759,7 +759,7 @@ func (h *MusicHandler) resolveAuthorizedJobRecord(c *gin.Context) (musicJobRecor
 	if auth.KeyID != token.KeyID {
 		return musicJobRecord{}, nil, httputil.NewError(http.StatusForbidden, "permission_error", "job_not_owned", "id", "Music job was created by a different API key.")
 	}
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, token.Model, nil, modality.ModalityMusic)
+	resolved, err := resolveEndpointModel(c, registry, auth, token.Model, nil, modality.ModalityMusic)
 	if err != nil {
 		return musicJobRecord{}, nil, err
 	}

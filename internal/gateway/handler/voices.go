@@ -165,7 +165,7 @@ func (h *VoicesHandler) CreateClone(c *gin.Context) {
 		return
 	}
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceCloning)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceCloning)
 	if err != nil {
 		writeModalityTargetError(c, err, "voice cloning")
 		return
@@ -209,7 +209,7 @@ func (h *VoicesHandler) CreateDesign(c *gin.Context) {
 		return
 	}
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceDesign)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceDesign)
 	if err != nil {
 		writeModalityTargetError(c, err, "voice design")
 		return
@@ -258,7 +258,7 @@ func (h *VoicesHandler) Retrain(c *gin.Context) {
 		return
 	}
 	auth := middleware.GetAuthContext(c)
-	resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceCloning)
+	resolved, err := resolveEndpointModel(c, registry, auth, req.Model, req.Routing, modality.ModalityVoice, modality.CapabilityVoiceCloning)
 	if err != nil {
 		writeModalityTargetError(c, err, "voice retraining")
 		return
@@ -478,7 +478,7 @@ func (h *VoicesHandler) resolveVoiceProvider(c *gin.Context, providerName string
 	modelName = strings.TrimSpace(modelName)
 	if modelName != "" {
 		auth := middleware.GetAuthContext(c)
-		resolved, err := resolveEndpointModel(c.Request.Context(), registry, auth, modelName, nil, modality.ModalityVoice)
+		resolved, err := resolveEndpointModel(c, registry, auth, modelName, nil, modality.ModalityVoice)
 		if err != nil {
 			return resolvedVoiceProvider{}, translateVoiceTargetError(err)
 		}

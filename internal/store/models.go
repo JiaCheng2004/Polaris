@@ -170,6 +170,7 @@ type RequestLog struct {
 	OutputTokens      int
 	TotalTokens       int
 	EstimatedCost     float64
+	CostSource        string
 	StatusCode        int
 	ErrorType         string
 	CreatedAt         time.Time
@@ -200,11 +201,12 @@ type ModelUsage struct {
 }
 
 type UsageReport struct {
-	TotalRequests int64        `json:"total_requests"`
-	TotalTokens   int64        `json:"total_tokens"`
-	TotalCost     float64      `json:"total_cost_usd"`
-	ByDay         []DailyUsage `json:"by_day,omitempty"`
-	ByModel       []ModelUsage `json:"by_model,omitempty"`
+	TotalRequests       int64            `json:"total_requests"`
+	TotalTokens         int64            `json:"total_tokens"`
+	TotalCost           float64          `json:"total_cost_usd"`
+	CostSourceBreakdown map[string]int64 `json:"cost_source_breakdown,omitempty"`
+	ByDay               []DailyUsage     `json:"by_day,omitempty"`
+	ByModel             []ModelUsage     `json:"by_model,omitempty"`
 }
 
 var (

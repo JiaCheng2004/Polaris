@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
+	"github.com/JiaCheng2004/Polaris/internal/pricing"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 )
 
@@ -63,6 +64,16 @@ func (r *Reloader) Reload() error {
 	}
 	for _, warning := range registryWarnings {
 		r.logger.Warn("registry warning", "warning", warning)
+	}
+	if pricingHolder := r.holder.PricingHolder(); pricingHolder != nil {
+		pricingCatalog, pricingWarnings, err := pricing.Load(nextCfg.Pricing.File)
+		if err != nil {
+			return err
+		}
+		for _, warning := range pricingWarnings {
+			r.logger.Warn("pricing warning", "warning", warning)
+		}
+		pricingHolder.Swap(pricingCatalog)
 	}
 
 	if r.level != nil {

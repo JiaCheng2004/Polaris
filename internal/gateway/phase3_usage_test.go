@@ -143,9 +143,10 @@ func TestPhase3UsageAggregatesMixedModalities(t *testing.T) {
 	}
 
 	var usage struct {
-		TotalRequests int64 `json:"total_requests"`
-		TotalTokens   int64 `json:"total_tokens"`
-		ByModel       []struct {
+		TotalRequests       int64            `json:"total_requests"`
+		TotalTokens         int64            `json:"total_tokens"`
+		CostSourceBreakdown map[string]int64 `json:"cost_source_breakdown"`
+		ByModel             []struct {
 			Model   string  `json:"model"`
 			CostUSD float64 `json:"cost_usd"`
 		} `json:"by_model"`
@@ -170,10 +171,13 @@ func TestPhase3UsageAggregatesMixedModalities(t *testing.T) {
 	if byModel["openai/text-embedding-3-small"] <= 0 {
 		t.Fatalf("expected positive embedding cost, got %#v", usage.ByModel)
 	}
-	if byModel["openai/gpt-image-1"] != 0 {
-		t.Fatalf("expected zero image cost until pricing policy exists, got %#v", usage.ByModel)
+	if byModel["openai/gpt-image-1"] <= 0 {
+		t.Fatalf("expected positive image cost, got %#v", usage.ByModel)
 	}
-	if byModel["openai/tts-1"] != 0 {
-		t.Fatalf("expected zero voice cost until pricing policy exists, got %#v", usage.ByModel)
+	if byModel["openai/tts-1"] <= 0 {
+		t.Fatalf("expected positive voice cost, got %#v", usage.ByModel)
+	}
+	if usage.CostSourceBreakdown["table"] != 3 {
+		t.Fatalf("expected table cost source for all requests, got %#v", usage.CostSourceBreakdown)
 	}
 }
