@@ -42,6 +42,7 @@ Supported CLI flags:
 - `runtime.control_plane`: project / virtual-key control-plane enablement.
 - `runtime.tools`: local tool registration metadata for the tool runtime.
 - `runtime.mcp`: MCP broker enablement.
+- `runtime.pricing`: optional pricing override file, reload interval, and strict missing-pricing policy.
 - `runtime.observability`: metrics, structured logging, tracing, and audit-event settings.
 
 The current runtime intentionally keeps `runtime.control_plane`, `runtime.tools`, and `runtime.mcp` YAML small. Detailed projects, virtual keys, policies, budgets, toolsets, and MCP bindings are managed through the database-backed control-plane API instead of being preloaded from YAML. Token-accounting provenance is always emitted by the runtime and does not currently have a separate `token_accounting` YAML section.
@@ -89,6 +90,20 @@ Run config validation with:
 ```bash
 make config-check
 ```
+
+## Pricing
+
+Bundled pricing defaults are loaded from `internal/pricing/data/*.yaml`. Operators can override or add model prices without rebuilding Polaris:
+
+```yaml
+runtime:
+  pricing:
+    file: ./pricing.yaml
+    reload_interval_seconds: 30
+    fail_on_missing: false
+```
+
+The override file uses the schema documented in `docs/PRICING.md`. Polaris polls the override file and atomically swaps the catalog on successful reload. Missing model prices still degrade to `$0` by default and are recorded as `cost_source=missing` in request logs and usage responses. Set `fail_on_missing: true` to reject unpriced resolved models with `400 model_not_priced` before dispatch.
 
 ## Secret Handling
 
@@ -503,6 +518,50 @@ Compatibility/local options still exist:
 - `runtime.auth.mode: none` for local development
 - `runtime.auth.mode: static` for simple fixed-key deployments
 - `runtime.auth.mode: multi-user` only when you still need the older key-row model
+
+## Container Image
+
+Polaris publishes signed multi-architecture container images to GitHub Container Registry on every `main` push and on every `v*.*.*` tag.
+
+- Registry: `ghcr.io/jiacheng2004/polaris`
+- Platforms: `linux/amd64`, `linux/arm64`
+- Tag policy:
+  - `vX.Y.Z` (and `X.Y`, `X`, `latest`) — released on stable semver tags. Pre-release tags such as `vX.Y.Z-rc1` publish only the full version and never move `latest`.
+  - `edge` — rolling tag pointing at the latest `main` commit.
+  - `sha-<short>` — immutable per-commit reference; pin this in production.
+
+Pull:
+
+```bash
+docker pull ghcr.io/jiacheng2004/polaris:latest
+docker pull ghcr.io/jiacheng2004/polaris:edge
+docker pull ghcr.io/jiacheng2004/polaris:vX.Y.Z
+```
+
+Inspect the embedded build metadata:
+
+```bash
+docker run --rm ghcr.io/jiacheng2004/polaris:latest --version
+```
+
+Verify the keyless cosign signature:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp '^https://github.com/JiaCheng2004/Polaris/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/jiacheng2004/polaris:vX.Y.Z
+```
+
+Verify the GitHub-native SLSA build provenance attestation:
+
+```bash
+gh attestation verify \
+  --owner JiaCheng2004 \
+  oci://ghcr.io/jiacheng2004/polaris:vX.Y.Z
+```
+
+Self-hosters who change Polaris source locally should keep using `deployments/docker-compose*.yml`, which build from the working tree. External consumers should reference an immutable tag (`vX.Y.Z` or `sha-<short>`) from their own Compose or Kubernetes manifests.
 
 ## Close-Out Commands
 
