@@ -1,15 +1,19 @@
 package gateway
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -161,6 +165,1043 @@ func TestGatewayRejectsOversizedRequestBody(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), `"request_body_too_large"`) {
 		t.Fatalf("expected request_body_too_large error, got %s", res.Body.String())
+	}
+}
+
+func TestFilesUploadListContentAndDelete(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	cfg := testConfig(t)
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	engine := newTestEngine(t, cfg)
+
+	body, contentType := multipartFileBody(t, "file", "note.txt", "text/plain", []byte("hello files"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		Bytes   int64  `json:"bytes"`
+		Polaris struct {
+			Sha256     string `json:"sha256"`
+			MimeType   string `json:"mime_type"`
+			ProjectID  string `json:"project_id"`
+			ContentURL string `json:"content_url"`
+		} `json:"polaris"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+	if !strings.HasPrefix(uploaded.ID, "pl_file_") || uploaded.Object != "file" || uploaded.Bytes != int64(len("hello files")) {
+		t.Fatalf("unexpected upload response %#v", uploaded)
+	}
+	if uploaded.Polaris.MimeType != "text/plain" || uploaded.Polaris.ProjectID != "legacy-default" || uploaded.Polaris.ContentURL == "" {
+		t.Fatalf("unexpected polaris metadata %#v", uploaded.Polaris)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/files", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), uploaded.ID) {
+		t.Fatalf("expected list to include file, got %d body=%s", res.Code, res.Body.String())
+	}
+
+	parsedURL, err := url.Parse(uploaded.Polaris.ContentURL)
+	if err != nil {
+		t.Fatalf("parse content_url: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, parsedURL.RequestURI(), nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || res.Body.String() != "hello files" {
+		t.Fatalf("expected content bytes, got %d body=%s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/v1/files/"+uploaded.ID, nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected delete 204, got %d body=%s", res.Code, res.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/files/"+uploaded.ID, nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected get deleted 404, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestFilesUploadPopularDocumentAndImageTypes(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	cfg := testConfig(t)
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "50/min",
+		AllowedModels: []string{"*"},
+	}}
+	engine := newTestEngine(t, cfg)
+
+	cases := []struct {
+		name     string
+		filename string
+		mimeType string
+		data     []byte
+	}{
+		{name: "pdf", filename: "report.pdf", mimeType: "application/pdf", data: []byte("%PDF-1.4\n%%EOF\n")},
+		{name: "docx", filename: "report.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", data: minimalZipPackage(t, map[string]string{
+			"[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>`,
+			"word/document.xml":   `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello DOCX</w:t></w:r></w:p></w:body></w:document>`,
+		})},
+		{name: "xlsx", filename: "sheet.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: minimalZipPackage(t, map[string]string{
+			"[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>`,
+			"xl/workbook.xml":     `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"></workbook>`,
+		})},
+		{name: "pptx", filename: "deck.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", data: minimalZipPackage(t, map[string]string{
+			"[Content_Types].xml":  `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>`,
+			"ppt/presentation.xml": `<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"></p:presentation>`,
+		})},
+		{name: "markdown", filename: "note.md", mimeType: "text/markdown", data: []byte("# Title\n\nbody\n")},
+		{name: "csv", filename: "data.csv", mimeType: "text/csv", data: []byte("name,value\npolaris,1\n")},
+		{name: "png", filename: "pixel.png", mimeType: "image/png", data: tinyPNGBytes(t)},
+		{name: "jpeg", filename: "pixel.jpg", mimeType: "image/jpeg", data: []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xff, 0xd9}},
+		{name: "gif", filename: "pixel.gif", mimeType: "image/gif", data: []byte("GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;")},
+		{name: "webp", filename: "pixel.webp", mimeType: "image/webp", data: minimalWebPVP8XBytes(2, 3)},
+		{name: "svg", filename: "icon.svg", mimeType: "image/svg+xml", data: []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="20"></svg>`)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, contentType := multipartFileBody(t, "file", tc.filename, tc.mimeType, tc.data)
+			req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+			req.Header.Set("Authorization", "Bearer secret")
+			req.Header.Set("Content-Type", contentType)
+			res := httptest.NewRecorder()
+			engine.ServeHTTP(res, req)
+			if res.Code != http.StatusOK {
+				t.Fatalf("expected upload 200 for %s, got %d body=%s", tc.mimeType, res.Code, res.Body.String())
+			}
+			var uploaded struct {
+				ID      string `json:"id"`
+				Polaris struct {
+					MimeType string `json:"mime_type"`
+				} `json:"polaris"`
+			}
+			if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+				t.Fatalf("decode upload response: %v", err)
+			}
+			if !strings.HasPrefix(uploaded.ID, "pl_file_") || uploaded.Polaris.MimeType != tc.mimeType {
+				t.Fatalf("unexpected upload response %#v", uploaded)
+			}
+		})
+	}
+}
+
+func TestFilesUploadHardFileBudgetRejectsOverage(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	cfg := testConfig(t)
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+
+	sqliteStore := testSQLiteStore(t)
+	if err := sqliteStore.CreateProject(t.Context(), store.Project{ID: "legacy-default", Name: "legacy-default", CreatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+	if err := sqliteStore.CreateBudget(t.Context(), store.Budget{
+		ID:             "bud_files",
+		ProjectID:      "legacy-default",
+		Name:           "file limit",
+		Mode:           store.BudgetModeHard,
+		LimitFileBytes: 4,
+		Window:         "monthly",
+		CreatedAt:      time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("CreateBudget() error = %v", err)
+	}
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New() error = %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    sqliteStore,
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	body, contentType := multipartFileBody(t, "file", "note.txt", "text/plain", []byte("hello"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected upload 429, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `"type":"budget_exceeded"`) || !strings.Contains(res.Body.String(), `"code":"budget_exceeded"`) {
+		t.Fatalf("expected budget_exceeded response, got %s", res.Body.String())
+	}
+}
+
+func TestFilesMaterializeOpenAIAndReuseCachedHandle(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	var mu sync.Mutex
+	uploadCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/files" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer sk-openai" {
+			t.Fatalf("unexpected Authorization header %q", got)
+		}
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatalf("ParseMultipartForm() error = %v", err)
+		}
+		if got := r.FormValue("purpose"); got != "user_data" {
+			t.Fatalf("unexpected purpose %q", got)
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			t.Fatalf("FormFile(file) error = %v", err)
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		data, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("ReadAll(file) error = %v", err)
+		}
+		if !bytes.HasPrefix(data, []byte("%PDF")) {
+			t.Fatalf("expected PDF bytes, got %q", string(data))
+		}
+		mu.Lock()
+		uploadCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"file_openai_cached",
+			"object":"file",
+			"bytes":18,
+			"filename":"report.pdf",
+			"purpose":"user_data",
+			"created_at":1714857600
+		}`))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	engine := newTestEngine(t, cfg)
+
+	fileBytes := []byte("%PDF-1.4\nfile bytes")
+	body, contentType := multipartFileBody(t, "file", "report.pdf", "application/pdf", fileBytes)
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	materializePath := "/v1/files/" + uploaded.ID + "/materialize?provider=openai"
+	req = httptest.NewRequest(http.MethodPost, materializePath, nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected materialize 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var materialized struct {
+		Object         string `json:"object"`
+		FileID         string `json:"file_id"`
+		Provider       string `json:"provider"`
+		ProviderFileID string `json:"provider_file_id"`
+		Cached         bool   `json:"cached"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &materialized); err != nil {
+		t.Fatalf("decode materialize response: %v", err)
+	}
+	if materialized.Object != "file.materialization" || materialized.FileID != uploaded.ID || materialized.Provider != "openai" || materialized.ProviderFileID != "file_openai_cached" || materialized.Cached {
+		t.Fatalf("unexpected materialization response %#v", materialized)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, materializePath, nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected cached materialize 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &materialized); err != nil {
+		t.Fatalf("decode cached materialize response: %v", err)
+	}
+	if !materialized.Cached {
+		t.Fatalf("expected cached materialization response, got %#v", materialized)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if uploadCalls != 1 {
+		t.Fatalf("expected one upstream file upload, got %d", uploadCalls)
+	}
+}
+
+func TestChatWithPolarisFileTriggersOpenAIMaterialization(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	var mu sync.Mutex
+	uploadCalls := 0
+	chatCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/files":
+			mu.Lock()
+			uploadCalls++
+			mu.Unlock()
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Fatalf("ParseMultipartForm() error = %v", err)
+			}
+			file, _, err := r.FormFile("file")
+			if err != nil {
+				t.Fatalf("FormFile(file) error = %v", err)
+			}
+			defer func() {
+				_ = file.Close()
+			}()
+			data, err := io.ReadAll(file)
+			if err != nil {
+				t.Fatalf("ReadAll(file) error = %v", err)
+			}
+			if !bytes.HasPrefix(data, []byte("%PDF")) {
+				t.Fatalf("expected PDF bytes, got %q", string(data))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"file_openai_lazy","object":"file","bytes":18,"filename":"report.pdf","purpose":"user_data","created_at":1714857600}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/chat/completions":
+			mu.Lock()
+			chatCalls++
+			mu.Unlock()
+			var payload struct {
+				Model    string `json:"model"`
+				Messages []struct {
+					Content []struct {
+						Type string `json:"type"`
+						File struct {
+							FileID string `json:"file_id"`
+						} `json:"file"`
+					} `json:"content"`
+				} `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode chat payload: %v", err)
+			}
+			if payload.Model != "gpt-4o" {
+				t.Fatalf("expected provider model gpt-4o, got %q", payload.Model)
+			}
+			if len(payload.Messages) != 1 || len(payload.Messages[0].Content) != 2 {
+				t.Fatalf("unexpected chat payload %#v", payload)
+			}
+			filePart := payload.Messages[0].Content[1]
+			if filePart.Type != "file" || filePart.File.FileID != "file_openai_lazy" {
+				t.Fatalf("expected resolved provider file id, got %#v", filePart)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"id":"chatcmpl_file",
+				"object":"chat.completion",
+				"created":1714857601,
+				"model":"gpt-4o",
+				"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
+				"usage":{"prompt_tokens":12,"completion_tokens":2,"total_tokens":14}
+			}`))
+		default:
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	model := cfg.Providers["openai"].Models["gpt-4o"]
+	model.Capabilities = append(model.Capabilities, modality.CapabilityPDFInput, modality.CapabilityFileReference)
+	cfg.Providers["openai"].Models["gpt-4o"] = model
+	engine := newTestEngine(t, cfg)
+
+	body, contentType := multipartFileBody(t, "file", "report.pdf", "application/pdf", []byte("%PDF-1.4\nfile bytes"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-4o",
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"summarize"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"application/pdf","filename":"report.pdf"}}
+			]
+		}]
+	}`, uploaded.ID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected chat 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if uploadCalls != 1 || chatCalls != 1 {
+		t.Fatalf("expected one materialization and one chat, got upload=%d chat=%d", uploadCalls, chatCalls)
+	}
+}
+
+func TestChatWithPolarisImageUsesOpenAIVisionPayload(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	chatCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/files" {
+			t.Fatalf("image chat should not materialize through OpenAI Files API")
+		}
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		chatCalls++
+		var payload struct {
+			Messages []struct {
+				Content []struct {
+					Type     string `json:"type"`
+					ImageURL struct {
+						URL string `json:"url"`
+					} `json:"image_url"`
+				} `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chat payload: %v", err)
+		}
+		if len(payload.Messages) != 1 || len(payload.Messages[0].Content) != 2 {
+			t.Fatalf("unexpected chat payload %#v", payload)
+		}
+		imagePart := payload.Messages[0].Content[1]
+		if imagePart.Type != "image_url" || !strings.HasPrefix(imagePart.ImageURL.URL, "data:image/png;base64,") {
+			t.Fatalf("expected image_url data URI, got %#v", imagePart)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl_image",
+			"object":"chat.completion",
+			"created":1714857601,
+			"model":"gpt-4o",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"seen"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":20,"completion_tokens":2,"total_tokens":22}
+		}`))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	engine := newTestEngine(t, cfg)
+
+	pngBytes := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	body, contentType := multipartFileBody(t, "file", "pixel.png", "image/png", pngBytes)
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-4o",
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"what is in this image?"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"image/png","filename":"pixel.png"}}
+			]
+		}]
+	}`, uploaded.ID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected chat 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if chatCalls != 1 {
+		t.Fatalf("expected one chat call, got %d", chatCalls)
+	}
+}
+
+func TestChatPolarisUnderstandingDisabledRejectsTextOnlyImage(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("upstream should not be called when native image support and Polaris understanding are unavailable")
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	cfg.Providers["openai"].Models["gpt-5.3-codex"] = config.ModelConfig{
+		Modality:     modality.ModalityChat,
+		Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityReasoning},
+	}
+	engine := newTestEngine(t, cfg)
+
+	body, contentType := multipartFileBody(t, "file", "pixel.png", "image/png", tinyPNGBytes(t))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-5.3-codex",
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"what is in this image?"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"image/png","filename":"pixel.png"}}
+			]
+		}]
+	}`, uploaded.ID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected chat 400, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "Polaris beta file understanding is disabled by default") {
+		t.Fatalf("expected beta opt-in guidance, got %s", res.Body.String())
+	}
+}
+
+func TestChatPolarisUnderstandingOptInConvertsImageForTextOnlyModel(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	chatCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		chatCalls++
+		var payload struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chat payload: %v", err)
+		}
+		if payload.Model != "gpt-5.3-codex" {
+			t.Fatalf("expected provider model gpt-5.3-codex, got %q", payload.Model)
+		}
+		if len(payload.Messages) != 1 || len(payload.Messages[0].Content) != 2 {
+			t.Fatalf("unexpected chat payload %#v", payload)
+		}
+		derived := payload.Messages[0].Content[1]
+		if derived.Type != "text" || !strings.Contains(derived.Text, "Polaris beta file understanding") || !strings.Contains(derived.Text, "Dimensions: 1x1 pixels") {
+			t.Fatalf("expected derived image context, got %#v", derived)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl_understanding",
+			"object":"chat.completion",
+			"created":1714857601,
+			"model":"gpt-5.3-codex",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"metadata seen"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":30,"completion_tokens":3,"total_tokens":33}
+		}`))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Files.Understanding.Enabled = true
+	cfg.Files.Understanding.Mode = "explicit"
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	cfg.Providers["openai"].Models["gpt-5.3-codex"] = config.ModelConfig{
+		Modality:     modality.ModalityChat,
+		Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityReasoning},
+	}
+	engine := newTestEngine(t, cfg)
+
+	body, contentType := multipartFileBody(t, "file", "pixel.png", "image/png", tinyPNGBytes(t))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-5.3-codex",
+		"polaris":{"file_understanding":{"mode":"derived_context"}},
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"what is in this image?"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"image/png","filename":"pixel.png"}}
+			]
+		}]
+	}`, uploaded.ID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected chat 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-Polaris-File-Understanding"); got != "derived_context" {
+		t.Fatalf("expected file understanding header, got %q", got)
+	}
+	var response struct {
+		Polaris struct {
+			FileUnderstanding struct {
+				Used      bool   `json:"used"`
+				Mode      string `json:"mode"`
+				Warning   string `json:"warning"`
+				Artifacts []struct {
+					FileID    string `json:"file_id"`
+					Processor string `json:"processor"`
+					Source    string `json:"source"`
+				} `json:"artifacts"`
+			} `json:"file_understanding"`
+		} `json:"polaris"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	if !response.Polaris.FileUnderstanding.Used ||
+		response.Polaris.FileUnderstanding.Mode != "derived_context" ||
+		!strings.Contains(response.Polaris.FileUnderstanding.Warning, "reduce answer quality") ||
+		len(response.Polaris.FileUnderstanding.Artifacts) != 1 ||
+		response.Polaris.FileUnderstanding.Artifacts[0].FileID != uploaded.ID ||
+		response.Polaris.FileUnderstanding.Artifacts[0].Processor != "polaris_image_metadata" {
+		t.Fatalf("unexpected file understanding metadata %#v", response.Polaris.FileUnderstanding)
+	}
+	if chatCalls != 1 {
+		t.Fatalf("expected one chat call, got %d", chatCalls)
+	}
+}
+
+func TestChatPolarisUnderstandingDerivedContextCanOverrideNativeVision(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	chatCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		chatCalls++
+		var payload struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content []struct {
+					Type     string `json:"type"`
+					Text     string `json:"text"`
+					ImageURL struct {
+						URL string `json:"url"`
+					} `json:"image_url"`
+				} `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chat payload: %v", err)
+		}
+		if payload.Model != "gpt-5.4-mini" {
+			t.Fatalf("expected provider model gpt-5.4-mini, got %q", payload.Model)
+		}
+		if len(payload.Messages) != 1 || len(payload.Messages[0].Content) != 2 {
+			t.Fatalf("unexpected chat payload %#v", payload)
+		}
+		derived := payload.Messages[0].Content[1]
+		if derived.Type != "text" || derived.ImageURL.URL != "" || !strings.Contains(derived.Text, "Polaris beta file understanding") {
+			t.Fatalf("expected forced derived text context, got %#v", derived)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl_understanding_native_override",
+			"object":"chat.completion",
+			"created":1714857601,
+			"model":"gpt-5.4-mini",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"derived context seen"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":30,"completion_tokens":3,"total_tokens":33}
+		}`))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Files.Understanding.Enabled = true
+	cfg.Files.Understanding.Mode = "explicit"
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	cfg.Providers["openai"].Models["gpt-5.4-mini"] = config.ModelConfig{
+		Modality:     modality.ModalityChat,
+		Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityVision, modality.CapabilityReasoning},
+	}
+	engine := newTestEngine(t, cfg)
+
+	body, contentType := multipartFileBody(t, "file", "pixel.png", "image/png", tinyPNGBytes(t))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-5.4-mini",
+		"polaris":{"file_understanding":{"mode":"derived_context"}},
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"what is in this image?"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"image/png","filename":"pixel.png"}}
+			]
+		}]
+	}`, uploaded.ID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected chat 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-Polaris-File-Understanding"); got != "derived_context" {
+		t.Fatalf("expected file understanding header, got %q", got)
+	}
+	if chatCalls != 1 {
+		t.Fatalf("expected one chat call, got %d", chatCalls)
+	}
+}
+
+func TestChatPolarisUnderstandingExtractsPDFAndDOCX(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	chatCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		chatCalls++
+		var payload struct {
+			Messages []struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chat payload: %v", err)
+		}
+		var derived strings.Builder
+		for _, part := range payload.Messages[0].Content {
+			if part.Type == "text" {
+				derived.WriteString(part.Text)
+				derived.WriteByte('\n')
+			}
+		}
+		derivedText := derived.String()
+		if !strings.Contains(derivedText, "Hello from PDF") || !strings.Contains(derivedText, "Hello from DOCX") {
+			t.Fatalf("expected PDF and DOCX derived context, got %q", derivedText)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl_understanding_docs",
+			"object":"chat.completion",
+			"created":1714857601,
+			"model":"gpt-5.3-codex",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"document context seen"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":60,"completion_tokens":3,"total_tokens":63}
+		}`))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithOpenAIBaseURL(t, upstream.URL+"/v1")
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Files.Understanding.Enabled = true
+	cfg.Files.Understanding.Mode = "explicit"
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{{
+		Name:          "test-key",
+		KeyHash:       middleware.HashAPIKey("secret"),
+		RateLimit:     "20/min",
+		AllowedModels: []string{"*"},
+	}}
+	cfg.Providers["openai"].Models["gpt-5.3-codex"] = config.ModelConfig{
+		Modality:     modality.ModalityChat,
+		Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityReasoning},
+	}
+	engine := newTestEngine(t, cfg)
+
+	pdfID := uploadTestFile(t, engine, "secret", "sample.pdf", "application/pdf", minimalPDFDocumentBytes("Hello from PDF"))
+	docxID := uploadTestFile(t, engine, "secret", "sample.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", minimalZipPackage(t, map[string]string{
+		"[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>`,
+		"word/document.xml":   `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello from DOCX</w:t></w:r></w:p></w:body></w:document>`,
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{
+		"model":"openai/gpt-5.3-codex",
+		"polaris":{"file_understanding":{"mode":"derived_context"}},
+		"messages":[{
+			"role":"user",
+			"content":[
+				{"type":"text","text":"summarize these documents"},
+				{"type":"file","file":{"file_id":%q,"mime_type":"application/pdf","filename":"sample.pdf"}},
+				{"type":"file","file":{"file_id":%q,"mime_type":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","filename":"sample.docx"}}
+			]
+		}]
+	}`, pdfID, docxID)))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected chat 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var response struct {
+		Polaris struct {
+			FileUnderstanding struct {
+				Artifacts []struct {
+					Processor string `json:"processor"`
+				} `json:"artifacts"`
+			} `json:"file_understanding"`
+		} `json:"polaris"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	processors := make(map[string]bool)
+	for _, artifact := range response.Polaris.FileUnderstanding.Artifacts {
+		processors[artifact.Processor] = true
+	}
+	if !processors["polaris_pdf_text_extract"] || !processors["polaris_ooxml_text_extract"] {
+		t.Fatalf("expected PDF and OOXML processors, got %#v", response.Polaris.FileUnderstanding.Artifacts)
+	}
+	if chatCalls != 1 {
+		t.Fatalf("expected one chat call, got %d", chatCalls)
+	}
+}
+
+func TestFilesTenantIsolationReturnsNotFound(t *testing.T) {
+	t.Setenv("POLARIS_FILE_DOWNLOAD_SECRET", "test-file-secret")
+	cfg := testConfig(t)
+	defaultCfg := config.Default()
+	cfg.Files = defaultCfg.Files
+	cfg.Files.Enabled = true
+	cfg.Auth.Mode = config.AuthModeVirtualKeys
+	cfg.Auth.BootstrapAdminKeyHash = middleware.HashAPIKey("admin")
+	cfg.Cache.RateLimit.Default = "50/min"
+
+	sqliteStore := testSQLiteStore(t)
+	for _, projectID := range []string{"proj_a", "proj_b"} {
+		if err := sqliteStore.CreateProject(t.Context(), store.Project{ID: projectID, Name: projectID, CreatedAt: time.Now().UTC()}); err != nil {
+			t.Fatalf("CreateProject(%s) error = %v", projectID, err)
+		}
+	}
+	keys := []struct {
+		id        string
+		projectID string
+		raw       string
+	}{
+		{id: "vk_a", projectID: "proj_a", raw: "secret-a"},
+		{id: "vk_b", projectID: "proj_b", raw: "secret-b"},
+	}
+	for _, key := range keys {
+		if err := sqliteStore.CreateVirtualKey(t.Context(), store.VirtualKey{
+			ID:            key.id,
+			ProjectID:     key.projectID,
+			Name:          key.id,
+			KeyHash:       middleware.HashAPIKey(key.raw),
+			KeyPrefix:     key.raw[:8],
+			AllowedModels: []string{"*"},
+			CreatedAt:     time.Now().UTC(),
+		}); err != nil {
+			t.Fatalf("CreateVirtualKey(%s) error = %v", key.id, err)
+		}
+	}
+	registry, warnings, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no registry warnings, got %v", warnings)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    sqliteStore,
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	body, contentType := multipartFileBody(t, "file", "note.txt", "text/plain", []byte("project A"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer secret-a")
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/files/"+uploaded.ID, nil)
+	req.Header.Set("Authorization", "Bearer secret-b")
+	res = httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected cross-project 404, got %d body=%s", res.Code, res.Body.String())
 	}
 }
 
@@ -2937,6 +3978,93 @@ func testSQLiteStore(t *testing.T) *sqlite.Store {
 		t.Fatalf("sqliteStore.Migrate() error = %v", err)
 	}
 	return sqliteStore
+}
+
+func multipartFileBody(t *testing.T, fieldName string, filename string, contentType string, data []byte) (*bytes.Buffer, string) {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, filename))
+	header.Set("Content-Type", contentType)
+	fileWriter, err := writer.CreatePart(header)
+	if err != nil {
+		t.Fatalf("CreatePart() error = %v", err)
+	}
+	if _, err := fileWriter.Write(data); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close() error = %v", err)
+	}
+	return &body, writer.FormDataContentType()
+}
+
+func tinyPNGBytes(t *testing.T) []byte {
+	t.Helper()
+	data, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode tiny png fixture: %v", err)
+	}
+	return data
+}
+
+func minimalZipPackage(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for name, body := range files {
+		part, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("zip create %s: %v", name, err)
+		}
+		if _, err := part.Write([]byte(body)); err != nil {
+			t.Fatalf("zip write %s: %v", name, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func minimalPDFDocumentBytes(text string) []byte {
+	stream := fmt.Sprintf("BT /F1 12 Tf 72 720 Td [(%s)]TJ ET", text)
+	var pdf bytes.Buffer
+	_, _ = pdf.WriteString("%PDF-1.4\n")
+	_, _ = pdf.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+	_, _ = pdf.WriteString("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
+	_, _ = pdf.WriteString("3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>\nendobj\n")
+	_, _ = fmt.Fprintf(&pdf, "4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n%%EOF\n", len(stream), stream)
+	return pdf.Bytes()
+}
+
+func uploadTestFile(t *testing.T, engine http.Handler, apiKey string, filename string, mimeType string, data []byte) string {
+	t.Helper()
+	body, contentType := multipartFileBody(t, "file", filename, mimeType, data)
+	req := httptest.NewRequest(http.MethodPost, "/v1/files", body)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", contentType)
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload 200 for %s, got %d body=%s", filename, res.Code, res.Body.String())
+	}
+	var uploaded struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+	return uploaded.ID
+}
+
+func minimalWebPVP8XBytes(width int, height int) []byte {
+	payload := []byte{0, 0, 0, 0, byte(width - 1), byte((width - 1) >> 8), byte((width - 1) >> 16), byte(height - 1), byte((height - 1) >> 8), byte((height - 1) >> 16)}
+	size := 4 + 8 + len(payload)
+	data := []byte{'R', 'I', 'F', 'F', byte(size), byte(size >> 8), byte(size >> 16), byte(size >> 24), 'W', 'E', 'B', 'P', 'V', 'P', '8', 'X', byte(len(payload)), 0, 0, 0}
+	data = append(data, payload...)
+	return data
 }
 
 func containsStructuredLogLine(logs string, needles ...string) bool {

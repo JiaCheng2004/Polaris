@@ -2,7 +2,7 @@ package polaris
 
 #Duration: =~"^[0-9]+(ns|us|µs|ms|s|m|h)([0-9]+(ns|us|µs|ms|s|m|h))*$"
 #HashedSecret: "" | =~"^sha256:.+" | =~"^\\$\\{[A-Z0-9_]+\\}$"
-#Modality: "chat" | "embed" | "image" | "video" | "voice" | "audio" | "music" | "notes" | "podcast" | "translation" | "interpreting"
+#Modality: "chat" | "embed" | "image" | "video" | "voice" | "audio" | "music" | "notes" | "podcast" | "translation" | "interpreting" | "files" | "batch"
 
 #Config: {
 	version: 2
@@ -53,6 +53,59 @@ package polaris
 		tools?: _
 		mcp?: {
 			enabled?: bool
+		}
+		files?: {
+			enabled?: bool
+			ingestion?: {
+				max_upload_bytes?: int & >=0
+				allowed_mime?: [...string]
+			}
+			storage?: {
+				inline_max_bytes?: int & >=0
+				blob_store?: "none" | "disk" | "s3"
+				disk_path?: string
+				s3?: _
+			}
+			downloads?: {
+				token_ttl?: #Duration
+			}
+			ssrf?: {
+				allowed_schemes?: [...("http" | "https")]
+				deny_hosts?: [...string]
+			}
+			materialization?: {
+				inline_fallback_max?: int & >=0
+			}
+			understanding?: {
+				enabled?: bool
+				mode?: "disabled" | "explicit" | "auto_fallback"
+				profile?: "fast" | "balanced" | "quality"
+				max_bytes?: int & >=0
+				max_text_chars?: int & >=0
+				cache_artifacts?: bool
+				chunking?: {
+					enabled?: bool
+					max_chars?: int & >=0
+					overlap_chars?: int & >=0
+				}
+				processors?: [...{
+					enabled?: bool
+					name?: string
+					backend?: "http" | "remote_http" | "tika"
+					endpoint?: string
+					method?: string
+					version?: string
+					timeout?: #Duration
+					priority?: int
+					mime_types?: [...string]
+					file_classes?: [...("text" | "image" | "pdf" | "office_document" | "office_spreadsheet" | "office_presentation" | "audio" | "video" | "archive" | "unknown")]
+					artifacts?: [...("text" | "metadata" | "ocr_text" | "layout" | "table" | "form" | "chunk" | "image_caption" | "image_metadata" | "embedding" | "raw")]
+					capabilities?: [...("detect" | "text_extract" | "metadata" | "ocr" | "layout" | "table_extract" | "form_extract" | "image_caption" | "chunk" | "embed")]
+					profiles?: [...("fast" | "balanced" | "quality")]
+					headers?: [string]: string
+					ocr?: bool
+				}]
+			}
 		}
 		pricing?: {
 			file?: string

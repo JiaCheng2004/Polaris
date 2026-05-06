@@ -37,6 +37,7 @@ Supported CLI flags:
 - `runtime.auth`: auth mode, static keys, external signed-claim auth, legacy multi-user compatibility, and virtual-key bootstrap settings.
 - `runtime.store`: backing database driver, DSN, and async log writer tuning.
 - `runtime.cache`: driver selection, Redis connection settings, rate limiting, and response-cache settings.
+- `runtime.files`: unified file upload, MIME validation, blob storage, signed downloads, and SSRF controls.
 - `providers`: provider credentials, transport policy, and model catalog references.
 - `routing`: static aliases, capability-driven selector aliases, and provider failover order.
 - `runtime.control_plane`: project / virtual-key control-plane enablement.
@@ -53,7 +54,48 @@ Local defaults bind Polaris to `127.0.0.1` with `auth.mode: none`. Use `0.0.0.0`
 
 `runtime.server.max_body_bytes` caps JSON and multipart request bodies. The default is `67108864` bytes (64 MiB). Oversized requests return `413 invalid_request_error / request_body_too_large`.
 
+`POST /v1/files` uses `runtime.files.ingestion.max_upload_bytes` instead of the general server body limit. The default is `524288000` bytes (500 MiB).
+
 `runtime.server.cors` is config-driven. The local default allows localhost and 127.0.0.1 browser origins, including wildcard ports such as `http://localhost:*`. Production configs should list exact application origins. `allow_credentials: true` is rejected when `allowed_origins` contains `*`.
+
+## Files
+
+The files surface is enabled by `runtime.files.enabled` and stores small uploads inline in the database. Larger direct uploads require an opt-in blob store.
+
+```yaml
+runtime:
+  files:
+    enabled: true
+    ingestion:
+      max_upload_bytes: 524288000
+      allowed_mime: [application/pdf, application/json, application/xml, application/x-yaml, application/yaml, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.openxmlformats-officedocument.presentationml.presentation, text/*, image/*, audio/*]
+    storage:
+      inline_max_bytes: 5242880
+      blob_store: none # none | disk | s3
+      disk_path: ./data/files
+    downloads:
+      token_ttl: 10m
+    ssrf:
+      allowed_schemes: [https]
+      deny_hosts: [169.254.169.254, metadata.google.internal]
+    materialization:
+      inline_fallback_max: 5242880
+    understanding:
+      enabled: false
+      mode: disabled # disabled | explicit | auto_fallback
+      profile: fast # fast | balanced | quality
+      max_bytes: 5242880
+      max_text_chars: 12000
+      cache_artifacts: true
+```
+
+Set `POLARIS_FILE_DOWNLOAD_SECRET` to issue signed `polaris.content_url` links for `/v1/files/:id/content`. URL ingestion uses the SSRF policy above; redirects and DNS resolutions are revalidated.
+
+Blob-backed uploads are content-addressed by SHA-256. If two `pl_file_...` rows contain byte-identical content, they point at the same blob key while retaining independent filenames, metadata, project/key ownership, and provider materialization rows.
+
+`runtime.files.understanding` is a beta derived-context layer for files and images. It is disabled by default. Set `enabled: true` with `mode: explicit` to require per-request opt-in through `polaris.file_understanding.mode: derived_context`; this forces Polaris-derived text context even when the selected model supports native file or image input. Set `mode: auto_fallback` only if you want Polaris to derive context automatically when the selected model lacks native support. `profile` selects the processor plan: `fast` uses local deterministic extraction only, while `balanced` and `quality` can select configured OCR/layout/table/form/caption/embedding backends. This fallback converts original bytes into source-preserving artifacts and can reduce answer quality compared with native multimodal processing. Built-in processors currently handle text-like files, born-digital PDF content-stream text, OOXML text for DOCX/PPTX/XLSX with document sections, slide notes, table cells, spreadsheet cell references/formulas, recursive text chunks with provenance, and image container metadata.
+
+Processor backends are modular. `backend: tika` calls Apache Tika Server directly. `backend: remote_http` sends Polaris's canonical file-understanding request to an operator-owned service, which can wrap AWS Textract, Google Document AI, Azure Document Intelligence, a VLM image-caption service, or an embedding service and return canonical artifacts (`text`, `ocr_text`, `layout`, `table`, `form`, `image_caption`, `embedding`). Processors declare MIME types, capabilities, artifact kinds, profiles, and priority; the planner selects the best matching processor without changing provider adapters.
 
 ## Provider Model References
 
@@ -538,10 +580,23 @@ docker pull ghcr.io/jiacheng2004/polaris:edge
 docker pull ghcr.io/jiacheng2004/polaris:vX.Y.Z
 ```
 
+The image includes `/etc/polaris/polaris.yaml` as a container-safe edge default. It binds to `0.0.0.0:8080`, stores SQLite data and file blobs under `/var/lib/polaris`, enables `/v1/files`, and keeps beta Polaris file/image understanding in explicit opt-in mode. Mount your own `/etc/polaris/polaris.yaml` for production auth, PostgreSQL/Redis, S3 file storage, external processors, or a wider provider matrix.
+
 Inspect the embedded build metadata:
 
 ```bash
 docker run --rm ghcr.io/jiacheng2004/polaris:latest --version
+```
+
+Run the edge image with persistent local storage:
+
+```bash
+docker run --rm \
+  -p 8080:8080 \
+  -v polaris-data:/var/lib/polaris \
+  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  ghcr.io/jiacheng2004/polaris:edge
 ```
 
 Verify the keyless cosign signature:

@@ -17,15 +17,16 @@
 7. [Embeddings](#7-embeddings)
 8. [Images](#8-images)
 9. [Video](#9-video)
-10. [Music](#10-music)
-11. [Voice — TTS & STT](#11-voice--tts--stt)
-12. [Models](#12-models)
-13. [Usage](#13-usage)
-14. [Control Plane & API Keys](#14-control-plane--api-keys)
-15. [MCP Broker](#15-mcp-broker)
-16. [Health & Readiness](#16-health--readiness)
-17. [Metrics](#17-metrics)
-18. [Full Endpoint Map](#18-full-endpoint-map)
+10. [Files](#10-files)
+11. [Music](#11-music)
+12. [Voice — TTS & STT](#12-voice--tts--stt)
+13. [Models](#13-models)
+14. [Usage](#14-usage)
+15. [Control Plane & API Keys](#15-control-plane--api-keys)
+16. [MCP Broker](#16-mcp-broker)
+17. [Health & Readiness](#17-health--readiness)
+18. [Metrics](#18-metrics)
+19. [Full Endpoint Map](#19-full-endpoint-map)
 
 ---
 
@@ -291,6 +292,7 @@ Generate a chat completion. Supports streaming and non-streaming, text-only and 
 | `tool_choice` | string \| object | no | `"auto"`, `"none"`, `"required"`, or `{"type":"function","function":{"name":"..."}}`. |
 | `response_format` | object | no | `{"type":"json_object"}` or `{"type":"json_schema","json_schema":{...}}`. Requires the model to declare JSON-mode support. |
 | `stop` | string \| array | no | Up to 4 stop sequences. |
+| `polaris.file_understanding` | object | no | Beta opt-in for Polaris-derived file/image context. `mode: "derived_context"` forces derived text context; `mode: "auto_fallback"` preserves native provider handling unless the selected model lacks support. Optional `profile` is `fast`, `balanced`, or `quality`; current built-ins are local `fast` processors and future OCR/layout/caption processors can bind to higher profiles. Requires operator config `runtime.files.understanding.enabled: true`. |
 
 **Multimodal content parts** (when `messages[].content` is an array):
 
@@ -299,8 +301,83 @@ Generate a chat completion. Supports streaming and non-streaming, text-only and 
 | `text` | `text` (string) | — |
 | `image_url` | `image_url.url` (http(s) URL or `data:` URI), `image_url.detail` (`low`/`high`/`auto`) | `vision` |
 | `input_audio` | `input_audio.data` (base64), `input_audio.format` (`wav`/`mp3`/…) | `audio_input` |
+| `file` | `file.file_id` (`pl_file_...` or provider id), `file.url`, or base64 `file.data`; optional `filename`, `mime_type`, `citations` | inferred from MIME: `vision`, `audio_input`, `pdf_input`, `document_input`, or `file_reference` |
+| `document` | Same shape as `file`; semantic alias for providers with document blocks | inferred from MIME |
 
 If the resolved model does not declare the required capability, the response is `400 capability_not_supported`.
+
+#### Beta Polaris File Understanding
+
+By default, Polaris never reinterprets uploaded bytes. A `pl_file_...` image or document is routed to the provider only when the selected model/provider supports native image, PDF, document, URL, inline, or provider-file transport. If the model lacks that native capability, Polaris returns `400 capability_not_supported`.
+
+Operators can enable a beta fallback:
+
+```yaml
+runtime:
+  files:
+    understanding:
+      enabled: true
+      mode: explicit
+      profile: fast
+      max_bytes: 5242880
+      max_text_chars: 12000
+      cache_artifacts: true
+```
+
+Callers must then opt in per request:
+
+```json
+{
+  "model": "openai/gpt-5.3-codex",
+  "polaris": {
+    "file_understanding": {
+      "mode": "derived_context",
+      "profile": "fast"
+    }
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Summarize this."},
+        {"type": "file", "file": {"file_id": "pl_file_...", "mime_type": "text/plain"}}
+      ]
+    }
+  ]
+}
+```
+
+In `derived_context` mode Polaris extracts source-preserving text context with selected processors and replaces the file part before sending the request upstream, even if the selected model also supports native multimodal input. `auto_fallback` keeps native provider handling first and only derives context when the selected model lacks native support. This is not equivalent to native multimodal understanding and can reduce response quality. Current built-ins extract text-like files, born-digital PDF content-stream text, OOXML text from DOCX/PPTX/XLSX with document sections, slide notes, table cells, spreadsheet cell references/formulas, recursive chunks with provenance, and image container metadata. Richer OCR, image captioning, scanned-PDF extraction, layout, table/form extraction, and embeddings are real processor backends configured through `runtime.files.understanding.processors`, not silent emulation. Non-supported MIME types still return `400 capability_not_supported / file_understanding_processor_missing`.
+
+Internally, Polaris now plans understanding through a file-class and capability abstraction. Inputs are classified as text, image, PDF, Office document, Office spreadsheet, Office presentation, audio, video, archive, or unknown. Processors advertise artifact kinds such as `text`, `metadata`, `ocr_text`, `layout`, `table`, `form`, `chunk`, `image_caption`, and `embedding`, plus capabilities such as `text_extract`, `ocr`, `layout`, `table_extract`, `form_extract`, `image_caption`, `chunk`, and `embed`. The default `fast` profile selects local deterministic processors only; `balanced` and `quality` can select configured Tika, Textract/Document AI/Azure wrapper, OCR/layout, VLM captioning, or embedding processors by priority.
+
+When used, non-streaming responses include:
+
+```json
+{
+  "polaris": {
+    "file_understanding": {
+      "used": true,
+      "mode": "derived_context",
+      "profile": "fast",
+      "warning": "Polaris beta file understanding converted the original file into derived text context...",
+      "artifacts": [
+        {
+          "file_id": "pl_file_...",
+          "sha256": "ab12...",
+          "mime_type": "image/png",
+          "kind": "image_metadata",
+          "processor": "polaris_image_metadata",
+          "version": "v1",
+          "source": "generated"
+        }
+      ]
+    }
+  }
+}
+```
+
+Streaming responses carry `X-Polaris-File-Understanding: derived_context` when the fallback is used.
 
 #### Non-streaming response (`stream: false`)
 
@@ -911,7 +988,86 @@ curl -X DELETE http://localhost:8080/v1/video/generations/vid_01HXYZ... \
 
 ---
 
-## 10. Music
+## 10. Files
+
+Files are Polaris-native project-scoped handles for documents, images, audio, and other provider inputs. Uploading a file only stores or references bytes; model processing happens later through native provider transport, inline/URL fallback, or the explicit beta Polaris file-understanding fallback described in §6.
+
+### `POST /v1/files`
+
+Upload either `multipart/form-data` with a `file` field, or JSON with a `url` field. The response uses an OpenAI-like file object with a `pl_file_...` id.
+
+Direct uploads are content-addressed when blob backing is enabled: byte-identical files share the same blob key by SHA-256, while each upload keeps its own `pl_file_...` id, filename, metadata, project/key binding, and provider materialization cache rows.
+
+JSON URL ingestion:
+
+```json
+{
+  "url": "https://example.com/report.pdf",
+  "filename": "report.pdf",
+  "purpose": "user_data",
+  "metadata": {"case": "q2"}
+}
+```
+
+### `GET /v1/files`
+
+Lists files scoped to the authenticated project. Optional query params: `limit`, `after`, `purpose`.
+
+### `GET /v1/files/:id`
+
+Returns metadata for one project-scoped file. Cross-project lookups return `404`.
+
+### `GET /v1/files/:id/content?token=...`
+
+Downloads raw bytes using the signed token returned in `polaris.content_url` when `POLARIS_FILE_DOWNLOAD_SECRET` is configured.
+
+### `DELETE /v1/files/:id`
+
+Deletes the Polaris file row and cached provider handles. Returns `204 No Content`.
+
+### `POST /v1/files/:id/materialize?provider=...`
+
+Provider pre-warming for providers that register a native files adapter. OpenAI, Anthropic, Google developer API, and Qwen are supported; unsupported providers return `400 capability_not_supported / provider_lacks_files_api`.
+
+Response:
+
+```json
+{
+  "object": "file.materialization",
+  "file_id": "pl_file_01J7P9V3YMZQK7E0X2QF5N6BHD",
+  "provider": "openai",
+  "provider_file_id": "file_abc123",
+  "purpose": "user_data",
+  "bytes": 482733,
+  "mime_type": "application/pdf",
+  "created_at": 1714857600,
+  "cached": false
+}
+```
+
+#### File Errors
+
+| HTTP | `type` | `code` |
+|---|---|---|
+| 400 | `invalid_request_error` | `invalid_purpose`, `invalid_url` |
+| 400 | `capability_not_supported` | `provider_lacks_files_api` |
+| 404 | `invalid_request_error` | `file_not_found` |
+| 410 | `invalid_request_error` | `file_expired` |
+| 413 | `invalid_request_error` | `file_too_large` |
+| 415 | `invalid_request_error` | `unsupported_mime` |
+| 422 | `invalid_request_error` | `ssrf_blocked` |
+
+### File-backed batches
+
+`POST /v1/batches` creates a provider batch job from an OpenAI-compatible JSONL input file referenced by `input_file_id`. The selected model determines the provider; OpenAI, Anthropic, and Google register batch adapters. The returned `id` is a signed `pl_batch_...` handle.
+
+- `GET /v1/batches/:id` polls provider status.
+- `GET /v1/batches/:id/output` streams output when the provider exposes output bytes.
+- `DELETE /v1/batches/:id` cancels the provider job.
+
+---
+
+## 11. Music
 
 Current implementation note: music is a first-class Polaris modality. The shipped Phase 5A surface is provider-neutral but capability-gated. For `v2.1.0`, MiniMax is the release-blocking music provider and backs generation, cover edits, and lyrics. ElevenLabs backs generation, streaming generation, stems, and composition plans through the same API shape, but that provider path is currently treated as preview until it is explicitly opted into live smoke. Async music jobs are Polaris-managed and require a configured cache backend. `sync` remains the default request mode, but long-running music jobs, especially MiniMax generation, should use `mode: "async"`.
 
@@ -1041,7 +1197,7 @@ Cancel an async Polaris-managed music job. Completed or already terminal jobs re
 | 504 | `timeout_error / provider_timeout` | Upstream music generation timed out. Retry with `mode=async` for long-running jobs or increase the provider timeout. |
 | 410 | `invalid_request_error` | Music asset expired. |
 
-## 11. Voice — TTS & STT
+## 12. Voice — TTS & STT
 
 Current implementation note: the voice surface is provider-backed. `POST /v1/audio/speech` is implemented end to end for OpenAI and ByteDance TTS. `POST /v1/audio/transcriptions` is implemented end to end for OpenAI and ByteDance STT. `POST /v1/audio/transcriptions/stream` plus `GET /v1/audio/transcriptions/stream/:id/ws` are implemented for ByteDance streaming STT 2.0. `POST /v1/audio/interpreting/sessions` plus `GET /v1/audio/interpreting/sessions/:id/ws` are implemented for ByteDance simultaneous interpretation 2.0. `POST /v1/audio/notes` plus `GET /v1/audio/notes/:id` are implemented for ByteDance notes. `POST /v1/audio/podcasts` plus `GET /v1/audio/podcasts/:id` and `GET /v1/audio/podcasts/:id/content` are implemented for ByteDance podcast generation. ByteDance TTS uses the new-console V3 TTS 2.0 SSE surface with provider-managed 2.0 speaker IDs. ByteDance STT uses the direct-upload file-recognition 2.0 compatibility endpoint and Polaris synthesizes `text`, `srt`, and `vtt` responses from the returned utterance timestamps. ByteDance streaming STT and interpreting keep the public websocket contract provider-neutral and translate the provider binary websocket protocol into JSON transcript or interpretation events.
 
@@ -1739,7 +1895,7 @@ Current runtime note:
 
 ---
 
-## 12. Models
+## 13. Models
 
 ### `GET /v1/models`
 
@@ -1842,7 +1998,7 @@ curl http://localhost:8080/v1/models \
 
 ---
 
-## 13. Usage
+## 14. Usage
 
 ### `GET /v1/usage`
 
@@ -1899,7 +2055,7 @@ curl "http://localhost:8080/v1/usage?from=2026-04-01T00:00:00Z&group_by=model" \
 
 ---
 
-## 14. Control Plane & API Keys
+## 15. Control Plane & API Keys
 
 The control-plane management surface is implemented, admin-only, and exposed only when `runtime.control_plane.enabled: true`. Use it in `runtime.auth.mode: virtual_keys` or `runtime.auth.mode: external`; `/v1/keys` remains available as a compatibility facade.
 
@@ -1993,9 +2149,11 @@ Budgets attach request or estimated-cost limits to a project.
 - `mode` required: `soft` or `hard`
 - `limit_usd` optional
 - `limit_requests` optional
+- `limit_file_bytes` optional, enforced against total live file bytes for the project
+- `limit_file_count` optional, enforced against total live file rows for the project
 - `window` optional, defaults to `monthly`
 
-Hard budgets can block requests with `429 budget_exceeded / budget_exceeded` once the current window has already exceeded the configured limit. Soft budgets are recorded but not enforced.
+Hard request/cost budgets can block inference with `429 budget_exceeded / budget_exceeded` once the current window has already exceeded the configured limit. Hard file budgets block uploads that would cross the configured byte or count limit. Soft file budgets emit audit events but allow the upload.
 
 ### `POST /v1/tools`, `GET /v1/tools`
 
@@ -2056,7 +2214,7 @@ Legacy key request fields:
 
 ---
 
-## 15. MCP Broker
+## 16. MCP Broker
 
 ### `GET /mcp/:binding_id`, `GET /mcp/:binding_id/*path`
 
@@ -2133,7 +2291,7 @@ Common MCP errors:
 
 ---
 
-## 16. Health & Readiness
+## 17. Health & Readiness
 
 ### `GET /health`
 
@@ -2161,7 +2319,7 @@ Response body:
 
 ---
 
-## 17. Metrics
+## 18. Metrics
 
 ### `GET /metrics`
 
@@ -2189,7 +2347,7 @@ Metric catalog:
 
 ---
 
-## 18. Full Endpoint Map
+## 19. Full Endpoint Map
 
 | Method | Path | Modality | Auth | Status | Section |
 |---|---|---|---|---|---|
@@ -2204,63 +2362,73 @@ Metric catalog:
 | `GET` | `/v1/video/generations/:id` | video | required | implemented | [§9](#9-video) |
 | `GET` | `/v1/video/generations/:id/content` | video | required | implemented | [§9](#9-video) |
 | `DELETE` | `/v1/video/generations/:id` | video | required | implemented | [§9](#9-video) |
-| `POST` | `/v1/music/generations` | music | required | implemented | [§10](#10-music) |
-| `POST` | `/v1/music/edits` | music | required | implemented | [§10](#10-music) |
-| `POST` | `/v1/music/stems` | music | required | implemented | [§10](#10-music) |
-| `POST` | `/v1/music/lyrics` | music | required | implemented | [§10](#10-music) |
-| `POST` | `/v1/music/plans` | music | required | implemented | [§10](#10-music) |
-| `GET` | `/v1/music/jobs/:id` | music | required | implemented | [§10](#10-music) |
-| `GET` | `/v1/music/jobs/:id/content` | music | required | implemented | [§10](#10-music) |
-| `DELETE` | `/v1/music/jobs/:id` | music | required | implemented | [§10](#10-music) |
-| `GET` | `/v1/voices` | voice catalog | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/voices/:id` | voice catalog | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/clones` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/designs` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/:id/retrain` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/:id/activate` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/:id/archive` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/voices/:id/unarchive` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `DELETE` | `/v1/voices/:id` | voice asset | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/speech` | voice (TTS) | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/transcriptions` | voice (STT) | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/transcriptions/stream` | voice (streaming STT) | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/transcriptions/stream/:id/ws` | voice (streaming STT) | client secret | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/notes` | notes | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/notes/:id` | notes | required | implemented | [§11](#11-voice--tts--stt) |
-| `DELETE` | `/v1/audio/notes/:id` | notes | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/podcasts` | podcast | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/podcasts/:id` | podcast | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/podcasts/:id/content` | podcast | required | implemented | [§11](#11-voice--tts--stt) |
-| `DELETE` | `/v1/audio/podcasts/:id` | podcast | required | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/interpreting/sessions` | interpreting | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/interpreting/sessions/:id/ws` | interpreting | client secret | implemented | [§11](#11-voice--tts--stt) |
-| `POST` | `/v1/audio/sessions` | audio | required | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/audio/sessions/:id/ws` | audio | client secret | implemented | [§11](#11-voice--tts--stt) |
-| `GET` | `/v1/models` | — | required | implemented | [§12](#12-models) |
-| `GET` | `/v1/usage` | — | required | implemented | [§13](#13-usage) |
-| `POST` | `/v1/projects` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/projects` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/virtual_keys` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/virtual_keys` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `DELETE` | `/v1/virtual_keys/:id` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/policies` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/policies` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/budgets` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/budgets` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/tools` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/tools` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/toolsets` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/toolsets` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/mcp/bindings` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/mcp/bindings` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `POST` | `/v1/keys` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET` | `/v1/keys` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `DELETE` | `/v1/keys/:id` | — | admin | implemented | [§14](#14-control-plane--api-keys) |
-| `GET,POST` | `/mcp/:binding_id` | — | required | implemented | [§15](#15-mcp-broker) |
-| `GET,POST` | `/mcp/:binding_id/*` | — | required | implemented | [§15](#15-mcp-broker) |
-| `GET` | `/health` | — | none | implemented | [§16](#16-health--readiness) |
-| `GET` | `/ready` | — | none | implemented | [§16](#16-health--readiness) |
-| `GET` | `/metrics` | — | none | implemented | [§17](#17-metrics) |
+| `POST` | `/v1/files` | files | required | foundation | [§10](#10-files) |
+| `GET` | `/v1/files` | files | required | foundation | [§10](#10-files) |
+| `GET` | `/v1/files/:id` | files | required | foundation | [§10](#10-files) |
+| `GET` | `/v1/files/:id/content` | files | signed token + auth | foundation | [§10](#10-files) |
+| `DELETE` | `/v1/files/:id` | files | required | foundation | [§10](#10-files) |
+| `POST` | `/v1/files/:id/materialize` | files | required | foundation | [§10](#10-files) |
+| `POST` | `/v1/batches` | batch | required | implemented | [§10](#10-files) |
+| `GET` | `/v1/batches/:id` | batch | required | implemented | [§10](#10-files) |
+| `GET` | `/v1/batches/:id/output` | batch | required | implemented | [§10](#10-files) |
+| `DELETE` | `/v1/batches/:id` | batch | required | implemented | [§10](#10-files) |
+| `POST` | `/v1/music/generations` | music | required | implemented | [§11](#11-music) |
+| `POST` | `/v1/music/edits` | music | required | implemented | [§11](#11-music) |
+| `POST` | `/v1/music/stems` | music | required | implemented | [§11](#11-music) |
+| `POST` | `/v1/music/lyrics` | music | required | implemented | [§11](#11-music) |
+| `POST` | `/v1/music/plans` | music | required | implemented | [§11](#11-music) |
+| `GET` | `/v1/music/jobs/:id` | music | required | implemented | [§11](#11-music) |
+| `GET` | `/v1/music/jobs/:id/content` | music | required | implemented | [§11](#11-music) |
+| `DELETE` | `/v1/music/jobs/:id` | music | required | implemented | [§11](#11-music) |
+| `GET` | `/v1/voices` | voice catalog | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/voices/:id` | voice catalog | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/clones` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/designs` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/:id/retrain` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/:id/activate` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/:id/archive` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/voices/:id/unarchive` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `DELETE` | `/v1/voices/:id` | voice asset | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/speech` | voice (TTS) | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/transcriptions` | voice (STT) | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/transcriptions/stream` | voice (streaming STT) | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/transcriptions/stream/:id/ws` | voice (streaming STT) | client secret | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/notes` | notes | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/notes/:id` | notes | required | implemented | [§12](#12-voice--tts--stt) |
+| `DELETE` | `/v1/audio/notes/:id` | notes | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/podcasts` | podcast | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/podcasts/:id` | podcast | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/podcasts/:id/content` | podcast | required | implemented | [§12](#12-voice--tts--stt) |
+| `DELETE` | `/v1/audio/podcasts/:id` | podcast | required | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/interpreting/sessions` | interpreting | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/interpreting/sessions/:id/ws` | interpreting | client secret | implemented | [§12](#12-voice--tts--stt) |
+| `POST` | `/v1/audio/sessions` | audio | required | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/audio/sessions/:id/ws` | audio | client secret | implemented | [§12](#12-voice--tts--stt) |
+| `GET` | `/v1/models` | — | required | implemented | [§13](#13-models) |
+| `GET` | `/v1/usage` | — | required | implemented | [§14](#14-usage) |
+| `POST` | `/v1/projects` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/projects` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/virtual_keys` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/virtual_keys` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `DELETE` | `/v1/virtual_keys/:id` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/policies` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/policies` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/budgets` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/budgets` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/tools` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/tools` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/toolsets` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/toolsets` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/mcp/bindings` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/mcp/bindings` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `POST` | `/v1/keys` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET` | `/v1/keys` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `DELETE` | `/v1/keys/:id` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
+| `GET,POST` | `/mcp/:binding_id` | — | required | implemented | [§16](#16-mcp-broker) |
+| `GET,POST` | `/mcp/:binding_id/*` | — | required | implemented | [§16](#16-mcp-broker) |
+| `GET` | `/health` | — | none | implemented | [§17](#17-health--readiness) |
+| `GET` | `/ready` | — | none | implemented | [§17](#17-health--readiness) |
+| `GET` | `/metrics` | — | none | implemented | [§18](#18-metrics) |
 
 ---
 

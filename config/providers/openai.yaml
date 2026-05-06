@@ -14,6 +14,7 @@ providers:
     models:
       use:
         - gpt-5.5
+        - gpt-5.4-mini
         - gpt-4o
         - gpt-4o-mini
         - gpt-image-2
@@ -28,6 +29,9 @@ providers:
         - text-embedding-3-small
         - text-embedding-3-large
       overrides:
+        gpt-5.4-mini:
+          context_window: 1000000
+          max_output_tokens: 128000
         gpt-5.5:
           context_window: 1000000
           max_output_tokens: 128000

@@ -3,6 +3,7 @@ CONFIG ?= ./config/polaris.yaml
 STACK ?= local
 LIVE_SMOKE_TIMEOUT ?= 45m
 LOAD_CHECK_TIMEOUT ?= 60m
+FILE_UNDERSTANDING_EVAL_REPORT ?= /tmp/polaris-file-understanding-eval.json
 GOLANGCI_LINT_VERSION ?= v2.11.4
 GOLANGCI_LINT_MODULE := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOLANGCI_LINT ?= go run $(GOLANGCI_LINT_MODULE)
@@ -13,7 +14,7 @@ GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test lint security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in load-check config-check contract-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test lint security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -32,6 +33,7 @@ help:
 	@printf "  make live-smoke     Run env-gated live provider smoke tests\n"
 	@printf "  make live-smoke-strict  Run strict live smoke for release-blocking models\n"
 	@printf "  make live-smoke-opt-in  Run live smoke including opt-in models\n"
+	@printf "  make file-understanding-eval  Run live file/image understanding evals for cheap chat models\n"
 	@printf "  make load-check     Run env-gated load validation with SQLite + memory cache\n"
 	@printf "  make config-check   Validate config loader, modular YAML, and model catalog wiring\n"
 	@printf "  make contract-check Validate OpenAPI route coverage and golden HTTP fixtures\n"
@@ -97,6 +99,9 @@ live-smoke-strict:
 
 live-smoke-opt-in:
 	POLARIS_LIVE_SMOKE=1 POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
+
+file-understanding-eval:
+	POLARIS_FILE_UNDERSTANDING_EVAL=1 POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 POLARIS_FILE_UNDERSTANDING_EVAL_REPORT=$(FILE_UNDERSTANDING_EVAL_REPORT) go test -v -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveFileUnderstandingEval
 
 load-check:
 	POLARIS_LOAD_CHECK=1 go test -count=1 -timeout $(LOAD_CHECK_TIMEOUT) ./tests/e2e -run TestLoadCheckMatrix

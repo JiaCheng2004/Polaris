@@ -25,7 +25,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -X main.buildDate=${BUILD_DATE}" \
       -o /out/polaris ./cmd/polaris
 
-RUN mkdir -p /image-root/etc/polaris /image-root/var/lib/polaris && touch /image-root/var/lib/polaris/.keep
+RUN mkdir -p /image-root/etc/polaris /image-root/var/lib/polaris/files && \
+    cp -R config/providers /image-root/etc/polaris/providers && \
+    cp -R config/routing /image-root/etc/polaris/routing && \
+    cp deployments/polaris.edge.yaml /image-root/etc/polaris/polaris.yaml && \
+    touch /image-root/var/lib/polaris/.keep /image-root/var/lib/polaris/files/.keep
 
 FROM gcr.io/distroless/static-debian12:nonroot
 

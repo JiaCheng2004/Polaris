@@ -26,6 +26,15 @@ func TestCreateChatCompletion(t *testing.T) {
 		if payload.Model != "default-chat" || payload.Stream {
 			t.Fatalf("unexpected payload %#v", payload)
 		}
+		if len(payload.Messages) != 1 || len(payload.Messages[0].Content.Parts) != 2 {
+			t.Fatalf("expected multipart chat content, got %#v", payload.Messages)
+		}
+		if payload.Messages[0].Content.Parts[1].File == nil || payload.Messages[0].Content.Parts[1].File.FileID != "pl_file_test" {
+			t.Fatalf("expected file content part, got %#v", payload.Messages[0].Content.Parts[1])
+		}
+		if payload.Polaris == nil || payload.Polaris.FileUnderstanding == nil || payload.Polaris.FileUnderstanding.Mode != "derived_context" {
+			t.Fatalf("expected Polaris file understanding options, got %#v", payload.Polaris)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -34,16 +43,24 @@ func TestCreateChatCompletion(t *testing.T) {
 			"created":1744329600,
 			"model":"openai/gpt-4o",
 			"choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}],
-			"usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14,"source":"provider_reported"}
+			"usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14,"cached_input_tokens":3,"reasoning_tokens":2,"source":"provider_reported"},
+			"polaris":{"file_understanding":{"used":true,"mode":"derived_context","profile":"quality","artifacts":[{"file_id":"pl_file_test","kind":"image_caption","processor":"captioner","source":"generated"}]}}
 		}`))
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server.URL, WithAPIKey("secret"))
 	response, err := client.CreateChatCompletion(context.Background(), &ChatCompletionRequest{
-		Model:    "default-chat",
-		Messages: []ChatMessage{{Role: "user", Content: NewTextContent("Hello")}},
-		Stream:   true,
+		Model: "default-chat",
+		Messages: []ChatMessage{{
+			Role: "user",
+			Content: NewPartContent(
+				ContentPart{Type: "text", Text: "Hello"},
+				ContentPart{Type: "file", File: &FilePart{FileID: "pl_file_test", MimeType: "image/png", Filename: "pixel.png"}},
+			),
+		}},
+		Polaris: &PolarisChatOptions{FileUnderstanding: &PolarisFileUnderstandingOptions{Mode: "derived_context"}},
+		Stream:  true,
 	})
 	if err != nil {
 		t.Fatalf("CreateChatCompletion() error = %v", err)
@@ -53,6 +70,15 @@ func TestCreateChatCompletion(t *testing.T) {
 	}
 	if response.Usage.Source != "provider_reported" {
 		t.Fatalf("unexpected usage source %#v", response.Usage)
+	}
+	if response.Usage.CachedInputTokens != 3 || response.Usage.ReasoningTokens != 2 {
+		t.Fatalf("unexpected extended usage %#v", response.Usage)
+	}
+	if response.Polaris == nil || response.Polaris.FileUnderstanding == nil || len(response.Polaris.FileUnderstanding.Artifacts) != 1 {
+		t.Fatalf("unexpected Polaris metadata %#v", response.Polaris)
+	}
+	if response.Polaris.FileUnderstanding.Artifacts[0].Kind != "image_caption" {
+		t.Fatalf("unexpected artifact metadata %#v", response.Polaris.FileUnderstanding.Artifacts[0])
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/chattools"
 )
 
 type RequestTranslator func(req *modality.ChatRequest, stream bool, providerModel string) any
@@ -69,9 +70,31 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) a
 	if a.translator != nil {
 		return a.translator(req, stream, providerModel)
 	}
-	payload := *req
-	payload.Model = providerModel
-	payload.Stream = stream
+	payload := struct {
+		Model           string                   `json:"model"`
+		Messages        []modality.ChatMessage   `json:"messages"`
+		Temperature     *float64                 `json:"temperature,omitempty"`
+		TopP            *float64                 `json:"top_p,omitempty"`
+		MaxTokens       int                      `json:"max_tokens,omitempty"`
+		Stream          bool                     `json:"stream,omitempty"`
+		Tools           []map[string]any         `json:"tools,omitempty"`
+		ToolChoice      json.RawMessage          `json:"tool_choice,omitempty"`
+		ResponseFormat  *modality.ResponseFormat `json:"response_format,omitempty"`
+		Stop            []string                 `json:"stop,omitempty"`
+		ReasoningEffort string                   `json:"reasoning_effort,omitempty"`
+	}{
+		Model:           providerModel,
+		Messages:        append([]modality.ChatMessage(nil), req.Messages...),
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		MaxTokens:       req.MaxTokens,
+		Stream:          stream,
+		Tools:           chattools.OpenAITools(req.Tools),
+		ToolChoice:      req.ToolChoice,
+		ResponseFormat:  req.ResponseFormat,
+		Stop:            append([]string(nil), req.Stop...),
+		ReasoningEffort: modality.ReasoningEffort(req.Reasoning),
+	}
 	return payload
 }
 

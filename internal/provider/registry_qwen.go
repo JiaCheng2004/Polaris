@@ -14,6 +14,7 @@ func init() {
 
 func registerQwenProvider(registry *Registry, warnings *[]string, providerName string, providerCfg config.ProviderConfig) {
 	client := qwen.NewClient(providerCfg)
+	registry.filesAdapters[providerName] = qwen.NewFilesAdapter(client, providerName)
 	for modelName, modelCfg := range providerCfg.Models {
 		if !runtimeSupportedModality(modelCfg.Modality) {
 			*warnings = append(*warnings, fmt.Sprintf("model %s/%s uses unsupported modality %s in this runtime build", providerName, modelName, modelCfg.Modality))

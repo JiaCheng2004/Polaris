@@ -78,6 +78,8 @@ docker pull ghcr.io/jiacheng2004/polaris:edge      # rolling main
 docker pull ghcr.io/jiacheng2004/polaris:vX.Y.Z    # immutable release
 ```
 
+The published image includes a container-safe default config at `/etc/polaris/polaris.yaml`. It enables `/v1/files`, stores SQLite data and local file blobs in `/var/lib/polaris`, and leaves beta Polaris file/image understanding in explicit opt-in mode. Mount your own config for production auth, PostgreSQL/Redis, S3 file storage, or external understanding processors.
+
 ### 3. Run The Local Gateway
 
 The default config is [`config/polaris.yaml`](./config/polaris.yaml). It binds to `127.0.0.1:8080`, uses SQLite, uses the in-memory cache, and sets `runtime.auth.mode: none` for local development.

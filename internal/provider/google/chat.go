@@ -135,6 +135,10 @@ type googleFunctionResponse struct {
 
 type googleTool struct {
 	FunctionDeclarations []googleFunctionDeclaration `json:"functionDeclarations,omitempty"`
+	GoogleSearch         *map[string]any             `json:"google_search,omitempty"`
+	CodeExecution        *map[string]any             `json:"code_execution,omitempty"`
+	URLContext           *map[string]any             `json:"url_context,omitempty"`
+	FileSearch           *map[string]any             `json:"file_search,omitempty"`
 }
 
 type googleFunctionDeclaration struct {
@@ -153,31 +157,53 @@ type googleFunctionCallingConfig struct {
 }
 
 type googleGenerationConfig struct {
-	Temperature      *float64       `json:"temperature,omitempty"`
-	TopP             *float64       `json:"topP,omitempty"`
-	MaxOutputTokens  int            `json:"maxOutputTokens,omitempty"`
-	StopSequences    []string       `json:"stopSequences,omitempty"`
-	ResponseMimeType string         `json:"responseMimeType,omitempty"`
-	ResponseSchema   map[string]any `json:"responseSchema,omitempty"`
+	Temperature      *float64              `json:"temperature,omitempty"`
+	TopP             *float64              `json:"topP,omitempty"`
+	MaxOutputTokens  int                   `json:"maxOutputTokens,omitempty"`
+	StopSequences    []string              `json:"stopSequences,omitempty"`
+	ResponseMimeType string                `json:"responseMimeType,omitempty"`
+	ResponseSchema   map[string]any        `json:"responseSchema,omitempty"`
+	ThinkingConfig   *googleThinkingConfig `json:"thinkingConfig,omitempty"`
+}
+
+type googleThinkingConfig struct {
+	ThinkingBudget  int  `json:"thinkingBudget,omitempty"`
+	IncludeThoughts bool `json:"includeThoughts,omitempty"`
 }
 
 type generateContentResponse struct {
-	Candidates    []googleCandidate   `json:"candidates"`
-	UsageMetadata googleUsageMetadata `json:"usageMetadata"`
-	ResponseID    string              `json:"responseId"`
-	ModelVersion  string              `json:"modelVersion"`
+	Candidates        []googleCandidate        `json:"candidates"`
+	UsageMetadata     googleUsageMetadata      `json:"usageMetadata"`
+	GroundingMetadata *googleGroundingMetadata `json:"groundingMetadata,omitempty"`
+	ResponseID        string                   `json:"responseId"`
+	ModelVersion      string                   `json:"modelVersion"`
 }
 
 type googleCandidate struct {
-	Content      googleContent `json:"content"`
-	FinishReason string        `json:"finishReason"`
-	Index        int           `json:"index"`
+	Content           googleContent            `json:"content"`
+	FinishReason      string                   `json:"finishReason"`
+	Index             int                      `json:"index"`
+	GroundingMetadata *googleGroundingMetadata `json:"groundingMetadata,omitempty"`
 }
 
 type googleUsageMetadata struct {
-	PromptTokenCount     int `json:"promptTokenCount"`
-	CandidatesTokenCount int `json:"candidatesTokenCount"`
-	TotalTokenCount      int `json:"totalTokenCount"`
+	PromptTokenCount        int `json:"promptTokenCount"`
+	CandidatesTokenCount    int `json:"candidatesTokenCount"`
+	TotalTokenCount         int `json:"totalTokenCount"`
+	CachedContentTokenCount int `json:"cachedContentTokenCount"`
+}
+
+type googleGroundingMetadata struct {
+	WebSearchQueries []string `json:"webSearchQueries"`
+	GroundingChunks  []struct {
+		Web *struct {
+			URI   string `json:"uri"`
+			Title string `json:"title"`
+		} `json:"web,omitempty"`
+	} `json:"groundingChunks"`
+	SearchEntryPoint *struct {
+		RenderedContent string `json:"renderedContent"`
+	} `json:"searchEntryPoint,omitempty"`
 }
 
 type googleCountTokensRequest struct {
@@ -268,13 +294,26 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 	if len(req.Tools) > 0 {
 		declarations := make([]googleFunctionDeclaration, 0, len(req.Tools))
 		for _, tool := range req.Tools {
-			declarations = append(declarations, googleFunctionDeclaration{
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-				Parameters:  tool.Function.Parameters,
-			})
+			switch strings.TrimSpace(tool.Type) {
+			case "", "function":
+				declarations = append(declarations, googleFunctionDeclaration{
+					Name:        tool.Function.Name,
+					Description: tool.Function.Description,
+					Parameters:  tool.Function.Parameters,
+				})
+			case "hosted":
+				translatedTool, ok, err := translateGoogleHostedTool(tool.Hosted)
+				if err != nil {
+					return generateContentRequest{}, err
+				}
+				if ok {
+					payload.Tools = append(payload.Tools, translatedTool)
+				}
+			}
 		}
-		payload.Tools = []googleTool{{FunctionDeclarations: declarations}}
+		if len(declarations) > 0 {
+			payload.Tools = append(payload.Tools, googleTool{FunctionDeclarations: declarations})
+		}
 		if len(req.ToolChoice) > 0 {
 			toolConfig, err := translateToolChoice(req.ToolChoice)
 			if err != nil {
@@ -285,11 +324,17 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 	}
 
 	var generationConfig *googleGenerationConfig
-	if req.Temperature != nil || req.TopP != nil || req.MaxTokens > 0 || len(req.Stop) > 0 || req.ResponseFormat != nil {
+	if req.Temperature != nil || req.TopP != nil || req.MaxTokens > 0 || len(req.Stop) > 0 || req.ResponseFormat != nil || req.Reasoning != nil {
 		generationConfig = &googleGenerationConfig{
 			Temperature:     req.Temperature,
 			TopP:            req.TopP,
 			MaxOutputTokens: req.MaxTokens,
+		}
+		if budget := modality.ReasoningBudgetTokens(req.Reasoning, req.Model); budget > 0 {
+			generationConfig.ThinkingConfig = &googleThinkingConfig{
+				ThinkingBudget:  budget,
+				IncludeThoughts: req.Reasoning != nil && req.Reasoning.IncludeSummary != "none",
+			}
 		}
 		if len(req.Stop) > 0 {
 			generationConfig.StopSequences = append([]string(nil), req.Stop...)
@@ -314,6 +359,28 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 	payload.GenerationConfig = generationConfig
 
 	return payload, nil
+}
+
+func translateGoogleHostedTool(spec *modality.HostedToolSpec) (googleTool, bool, error) {
+	if spec == nil {
+		return googleTool{}, false, nil
+	}
+	config := map[string]any{}
+	for key, value := range spec.Config {
+		config[key] = value
+	}
+	switch strings.TrimSpace(spec.Name) {
+	case "web_search":
+		return googleTool{GoogleSearch: &config}, true, nil
+	case "code_interpreter":
+		return googleTool{CodeExecution: &config}, true, nil
+	case "url_context":
+		return googleTool{URLContext: &config}, true, nil
+	case "file_search":
+		return googleTool{FileSearch: &config}, true, nil
+	default:
+		return googleTool{}, false, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Google does not support the requested hosted tool.")
+	}
 }
 
 func translateToolChoice(raw json.RawMessage) (*googleToolConfig, error) {
@@ -383,11 +450,38 @@ func translateContentParts(content modality.MessageContent) ([]googlePart, error
 					Data:     part.InputAudio.Data,
 				},
 			})
+		case "file", "document":
+			translated, err := translateFilePart(part)
+			if err != nil {
+				return nil, err
+			}
+			parts = append(parts, translated)
 		default:
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 	return parts, nil
+}
+
+func translateFilePart(part modality.ContentPart) (googlePart, error) {
+	filePart := part.File
+	if part.Type == "document" {
+		filePart = part.Document
+	}
+	if filePart == nil {
+		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
+	}
+	mimeType := firstNonEmpty(filePart.MimeType, "application/octet-stream")
+	switch {
+	case strings.TrimSpace(filePart.Data) != "":
+		return googlePart{InlineData: &googleBlob{MimeType: mimeType, Data: strings.TrimSpace(filePart.Data)}}, nil
+	case strings.TrimSpace(filePart.FileID) != "":
+		return googlePart{FileData: &googleBlob{MimeType: mimeType, FileURI: strings.TrimSpace(filePart.FileID)}}, nil
+	case strings.TrimSpace(filePart.URL) != "":
+		return googlePart{FileData: &googleBlob{MimeType: mimeType, FileURI: strings.TrimSpace(filePart.URL)}}, nil
+	default:
+		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
+	}
 }
 
 func translateImagePart(raw string) (googlePart, error) {
@@ -442,10 +536,12 @@ func (a *ChatAdapter) translateResponse(response generateContentResponse, canoni
 	}
 
 	usage := modality.Usage{
-		PromptTokens:     response.UsageMetadata.PromptTokenCount,
-		CompletionTokens: response.UsageMetadata.CandidatesTokenCount,
-		TotalTokens:      response.UsageMetadata.TotalTokenCount,
+		PromptTokens:      response.UsageMetadata.PromptTokenCount,
+		CompletionTokens:  response.UsageMetadata.CandidatesTokenCount,
+		TotalTokens:       response.UsageMetadata.TotalTokenCount,
+		CachedInputTokens: response.UsageMetadata.CachedContentTokenCount,
 	}
+	citations := googleCitations(firstNonNilGrounding(candidate.GroundingMetadata, response.GroundingMetadata))
 
 	return &modality.ChatResponse{
 		ID:      responseID(response.ResponseID, canonicalModel),
@@ -457,6 +553,7 @@ func (a *ChatAdapter) translateResponse(response generateContentResponse, canoni
 				Index:        candidate.Index,
 				Message:      message,
 				FinishReason: normalizeFinishReason(candidate.FinishReason),
+				Citations:    citations,
 			},
 		},
 		Usage: usage,
@@ -593,6 +690,47 @@ func translateCandidateParts(parts []googlePart) ([]string, []modality.ToolCall)
 		}
 	}
 	return textParts, toolCalls
+}
+
+func googleCitations(metadata *googleGroundingMetadata) []modality.Citation {
+	if metadata == nil {
+		return nil
+	}
+	var citations []modality.Citation
+	for _, query := range metadata.WebSearchQueries {
+		if strings.TrimSpace(query) != "" {
+			citations = append(citations, modality.Citation{Kind: "search_query", Title: query, Provider: "google"})
+		}
+	}
+	for _, chunk := range metadata.GroundingChunks {
+		if chunk.Web == nil || strings.TrimSpace(chunk.Web.URI) == "" {
+			continue
+		}
+		citations = append(citations, modality.Citation{
+			Kind:     "url",
+			URL:      chunk.Web.URI,
+			Title:    chunk.Web.Title,
+			Provider: "google",
+		})
+	}
+	if metadata.SearchEntryPoint != nil && strings.TrimSpace(metadata.SearchEntryPoint.RenderedContent) != "" {
+		raw, _ := json.Marshal(metadata.SearchEntryPoint)
+		citations = append(citations, modality.Citation{
+			Kind:     "search_query",
+			Provider: "google",
+			RawMeta:  raw,
+		})
+	}
+	return citations
+}
+
+func firstNonNilGrounding(values ...*googleGroundingMetadata) *googleGroundingMetadata {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func (a *ChatAdapter) generatePath(requestModel string) string {

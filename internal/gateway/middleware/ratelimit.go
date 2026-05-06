@@ -63,8 +63,9 @@ func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logge
 		currentStart := now.Unix() / windowSeconds * windowSeconds
 		previousStart := currentStart - windowSeconds
 
-		currentKey := fmt.Sprintf("ratelimit:%s:%d", auth.KeyID, currentStart)
-		previousKey := fmt.Sprintf("ratelimit:%s:%d", auth.KeyID, previousStart)
+		bucket := rateLimitBucket(c)
+		currentKey := fmt.Sprintf("ratelimit:%s:%s:%d", bucket, auth.KeyID, currentStart)
+		previousKey := fmt.Sprintf("ratelimit:%s:%s:%d", bucket, auth.KeyID, previousStart)
 
 		currentCount, err := limiter.Increment(context.Background(), currentKey, 2*window)
 		if err != nil {
@@ -101,6 +102,21 @@ func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logge
 		}
 
 		c.Next()
+	}
+}
+
+func rateLimitBucket(c *gin.Context) string {
+	path := c.FullPath()
+	if path == "" {
+		path = c.Request.URL.Path
+	}
+	switch {
+	case strings.HasPrefix(path, "/v1/files") && c.Request.Method == http.MethodPost:
+		return "files_upload"
+	case strings.HasPrefix(path, "/v1/files"):
+		return "files_read"
+	default:
+		return "requests"
 	}
 }
 

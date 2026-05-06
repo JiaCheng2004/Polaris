@@ -133,6 +133,9 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) (
 	}
 
 	for _, tool := range req.Tools {
+		if tool.Type != "" && tool.Type != "function" {
+			continue
+		}
 		payload.Tools = append(payload.Tools, ollamaToolDef{
 			Type: tool.Type,
 			Function: ollamaToolDefFunction{

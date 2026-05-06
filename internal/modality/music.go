@@ -42,6 +42,7 @@ type MusicEditRequest struct {
 	Plan            json.RawMessage `json:"plan,omitempty"`
 	SourceJobID     string          `json:"source_job_id,omitempty"`
 	SourceAudio     string          `json:"source_audio,omitempty"`
+	SourceFile      *FileSource     `json:"source_file,omitempty"`
 	File            []byte          `json:"-"`
 	Filename        string          `json:"-"`
 	ContentType     string          `json:"-"`
@@ -61,6 +62,7 @@ type MusicStemRequest struct {
 	Routing      *RoutingOptions `json:"routing,omitempty"`
 	SourceJobID  string          `json:"source_job_id,omitempty"`
 	SourceAudio  string          `json:"source_audio,omitempty"`
+	SourceFile   *FileSource     `json:"source_file,omitempty"`
 	File         []byte          `json:"-"`
 	Filename     string          `json:"-"`
 	ContentType  string          `json:"-"`

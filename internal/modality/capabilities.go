@@ -16,11 +16,13 @@ const (
 	ModalityTranslation  Modality = "translation"
 	ModalityNotes        Modality = "notes"
 	ModalityPodcast      Modality = "podcast"
+	ModalityFiles        Modality = "files"
+	ModalityBatch        Modality = "batch"
 )
 
 func (m Modality) Valid() bool {
 	switch m {
-	case ModalityChat, ModalityImage, ModalityVideo, ModalityVoice, ModalityEmbed, ModalityAudio, ModalityInterpreting, ModalityMusic, ModalityTranslation, ModalityNotes, ModalityPodcast:
+	case ModalityChat, ModalityImage, ModalityVideo, ModalityVoice, ModalityEmbed, ModalityAudio, ModalityInterpreting, ModalityMusic, ModalityTranslation, ModalityNotes, ModalityPodcast, ModalityFiles, ModalityBatch:
 		return true
 	default:
 		return false
@@ -30,40 +32,50 @@ func (m Modality) Valid() bool {
 type Capability string
 
 const (
-	CapabilityVision            Capability = "vision"
-	CapabilityFunctionCalling   Capability = "function_calling"
-	CapabilityStreaming         Capability = "streaming"
-	CapabilityJSONMode          Capability = "json_mode"
-	CapabilityAudioInput        Capability = "audio_input"
-	CapabilityAudioOutput       Capability = "audio_output"
-	CapabilityPDF               Capability = "pdf"
-	CapabilityExtendedThinking  Capability = "extended_thinking"
-	CapabilityVideoInput        Capability = "video_input"
-	CapabilityGeneration        Capability = "generation"
-	CapabilityEditing           Capability = "editing"
-	CapabilityMultiReference    Capability = "multi_reference"
-	CapabilityTTS               Capability = "tts"
-	CapabilitySTT               Capability = "stt"
-	CapabilityVoiceCloning      Capability = "voice_cloning"
-	CapabilityVoiceDesign       Capability = "voice_design"
-	CapabilityTextToVideo       Capability = "text_to_video"
-	CapabilityImageToVideo      Capability = "image_to_video"
-	CapabilityLastFrame         Capability = "last_frame"
-	CapabilityReferenceImages   Capability = "reference_images"
-	CapabilityNativeAudio       Capability = "native_audio"
-	CapabilityReasoning         Capability = "reasoning"
-	CapabilityAudioNotes        Capability = "audio_notes"
-	CapabilityPodcastGeneration Capability = "podcast_generation"
-	CapabilityMusicGeneration   Capability = "music_generation"
-	CapabilityMusicStreaming    Capability = "music_streaming"
-	CapabilityMusicEditing      Capability = "music_editing"
-	CapabilityMusicExtension    Capability = "music_extension"
-	CapabilityMusicCover        Capability = "music_cover"
-	CapabilityMusicInpainting   Capability = "music_inpainting"
-	CapabilityMusicStems        Capability = "music_stems"
-	CapabilityLyricsGeneration  Capability = "lyrics_generation"
-	CapabilityCompositionPlans  Capability = "composition_plans"
-	CapabilityInstrumental      Capability = "instrumental"
+	CapabilityVision                    Capability = "vision"
+	CapabilityFunctionCalling           Capability = "function_calling"
+	CapabilityStreaming                 Capability = "streaming"
+	CapabilityJSONMode                  Capability = "json_mode"
+	CapabilityAudioInput                Capability = "audio_input"
+	CapabilityAudioOutput               Capability = "audio_output"
+	CapabilityPDF                       Capability = "pdf"
+	CapabilityPDFInput                  Capability = "pdf_input"
+	CapabilityDocumentInput             Capability = "document_input"
+	CapabilityFileReference             Capability = "file_reference"
+	CapabilityExtendedThinking          Capability = "extended_thinking"
+	CapabilityVideoInput                Capability = "video_input"
+	CapabilityGeneration                Capability = "generation"
+	CapabilityEditing                   Capability = "editing"
+	CapabilityMultiReference            Capability = "multi_reference"
+	CapabilityTTS                       Capability = "tts"
+	CapabilitySTT                       Capability = "stt"
+	CapabilityVoiceCloning              Capability = "voice_cloning"
+	CapabilityVoiceDesign               Capability = "voice_design"
+	CapabilityTextToVideo               Capability = "text_to_video"
+	CapabilityImageToVideo              Capability = "image_to_video"
+	CapabilityLastFrame                 Capability = "last_frame"
+	CapabilityReferenceImages           Capability = "reference_images"
+	CapabilityNativeAudio               Capability = "native_audio"
+	CapabilityReasoning                 Capability = "reasoning"
+	CapabilityHostedToolWebSearch       Capability = "hosted_tool_web_search"
+	CapabilityHostedToolCodeInterpreter Capability = "hosted_tool_code_interpreter"
+	CapabilityHostedToolComputerUse     Capability = "hosted_tool_computer_use"
+	CapabilityHostedToolFileSearch      Capability = "hosted_tool_file_search"
+	CapabilityHostedToolImageGeneration Capability = "hosted_tool_image_generation"
+	CapabilityHostedToolMCP             Capability = "hosted_tool_mcp"
+	CapabilityHostedToolURLContext      Capability = "hosted_tool_url_context"
+	CapabilityAudioNotes                Capability = "audio_notes"
+	CapabilityPodcastGeneration         Capability = "podcast_generation"
+	CapabilityMusicGeneration           Capability = "music_generation"
+	CapabilityMusicStreaming            Capability = "music_streaming"
+	CapabilityMusicEditing              Capability = "music_editing"
+	CapabilityMusicExtension            Capability = "music_extension"
+	CapabilityMusicCover                Capability = "music_cover"
+	CapabilityMusicInpainting           Capability = "music_inpainting"
+	CapabilityMusicStems                Capability = "music_stems"
+	CapabilityLyricsGeneration          Capability = "lyrics_generation"
+	CapabilityCompositionPlans          Capability = "composition_plans"
+	CapabilityInstrumental              Capability = "instrumental"
 )
 
 func (c Capability) Valid() bool {
@@ -75,6 +87,9 @@ func (c Capability) Valid() bool {
 		CapabilityAudioInput,
 		CapabilityAudioOutput,
 		CapabilityPDF,
+		CapabilityPDFInput,
+		CapabilityDocumentInput,
+		CapabilityFileReference,
 		CapabilityExtendedThinking,
 		CapabilityVideoInput,
 		CapabilityGeneration,
@@ -90,6 +105,13 @@ func (c Capability) Valid() bool {
 		CapabilityReferenceImages,
 		CapabilityNativeAudio,
 		CapabilityReasoning,
+		CapabilityHostedToolWebSearch,
+		CapabilityHostedToolCodeInterpreter,
+		CapabilityHostedToolComputerUse,
+		CapabilityHostedToolFileSearch,
+		CapabilityHostedToolImageGeneration,
+		CapabilityHostedToolMCP,
+		CapabilityHostedToolURLContext,
 		CapabilityAudioNotes,
 		CapabilityPodcastGeneration,
 		CapabilityMusicGeneration,

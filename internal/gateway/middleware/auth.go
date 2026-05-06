@@ -436,6 +436,8 @@ func allModalities() []modality.Modality {
 		modality.ModalityTranslation,
 		modality.ModalityNotes,
 		modality.ModalityPodcast,
+		modality.ModalityFiles,
+		modality.ModalityBatch,
 	}
 }
 

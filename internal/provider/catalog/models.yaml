@@ -41,6 +41,22 @@ models:
     verification_class: strict
     doc_url: https://docs.anthropic.com/en/docs/about-claude/models/all-models
     last_verified: "2026-04-22"
+  - provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    display_name: Claude Haiku 4.5
+    aliases: ["Claude Haiku 4.5"]
+    family_id: claude-haiku-4-5
+    family_display_name: Claude Haiku 4.5
+    family_aliases: ["Claude Haiku 4.5"]
+    family_priority: 10
+    modality: chat
+    capabilities: [streaming, function_calling, vision, extended_thinking, pdf]
+    cost_tier: low
+    latency_tier: fast
+    status: ga
+    verification_class: strict
+    doc_url: https://docs.claude.com/en/docs/about-claude/models/whats-new-claude-4-5
+    last_verified: "2026-05-05"
 
   - provider: bedrock
     model_id: "amazon.nova-2-lite-v1:0"

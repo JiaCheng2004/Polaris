@@ -197,3 +197,121 @@ func TestSQLiteMigrateUpgradesExistingRequestLogsSchema(t *testing.T) {
 		}
 	}
 }
+
+func TestSQLiteStoreFiles(t *testing.T) {
+	ctx := context.Background()
+	sqliteStore, err := New(config.StoreConfig{
+		Driver:           "sqlite",
+		DSN:              filepath.Join(t.TempDir(), "files.db"),
+		MaxConnections:   1,
+		LogRetentionDays: 30,
+		LogBufferSize:    10,
+		LogFlushInterval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() {
+		_ = sqliteStore.Close()
+	}()
+	if err := sqliteStore.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate() error = %v", err)
+	}
+	for _, projectID := range []string{"proj_a", "proj_b"} {
+		if err := sqliteStore.CreateProject(ctx, store.Project{ID: projectID, Name: projectID, CreatedAt: time.Now().UTC()}); err != nil {
+			t.Fatalf("CreateProject(%s) error = %v", projectID, err)
+		}
+	}
+
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	file := store.File{
+		PolarisID:        "pl_file_01J7P9V3YMZQK7E0X2QF5N6BHD",
+		ProjectID:        "proj_a",
+		KeyID:            "vk_a",
+		Sha256:           "abc123",
+		Size:             5,
+		MimeType:         "text/plain",
+		OriginalFilename: "note.txt",
+		Purpose:          modality.FilePurposeUserData,
+		InlineBytes:      []byte("hello"),
+		BlobKey:          "sha256/ab/abc123",
+		Metadata:         map[string]string{"source": "test"},
+		CreatedAt:        time.Now().UTC(),
+		ExpiresAt:        &expiresAt,
+	}
+	if err := sqliteStore.CreateFile(ctx, file); err != nil {
+		t.Fatalf("CreateFile() error = %v", err)
+	}
+	got, err := sqliteStore.GetFileForProject(ctx, file.PolarisID, "proj_a")
+	if err != nil {
+		t.Fatalf("GetFileForProject() error = %v", err)
+	}
+	if got.Sha256 != file.Sha256 || string(got.InlineBytes) != "hello" || got.Metadata["source"] != "test" {
+		t.Fatalf("unexpected file %#v", got)
+	}
+	if _, err := sqliteStore.GetFileForProject(ctx, file.PolarisID, "proj_b"); err != store.ErrNotFound {
+		t.Fatalf("expected cross-project ErrNotFound, got %v", err)
+	}
+	inline, err := sqliteStore.GetFileInline(ctx, file.PolarisID)
+	if err != nil || string(inline) != "hello" {
+		t.Fatalf("GetFileInline() = %q, %v", inline, err)
+	}
+	total, err := sqliteStore.SumProjectFileBytes(ctx, "proj_a")
+	if err != nil || total != 5 {
+		t.Fatalf("SumProjectFileBytes() = %d, %v", total, err)
+	}
+	count, err := sqliteStore.CountProjectFiles(ctx, "proj_a")
+	if err != nil || count != 1 {
+		t.Fatalf("CountProjectFiles() = %d, %v", count, err)
+	}
+	blobRefs, err := sqliteStore.CountFilesByBlobKey(ctx, "sha256/ab/abc123")
+	if err != nil || blobRefs != 1 {
+		t.Fatalf("CountFilesByBlobKey() = %d, %v", blobRefs, err)
+	}
+
+	artifact := store.FileUnderstandingArtifact{
+		Sha256:       file.Sha256,
+		Processor:    "polaris_text_extract",
+		Version:      "v1",
+		MimeType:     "text/plain",
+		Text:         "hello",
+		Warning:      "quality warning",
+		MetadataJSON: `{"truncated":false}`,
+		ArtifactJSON: `{"kind":"text","text":"hello"}`,
+		CreatedAt:    time.Now().UTC(),
+	}
+	if err := sqliteStore.PutFileUnderstandingArtifact(ctx, artifact); err != nil {
+		t.Fatalf("PutFileUnderstandingArtifact() error = %v", err)
+	}
+	gotArtifact, ok, err := sqliteStore.GetFileUnderstandingArtifact(ctx, file.Sha256, "polaris_text_extract", "v1")
+	if err != nil || !ok || gotArtifact.Text != "hello" || gotArtifact.Warning != "quality warning" || gotArtifact.ArtifactJSON == "" {
+		t.Fatalf("GetFileUnderstandingArtifact() = %#v, %v, %v", gotArtifact, ok, err)
+	}
+
+	handle := store.FileProviderHandle{
+		PolarisID:      file.PolarisID,
+		Provider:       "openai",
+		ProviderFileID: "file_provider",
+		Purpose:        modality.FilePurposeUserData,
+		SizeBytes:      5,
+		MimeType:       "text/plain",
+		CreatedAt:      time.Now().UTC(),
+	}
+	if err := sqliteStore.PutFileProviderHandle(ctx, handle); err != nil {
+		t.Fatalf("PutFileProviderHandle() error = %v", err)
+	}
+	gotHandle, ok, err := sqliteStore.GetFileProviderHandle(ctx, file.PolarisID, "openai")
+	if err != nil || !ok || gotHandle.ProviderFileID != "file_provider" {
+		t.Fatalf("GetFileProviderHandle() = %#v, %v, %v", gotHandle, ok, err)
+	}
+	files, err := sqliteStore.ListFiles(ctx, store.FileFilter{ProjectID: "proj_a", Limit: 10})
+	if err != nil || len(files) != 1 {
+		t.Fatalf("ListFiles() len=%d err=%v", len(files), err)
+	}
+	if err := sqliteStore.DeleteFile(ctx, file.PolarisID); err != nil {
+		t.Fatalf("DeleteFile() error = %v", err)
+	}
+	if _, ok, err := sqliteStore.GetFileProviderHandle(ctx, file.PolarisID, "openai"); err != nil || ok {
+		t.Fatalf("expected provider handle cascade delete, ok=%v err=%v", ok, err)
+	}
+}

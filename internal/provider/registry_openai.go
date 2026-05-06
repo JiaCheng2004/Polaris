@@ -14,6 +14,8 @@ func init() {
 
 func registerOpenAIProvider(registry *Registry, warnings *[]string, providerName string, providerCfg config.ProviderConfig) {
 	client := openai.NewClient(providerCfg)
+	registry.filesAdapters[providerName] = openai.NewFilesAdapter(client, providerName)
+	registry.batchAdapters[providerName] = openai.NewBatchAdapter(client, providerName)
 	for modelName, modelCfg := range providerCfg.Models {
 		if !runtimeSupportedModality(modelCfg.Modality) {
 			*warnings = append(*warnings, fmt.Sprintf("model %s/%s uses unsupported modality %s in this runtime build", providerName, modelName, modelCfg.Modality))

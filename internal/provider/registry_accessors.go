@@ -166,6 +166,30 @@ func (r *Registry) GetMusicAdapter(name string) (modality.MusicAdapter, Model, e
 	return adapter, model, nil
 }
 
+func (r *Registry) GetFilesAdapter(providerName string) (modality.FilesAdapter, error) {
+	trimmed := strings.TrimSpace(providerName)
+	if trimmed == "" {
+		return nil, fmt.Errorf("%w: provider", ErrAdapterMissing)
+	}
+	adapter, ok := r.filesAdapters[trimmed]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrAdapterMissing, trimmed)
+	}
+	return adapter, nil
+}
+
+func (r *Registry) GetBatchAdapter(providerName string) (modality.BatchAdapter, error) {
+	trimmed := strings.TrimSpace(providerName)
+	if trimmed == "" {
+		return nil, fmt.Errorf("%w: provider", ErrAdapterMissing)
+	}
+	adapter, ok := r.batchAdapters[trimmed]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrAdapterMissing, trimmed)
+	}
+	return adapter, nil
+}
+
 func (r *Registry) GetAudioNotesAdapter(name string) (modality.AudioNotesAdapter, Model, error) {
 	model, err := r.RequireModel(name, modality.ModalityNotes)
 	if err != nil {

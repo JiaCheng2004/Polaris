@@ -53,6 +53,7 @@ type liveSmokeHarnessOptions struct {
 	rateLimitEnabled     *bool
 	logBufferSize        int
 	logFlushInterval     time.Duration
+	configure            func(*config.Config)
 }
 
 func newLiveSmokeHarness(t *testing.T) *liveSmokeHarness {
@@ -108,6 +109,9 @@ func newLiveSmokeHarnessWithOptions(t *testing.T, opts liveSmokeHarnessOptions) 
 	}
 	if opts.logFlushInterval > 0 {
 		cfg.Store.LogFlushInterval = opts.logFlushInterval
+	}
+	if opts.configure != nil {
+		opts.configure(cfg)
 	}
 
 	appStore, err := newE2EStore(cfg.Store)

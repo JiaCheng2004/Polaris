@@ -1,0 +1,114 @@
+# Polaris container default config for published edge images.
+# Operators can still mount /etc/polaris/polaris.yaml to replace this file.
+
+version: 2
+
+imports:
+  - ./providers/openai.yaml
+  - ./providers/anthropic.yaml
+  - ./routing/local.yaml
+
+runtime:
+  server:
+    host: 0.0.0.0
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 120s
+    shutdown_timeout: 15s
+    max_body_bytes: 67108864
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost
+        - http://localhost:*
+        - http://127.0.0.1
+        - http://127.0.0.1:*
+      allowed_headers: [Authorization, Content-Type, X-Request-ID, X-Polaris-Admin-Key]
+      allowed_methods: [GET, POST, DELETE, OPTIONS]
+      exposed_headers: [X-Request-ID, X-RateLimit-Remaining, Retry-After, X-Polaris-Fallback, X-Polaris-Resolved-Model, X-Polaris-Resolved-Provider]
+      allow_credentials: false
+      max_age: 1h
+
+  auth:
+    mode: none
+    static_keys: []
+    admin_key_hash: ""
+
+  store:
+    driver: sqlite
+    dsn: /var/lib/polaris/polaris.db
+    max_connections: 1
+    log_retention_days: 30
+    log_buffer_size: 1000
+    log_flush_interval: 5s
+
+  cache:
+    driver: memory
+    rate_limit:
+      enabled: true
+      default: 60/min
+      window: sliding
+    response_cache:
+      enabled: false
+      ttl: 24h
+      max_entries_per_model: 100
+      similarity_threshold: 0.95
+
+  files:
+    enabled: true
+    ingestion:
+      max_upload_bytes: 524288000
+      allowed_mime:
+        - application/pdf
+        - application/json
+        - application/xml
+        - application/x-yaml
+        - application/yaml
+        - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        - application/vnd.openxmlformats-officedocument.presentationml.presentation
+        - text/*
+        - image/*
+        - audio/*
+    storage:
+      inline_max_bytes: 5242880
+      blob_store: disk
+      disk_path: /var/lib/polaris/files
+    downloads:
+      token_ttl: 10m
+    ssrf:
+      allowed_schemes: [https]
+      deny_hosts:
+        - 169.254.169.254
+        - metadata.google.internal
+    materialization:
+      inline_fallback_max: 5242880
+    understanding:
+      enabled: true
+      mode: explicit
+      profile: fast
+      max_bytes: 5242880
+      max_text_chars: 12000
+      cache_artifacts: true
+      chunking:
+        enabled: true
+        max_chars: 1800
+        overlap_chars: 200
+      processors: []
+
+  observability:
+    metrics:
+      enabled: true
+      path: /metrics
+    logging:
+      level: info
+      format: json
+
+providers:
+  openai:
+    models:
+      use: [gpt-5.5, gpt-5.4-mini, gpt-4o, gpt-4o-mini, gpt-image-2]
+
+  anthropic:
+    models:
+      use: [claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-6]

@@ -162,6 +162,111 @@ func Validate(cfg *Config) error {
 	if cfg.Cache.ResponseCache.SimilarityThreshold < 0 || cfg.Cache.ResponseCache.SimilarityThreshold > 1 {
 		problems = append(problems, errors.New("cache.response_cache.similarity_threshold must be between 0 and 1"))
 	}
+	if cfg.Files.Ingestion.MaxUploadBytes < 0 {
+		problems = append(problems, errors.New("files.ingestion.max_upload_bytes must not be negative"))
+	}
+	for _, mimeType := range cfg.Files.Ingestion.AllowedMime {
+		if strings.TrimSpace(mimeType) == "" {
+			problems = append(problems, errors.New("files.ingestion.allowed_mime must not contain empty values"))
+		}
+	}
+	if cfg.Files.Storage.InlineMaxBytes < 0 {
+		problems = append(problems, errors.New("files.storage.inline_max_bytes must not be negative"))
+	}
+	switch strings.TrimSpace(cfg.Files.Storage.BlobStore) {
+	case "", "none", "disk", "s3":
+	default:
+		problems = append(problems, fmt.Errorf("files.storage.blob_store %q is invalid", cfg.Files.Storage.BlobStore))
+	}
+	if strings.TrimSpace(cfg.Files.Storage.BlobStore) == "disk" && strings.TrimSpace(cfg.Files.Storage.DiskPath) == "" {
+		problems = append(problems, errors.New("files.storage.disk_path is required when files.storage.blob_store=disk"))
+	}
+	if strings.TrimSpace(cfg.Files.Storage.BlobStore) == "s3" {
+		if strings.TrimSpace(cfg.Files.Storage.S3.Endpoint) == "" {
+			problems = append(problems, errors.New("files.storage.s3.endpoint is required when files.storage.blob_store=s3"))
+		}
+		if strings.TrimSpace(cfg.Files.Storage.S3.Bucket) == "" {
+			problems = append(problems, errors.New("files.storage.s3.bucket is required when files.storage.blob_store=s3"))
+		}
+	}
+	if cfg.Files.Downloads.TokenTTL < 0 {
+		problems = append(problems, errors.New("files.downloads.token_ttl must not be negative"))
+	}
+	if cfg.Files.Materialize.InlineFallbackMax < 0 {
+		problems = append(problems, errors.New("files.materialization.inline_fallback_max must not be negative"))
+	}
+	if cfg.Files.Understanding.Enabled {
+		switch strings.TrimSpace(cfg.Files.Understanding.Mode) {
+		case "", "disabled", "explicit", "auto_fallback":
+		default:
+			problems = append(problems, fmt.Errorf("files.understanding.mode %q is invalid", cfg.Files.Understanding.Mode))
+		}
+	} else {
+		switch strings.TrimSpace(cfg.Files.Understanding.Mode) {
+		case "", "disabled", "explicit", "auto_fallback":
+		default:
+			problems = append(problems, fmt.Errorf("files.understanding.mode %q is invalid", cfg.Files.Understanding.Mode))
+		}
+	}
+	if cfg.Files.Understanding.MaxBytes < 0 {
+		problems = append(problems, errors.New("files.understanding.max_bytes must not be negative"))
+	}
+	if cfg.Files.Understanding.MaxTextChars < 0 {
+		problems = append(problems, errors.New("files.understanding.max_text_chars must not be negative"))
+	}
+	if cfg.Files.Understanding.Chunking.MaxChars < 0 {
+		problems = append(problems, errors.New("files.understanding.chunking.max_chars must not be negative"))
+	}
+	if cfg.Files.Understanding.Chunking.OverlapChars < 0 {
+		problems = append(problems, errors.New("files.understanding.chunking.overlap_chars must not be negative"))
+	}
+	if cfg.Files.Understanding.Chunking.MaxChars > 0 && cfg.Files.Understanding.Chunking.OverlapChars >= cfg.Files.Understanding.Chunking.MaxChars {
+		problems = append(problems, errors.New("files.understanding.chunking.overlap_chars must be less than max_chars"))
+	}
+	switch strings.TrimSpace(cfg.Files.Understanding.Profile) {
+	case "", "fast", "balanced", "quality":
+	default:
+		problems = append(problems, fmt.Errorf("files.understanding.profile %q is invalid", cfg.Files.Understanding.Profile))
+	}
+	for i, processor := range cfg.Files.Understanding.Processors {
+		if !processor.Enabled {
+			continue
+		}
+		prefix := fmt.Sprintf("files.understanding.processors[%d]", i)
+		if strings.TrimSpace(processor.Name) == "" {
+			problems = append(problems, fmt.Errorf("%s.name is required when processor is enabled", prefix))
+		}
+		switch strings.TrimSpace(processor.Backend) {
+		case "http", "remote_http", "tika":
+		default:
+			problems = append(problems, fmt.Errorf("%s.backend %q is invalid; expected http, remote_http, or tika", prefix, processor.Backend))
+		}
+		if strings.TrimSpace(processor.Endpoint) == "" {
+			problems = append(problems, fmt.Errorf("%s.endpoint is required when processor is enabled", prefix))
+		}
+		if processor.Timeout < 0 {
+			problems = append(problems, fmt.Errorf("%s.timeout must not be negative", prefix))
+		}
+		for _, profile := range processor.Profiles {
+			switch strings.TrimSpace(profile) {
+			case "", "fast", "balanced", "quality":
+			default:
+				problems = append(problems, fmt.Errorf("%s.profiles contains invalid profile %q", prefix, profile))
+			}
+		}
+	}
+	for _, scheme := range cfg.Files.SSRF.AllowedSchemes {
+		switch strings.ToLower(strings.TrimSpace(scheme)) {
+		case "http", "https":
+		default:
+			problems = append(problems, fmt.Errorf("files.ssrf.allowed_schemes contains unsupported scheme %q", scheme))
+		}
+	}
+	for _, host := range cfg.Files.SSRF.DenyHosts {
+		if strings.TrimSpace(host) == "" {
+			problems = append(problems, errors.New("files.ssrf.deny_hosts must not contain empty values"))
+		}
+	}
 	if cfg.Pricing.ReloadIntervalSeconds < 0 {
 		problems = append(problems, errors.New("pricing.reload_interval_seconds must not be negative"))
 	}

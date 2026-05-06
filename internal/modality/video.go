@@ -18,11 +18,16 @@ type VideoRequest struct {
 	Resolution      string          `json:"resolution,omitempty"`
 	FirstFrame      string          `json:"first_frame,omitempty"`
 	ReferenceImages []string        `json:"reference_images,omitempty"`
+	FirstFrameFile  *FileSource     `json:"first_frame_file,omitempty"`
+	ReferenceFiles  []FileSource    `json:"reference_files,omitempty"`
 	WithAudio       bool            `json:"with_audio,omitempty"`
 
-	LastFrame       string   `json:"last_frame,omitempty"`
-	ReferenceVideos []string `json:"reference_videos,omitempty"`
-	Audio           string   `json:"audio,omitempty"`
+	LastFrame           string       `json:"last_frame,omitempty"`
+	LastFrameFile       *FileSource  `json:"last_frame_file,omitempty"`
+	ReferenceVideos     []string     `json:"reference_videos,omitempty"`
+	ReferenceVideoFiles []FileSource `json:"reference_video_files,omitempty"`
+	Audio               string       `json:"audio,omitempty"`
+	AudioFile           *FileSource  `json:"audio_file,omitempty"`
 }
 
 type VideoJob struct {

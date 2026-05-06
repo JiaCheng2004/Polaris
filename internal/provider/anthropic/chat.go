@@ -39,7 +39,7 @@ func (a *ChatAdapter) Complete(ctx context.Context, req *modality.ChatRequest) (
 	}
 
 	var response anthropicMessagesResponse
-	if err := a.client.JSON(ctx, "/v1/messages", payload, &response); err != nil {
+	if err := a.client.JSONWithBetas(ctx, "/v1/messages", payload, &response, anthropicRequestBetas(req)); err != nil {
 		return nil, err
 	}
 
@@ -56,7 +56,7 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 		return nil, err
 	}
 
-	resp, err := a.client.Stream(ctx, "/v1/messages", payload)
+	resp, err := a.client.StreamWithBetas(ctx, "/v1/messages", payload, anthropicRequestBetas(req))
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +116,7 @@ type anthropicMessagesRequest struct {
 	StopSequences []string           `json:"stop_sequences,omitempty"`
 	Tools         []anthropicTool    `json:"tools,omitempty"`
 	ToolChoice    map[string]any     `json:"tool_choice,omitempty"`
+	Thinking      *anthropicThinking `json:"thinking,omitempty"`
 	Metadata      map[string]string  `json:"metadata,omitempty"`
 }
 
@@ -128,6 +129,7 @@ type anthropicContentBlock struct {
 	Type      string                `json:"type"`
 	Text      string                `json:"text,omitempty"`
 	Source    *anthropicImageSource `json:"source,omitempty"`
+	Citations json.RawMessage       `json:"citations,omitempty"`
 	ID        string                `json:"id,omitempty"`
 	Name      string                `json:"name,omitempty"`
 	Input     map[string]any        `json:"input,omitempty"`
@@ -140,12 +142,44 @@ type anthropicImageSource struct {
 	MediaType string `json:"media_type,omitempty"`
 	Data      string `json:"data,omitempty"`
 	URL       string `json:"url,omitempty"`
+	FileID    string `json:"file_id,omitempty"`
+}
+
+type anthropicCitations struct {
+	Enabled bool `json:"enabled"`
 }
 
 type anthropicTool struct {
 	Name        string          `json:"name"`
+	Type        string          `json:"type,omitempty"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema,omitempty"`
+	Config      map[string]any  `json:"-"`
+}
+
+func (t anthropicTool) MarshalJSON() ([]byte, error) {
+	out := map[string]any{}
+	for key, value := range t.Config {
+		out[key] = value
+	}
+	if t.Name != "" {
+		out["name"] = t.Name
+	}
+	if t.Type != "" {
+		out["type"] = t.Type
+	}
+	if t.Description != "" {
+		out["description"] = t.Description
+	}
+	if len(t.InputSchema) > 0 {
+		out["input_schema"] = t.InputSchema
+	}
+	return json.Marshal(out)
+}
+
+type anthropicThinking struct {
+	Type         string `json:"type"`
+	BudgetTokens int    `json:"budget_tokens"`
 }
 
 type anthropicMessagesResponse struct {
@@ -154,8 +188,16 @@ type anthropicMessagesResponse struct {
 	Content    []anthropicContentBlock `json:"content"`
 	StopReason string                  `json:"stop_reason"`
 	Usage      struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
+		InputTokens                int `json:"input_tokens"`
+		OutputTokens               int `json:"output_tokens"`
+		CacheReadInputTokens       int `json:"cache_read_input_tokens"`
+		CacheCreationInputTokens   int `json:"cache_creation_input_tokens"`
+		CacheCreation5mInputTokens int `json:"cache_creation_5m_input_tokens"`
+		CacheCreation1hInputTokens int `json:"cache_creation_1h_input_tokens"`
+		CacheCreation              struct {
+			Ephemeral5mInputTokens int `json:"ephemeral_5m_input_tokens"`
+			Ephemeral1hInputTokens int `json:"ephemeral_1h_input_tokens"`
+		} `json:"cache_creation"`
 	} `json:"usage"`
 }
 
@@ -209,11 +251,13 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) (
 	payload.System = strings.Join(systemParts, "\n\n")
 
 	for _, tool := range req.Tools {
-		payload.Tools = append(payload.Tools, anthropicTool{
-			Name:        tool.Function.Name,
-			Description: tool.Function.Description,
-			InputSchema: tool.Function.Parameters,
-		})
+		translatedTool, ok, err := translateAnthropicToolDefinition(tool)
+		if err != nil {
+			return anthropicMessagesRequest{}, err
+		}
+		if ok {
+			payload.Tools = append(payload.Tools, translatedTool)
+		}
 	}
 	if len(payload.Tools) > 0 && len(req.ToolChoice) > 0 {
 		toolChoice, err := translateToolChoice(req.ToolChoice)
@@ -222,8 +266,88 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) (
 		}
 		payload.ToolChoice = toolChoice
 	}
+	if budget := modality.ReasoningBudgetTokens(req.Reasoning, req.Model); budget > 0 {
+		payload.Thinking = &anthropicThinking{Type: "enabled", BudgetTokens: budget}
+	}
 
 	return payload, nil
+}
+
+func anthropicRequestBetas(req *modality.ChatRequest) []string {
+	if req == nil {
+		return nil
+	}
+	var betas []string
+	add := func(beta string) {
+		for _, existing := range betas {
+			if existing == beta {
+				return
+			}
+		}
+		betas = append(betas, beta)
+	}
+	for _, message := range req.Messages {
+		for _, part := range message.Content.Parts {
+			if (part.Type == "file" && part.File != nil && strings.TrimSpace(part.File.FileID) != "") ||
+				(part.Type == "document" && part.Document != nil && strings.TrimSpace(part.Document.FileID) != "") {
+				add("files-api-2025-04-14")
+			}
+		}
+	}
+	for _, tool := range req.Tools {
+		if tool.Type != "hosted" || tool.Hosted == nil {
+			continue
+		}
+		switch strings.TrimSpace(tool.Hosted.Name) {
+		case "code_interpreter":
+			add("code-execution-2026-01-20")
+		case "computer_use":
+			add("computer-use-2025-11-24")
+		case "url_context":
+			add("web-fetch-2026-02-09")
+		case "mcp":
+			add("mcp-client-2025-04-04")
+		}
+	}
+	return betas
+}
+
+func translateAnthropicToolDefinition(tool modality.ToolDefinition) (anthropicTool, bool, error) {
+	switch strings.TrimSpace(tool.Type) {
+	case "", "function":
+		if strings.TrimSpace(tool.Function.Name) == "" {
+			return anthropicTool{}, false, nil
+		}
+		return anthropicTool{
+			Name:        tool.Function.Name,
+			Description: tool.Function.Description,
+			InputSchema: tool.Function.Parameters,
+		}, true, nil
+	case "hosted":
+		if tool.Hosted == nil {
+			return anthropicTool{}, false, nil
+		}
+		config := map[string]any{}
+		for key, value := range tool.Hosted.Config {
+			config[key] = value
+		}
+		switch strings.TrimSpace(tool.Hosted.Name) {
+		case "web_search":
+			return anthropicTool{Type: "web_search_20260209", Config: config}, true, nil
+		case "code_interpreter":
+			return anthropicTool{Type: "code_execution_20260120", Config: config}, true, nil
+		case "computer_use":
+			return anthropicTool{Type: "computer_20251124", Config: config}, true, nil
+		case "url_context":
+			return anthropicTool{Type: "web_fetch_20260209", Config: config}, true, nil
+		case "mcp":
+			return anthropicTool{Type: "mcp_toolset", Config: config}, true, nil
+		default:
+			return anthropicTool{}, false, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Anthropic does not support the requested hosted tool.")
+		}
+	default:
+		return anthropicTool{}, false, nil
+	}
 }
 
 func translateMessage(message modality.ChatMessage) (anthropicMessage, error) {
@@ -301,11 +425,55 @@ func translateContent(content modality.MessageContent) ([]anthropicContentBlock,
 			})
 		case "input_audio":
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_input", "messages.content.input_audio", "Anthropic chat does not support audio input in this build.")
+		case "file", "document":
+			block, err := translateFileBlock(part)
+			if err != nil {
+				return nil, err
+			}
+			blocks = append(blocks, block)
 		default:
 			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 	return blocks, nil
+}
+
+func translateFileBlock(part modality.ContentPart) (anthropicContentBlock, error) {
+	filePart := part.File
+	if part.Type == "document" {
+		filePart = part.Document
+	}
+	if filePart == nil {
+		return anthropicContentBlock{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
+	}
+	blockType := "document"
+	if strings.HasPrefix(filePart.MimeType, "image/") {
+		blockType = "image"
+	}
+	source, err := translateFileSource(filePart)
+	if err != nil {
+		return anthropicContentBlock{}, err
+	}
+	block := anthropicContentBlock{Type: blockType, Source: source}
+	if filePart.Citations != nil && blockType == "document" {
+		raw, _ := json.Marshal(anthropicCitations{Enabled: *filePart.Citations})
+		block.Citations = raw
+	}
+	return block, nil
+}
+
+func translateFileSource(part *modality.FilePart) (*anthropicImageSource, error) {
+	switch {
+	case strings.TrimSpace(part.FileID) != "":
+		return &anthropicImageSource{Type: "file", FileID: strings.TrimSpace(part.FileID)}, nil
+	case strings.TrimSpace(part.Data) != "":
+		mediaType := firstNonEmpty(part.MimeType, "application/octet-stream")
+		return &anthropicImageSource{Type: "base64", MediaType: mediaType, Data: strings.TrimSpace(part.Data)}, nil
+	case strings.TrimSpace(part.URL) != "":
+		return &anthropicImageSource{Type: "url", URL: strings.TrimSpace(part.URL)}, nil
+	default:
+		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
+	}
 }
 
 func translateImageSource(raw string) (*anthropicImageSource, error) {
@@ -382,15 +550,18 @@ func translateToolChoice(raw json.RawMessage) (map[string]any, error) {
 }
 
 func (a *ChatAdapter) translateResponse(response anthropicMessagesResponse, canonicalModel string) (*modality.ChatResponse, error) {
-	message, err := responseContentToMessage(response.Content)
+	message, citations, err := responseContentToMessage(response.Content)
 	if err != nil {
 		return nil, err
 	}
 
 	usage := modality.Usage{
-		PromptTokens:     response.Usage.InputTokens,
-		CompletionTokens: response.Usage.OutputTokens,
-		TotalTokens:      response.Usage.InputTokens + response.Usage.OutputTokens,
+		PromptTokens:       response.Usage.InputTokens,
+		CompletionTokens:   response.Usage.OutputTokens,
+		TotalTokens:        response.Usage.InputTokens + response.Usage.OutputTokens,
+		CachedInputTokens:  response.Usage.CacheReadInputTokens,
+		CacheWrite5mTokens: response.Usage.CacheCreation5mInputTokens + response.Usage.CacheCreation.Ephemeral5mInputTokens,
+		CacheWrite1hTokens: response.Usage.CacheCreation1hInputTokens + response.Usage.CacheCreation.Ephemeral1hInputTokens,
 	}
 
 	return &modality.ChatResponse{
@@ -403,15 +574,17 @@ func (a *ChatAdapter) translateResponse(response anthropicMessagesResponse, cano
 				Index:        0,
 				Message:      message,
 				FinishReason: mapStopReason(response.StopReason),
+				Citations:    citations,
 			},
 		},
 		Usage: usage,
 	}, nil
 }
 
-func responseContentToMessage(content []anthropicContentBlock) (modality.ChatMessage, error) {
+func responseContentToMessage(content []anthropicContentBlock) (modality.ChatMessage, []modality.Citation, error) {
 	var textParts []string
 	var toolCalls []modality.ToolCall
+	var citations []modality.Citation
 
 	for _, block := range content {
 		switch block.Type {
@@ -419,12 +592,13 @@ func responseContentToMessage(content []anthropicContentBlock) (modality.ChatMes
 			if block.Text != "" {
 				textParts = append(textParts, block.Text)
 			}
+			citations = append(citations, anthropicCitationsFromRaw(block.Citations)...)
 		case "tool_use":
 			arguments := "{}"
 			if len(block.Input) > 0 {
 				raw, err := json.Marshal(block.Input)
 				if err != nil {
-					return modality.ChatMessage{}, fmt.Errorf("marshal anthropic tool input: %w", err)
+					return modality.ChatMessage{}, nil, fmt.Errorf("marshal anthropic tool input: %w", err)
 				}
 				arguments = string(raw)
 			}
@@ -446,7 +620,53 @@ func responseContentToMessage(content []anthropicContentBlock) (modality.ChatMes
 	if len(toolCalls) > 0 {
 		message.ToolCalls = toolCalls
 	}
-	return message, nil
+	return message, citations, nil
+}
+
+func anthropicCitationsFromRaw(raw json.RawMessage) []modality.Citation {
+	if len(raw) == 0 {
+		return nil
+	}
+	var parsed []struct {
+		Type            string `json:"type"`
+		CitedText       string `json:"cited_text"`
+		DocumentTitle   string `json:"document_title"`
+		DocumentIndex   int    `json:"document_index"`
+		StartCharIndex  int    `json:"start_char_index"`
+		EndCharIndex    int    `json:"end_char_index"`
+		StartPageNumber int    `json:"start_page_number"`
+		EndPageNumber   int    `json:"end_page_number"`
+		StartBlockIndex int    `json:"start_block_index"`
+		EndBlockIndex   int    `json:"end_block_index"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil
+	}
+	citations := make([]modality.Citation, 0, len(parsed))
+	for _, item := range parsed {
+		kind := "file"
+		switch {
+		case item.StartPageNumber > 0 || item.EndPageNumber > 0:
+			kind = "page"
+		case item.StartCharIndex > 0 || item.EndCharIndex > 0:
+			kind = "block"
+		}
+		citations = append(citations, modality.Citation{
+			Kind:      kind,
+			Title:     item.DocumentTitle,
+			CitedText: item.CitedText,
+			Provider:  "anthropic",
+			Locator: &modality.CitationLocator{
+				StartChar: item.StartCharIndex,
+				EndChar:   item.EndCharIndex,
+				PageStart: item.StartPageNumber,
+				PageEnd:   item.EndPageNumber,
+				BlockIdx:  item.StartBlockIndex,
+			},
+			RawMeta: raw,
+		})
+	}
+	return citations
 }
 
 func (a *ChatAdapter) decodeStream(r io.Reader, canonicalModel string, dst chan<- modality.ChatChunk) error {
@@ -728,6 +948,15 @@ func mapStopReason(reason string) string {
 	default:
 		return "stop"
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func providerModelName(requestModel string, fallbackModel string) string {

@@ -48,15 +48,20 @@ type Rates struct {
 	InputImageTokenPerMTok  float64 `yaml:"input_image_token_per_mtok,omitempty"`
 	OutputImageTokenPerMTok float64 `yaml:"output_image_token_per_mtok,omitempty"`
 
-	InputPerAudioSecond  float64 `yaml:"input_per_audio_second,omitempty"`
-	OutputPerAudioSecond float64 `yaml:"output_per_audio_second,omitempty"`
-	InputPerVideoSecond  float64 `yaml:"input_per_video_second,omitempty"`
-	OutputPerVideoSecond float64 `yaml:"output_per_video_second,omitempty"`
-	InputPerCharacter    float64 `yaml:"input_per_character,omitempty"`
-	InputPerImage        float64 `yaml:"input_per_image,omitempty"`
-	OutputPerImage       float64 `yaml:"output_per_image,omitempty"`
-	OutputPerPixel       float64 `yaml:"output_per_pixel,omitempty"`
-	PerCall              float64 `yaml:"per_call,omitempty"`
+	InputPerAudioSecond     float64 `yaml:"input_per_audio_second,omitempty"`
+	OutputPerAudioSecond    float64 `yaml:"output_per_audio_second,omitempty"`
+	InputPerVideoSecond     float64 `yaml:"input_per_video_second,omitempty"`
+	OutputPerVideoSecond    float64 `yaml:"output_per_video_second,omitempty"`
+	InputPerPDFPage         float64 `yaml:"input_per_pdf_page,omitempty"`
+	InputPerImageTile       float64 `yaml:"input_per_image_tile,omitempty"`
+	InputPerAudioFileSecond float64 `yaml:"input_per_audio_file_second,omitempty"`
+	PerFileStorageGBHour    float64 `yaml:"per_file_storage_gb_hour,omitempty"`
+	PerFileBytesIngestedGB  float64 `yaml:"per_file_bytes_ingested_gb,omitempty"`
+	InputPerCharacter       float64 `yaml:"input_per_character,omitempty"`
+	InputPerImage           float64 `yaml:"input_per_image,omitempty"`
+	OutputPerImage          float64 `yaml:"output_per_image,omitempty"`
+	OutputPerPixel          float64 `yaml:"output_per_pixel,omitempty"`
+	PerCall                 float64 `yaml:"per_call,omitempty"`
 }
 
 type TieredRates struct {
@@ -71,22 +76,27 @@ type Deprecation struct {
 }
 
 type EstimateRequest struct {
-	Model              string
-	Tier               string
-	Deployment         string
-	InputTokens        int
-	CachedInputTokens  int
-	CacheWrite5mTokens int
-	CacheWrite1hTokens int
-	OutputTokens       int
-	ReasoningTokens    int
-	InputImageTokens   int
-	OutputImageTokens  int
-	AudioSeconds       float64
-	VideoSeconds       float64
-	Characters         int
-	Images             int
-	UnitCounts         map[string]int
+	Model                 string
+	Tier                  string
+	Deployment            string
+	InputTokens           int
+	CachedInputTokens     int
+	CacheWrite5mTokens    int
+	CacheWrite1hTokens    int
+	OutputTokens          int
+	ReasoningTokens       int
+	InputImageTokens      int
+	OutputImageTokens     int
+	AudioSeconds          float64
+	VideoSeconds          float64
+	PDFPages              int
+	ImageTiles            int
+	InputAudioFileSeconds float64
+	FileStorageGBHours    float64
+	FileBytesIngested     int64
+	Characters            int
+	Images                int
+	UnitCounts            map[string]int
 }
 
 type EstimateResult struct {
@@ -118,6 +128,8 @@ func validMode(mode string) bool {
 		"video",
 		"interpreting",
 		"music",
+		"files",
+		"batch",
 		"podcast",
 		"notes",
 		"translation":

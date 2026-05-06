@@ -54,6 +54,23 @@ paths:
     post: {operationId: createEmbedding, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /v1/tokens/count:
     post: {operationId: countTokens, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/files:
+    get: {operationId: listFiles, tags: [gateway], responses: {"200": {description: File list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createFile, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {type: object}}, multipart/form-data: {schema: {type: object}}}}, responses: {"200": {description: File object, content: {application/json: {schema: {$ref: "#/components/schemas/FileObject"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/files/{id}:
+    get: {operationId: getFile, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: File object, content: {application/json: {schema: {$ref: "#/components/schemas/FileObject"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: deleteFile, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"204": {description: Deleted}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/files/{id}/content:
+    get: {operationId: getFileContent, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: File bytes}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/files/{id}/materialize:
+    post: {operationId: materializeFile, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Provider file materialization, content: {application/json: {schema: {$ref: "#/components/schemas/FileMaterialization"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/batches:
+    post: {operationId: createBatch, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/batches/{id}:
+    get: {operationId: getBatch, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    delete: {operationId: cancelBatch, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"204": {description: Cancelled}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/batches/{id}/output:
+    get: {operationId: getBatchOutput, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Batch output}, default: {$ref: "#/components/responses/Error"}}}
   /v1/translations:
     post: {operationId: createTranslation, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
@@ -244,6 +261,44 @@ components:
         data:
           type: array
           items: {}
+    FileObject:
+      type: object
+      required: [id, object, bytes, created_at, filename, purpose, polaris]
+      properties:
+        id: {type: string}
+        object: {type: string, const: file}
+        bytes: {type: integer}
+        created_at: {type: integer}
+        filename: {type: string}
+        purpose: {type: string}
+        polaris:
+          type: object
+          properties:
+            sha256: {type: string}
+            mime_type: {type: string}
+            project_id: {type: string}
+            expires_at: {type: integer}
+            materialized_providers:
+              type: array
+              items: {type: string}
+            has_inline_bytes: {type: boolean}
+            has_blob_backing: {type: boolean}
+            origin_url: {type: string}
+            content_url: {type: string}
+    FileMaterialization:
+      type: object
+      required: [object, file_id, provider, provider_file_id, purpose, bytes, mime_type, created_at, cached]
+      properties:
+        object: {type: string, const: file.materialization}
+        file_id: {type: string}
+        provider: {type: string}
+        provider_file_id: {type: string}
+        purpose: {type: string}
+        bytes: {type: integer}
+        mime_type: {type: string}
+        created_at: {type: integer}
+        expires_at: {type: integer}
+        cached: {type: boolean}
     ChatCompletion:
       type: object
       required: [id, object, created, model, choices, usage]
@@ -255,6 +310,33 @@ components:
         choices: {type: array, items: {type: object}}
         usage:
           $ref: "#/components/schemas/Usage"
+        polaris:
+          type: object
+          properties:
+            file_understanding:
+              type: object
+              properties:
+                used: {type: boolean}
+                mode:
+                  type: string
+                  enum: [derived_context, auto_fallback]
+                profile:
+                  type: string
+                  enum: [fast, balanced, quality]
+                warning: {type: string}
+                artifacts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      file_id: {type: string}
+                      sha256: {type: string}
+                      mime_type: {type: string}
+                      filename: {type: string}
+                      kind: {type: string}
+                      processor: {type: string}
+                      version: {type: string}
+                      source: {type: string}
     AsyncJob:
       type: object
       required: [id, status]

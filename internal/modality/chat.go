@@ -36,18 +36,32 @@ type NativeMessagesAdapter interface {
 }
 
 type ChatRequest struct {
-	Model          string            `json:"model"`
-	Routing        *RoutingOptions   `json:"routing,omitempty"`
-	Messages       []ChatMessage     `json:"messages"`
-	Temperature    *float64          `json:"temperature,omitempty"`
-	TopP           *float64          `json:"top_p,omitempty"`
-	MaxTokens      int               `json:"max_tokens,omitempty"`
-	Stream         bool              `json:"stream,omitempty"`
-	Tools          []ToolDefinition  `json:"tools,omitempty"`
-	ToolChoice     json.RawMessage   `json:"tool_choice,omitempty"`
-	ResponseFormat *ResponseFormat   `json:"response_format,omitempty"`
-	Stop           []string          `json:"stop,omitempty"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
+	Model          string              `json:"model"`
+	Routing        *RoutingOptions     `json:"routing,omitempty"`
+	Messages       []ChatMessage       `json:"messages"`
+	Temperature    *float64            `json:"temperature,omitempty"`
+	TopP           *float64            `json:"top_p,omitempty"`
+	MaxTokens      int                 `json:"max_tokens,omitempty"`
+	Stream         bool                `json:"stream,omitempty"`
+	Tools          []ToolDefinition    `json:"tools,omitempty"`
+	ToolChoice     json.RawMessage     `json:"tool_choice,omitempty"`
+	ResponseFormat *ResponseFormat     `json:"response_format,omitempty"`
+	Reasoning      *ReasoningOptions   `json:"reasoning,omitempty"`
+	Stop           []string            `json:"stop,omitempty"`
+	Metadata       map[string]string   `json:"metadata,omitempty"`
+	Polaris        *PolarisChatOptions `json:"polaris,omitempty"`
+
+	FileUnderstandingUsage *FileUnderstandingUsage `json:"-"`
+}
+
+type PolarisChatOptions struct {
+	FileUnderstanding *PolarisFileUnderstandingOptions `json:"file_understanding,omitempty"`
+}
+
+type PolarisFileUnderstandingOptions struct {
+	Enabled *bool  `json:"enabled,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+	Profile string `json:"profile,omitempty"`
 }
 
 type ChatMessage struct {
@@ -111,6 +125,8 @@ type ContentPart struct {
 	Text       string          `json:"text,omitempty"`
 	ImageURL   *ImageURLPart   `json:"image_url,omitempty"`
 	InputAudio *InputAudioPart `json:"input_audio,omitempty"`
+	File       *FilePart       `json:"file,omitempty"`
+	Document   *FilePart       `json:"document,omitempty"`
 }
 
 type ImageURLPart struct {
@@ -123,15 +139,31 @@ type InputAudioPart struct {
 	Format string `json:"format"`
 }
 
+type FilePart struct {
+	FileID    string `json:"file_id,omitempty"`
+	URL       string `json:"url,omitempty"`
+	Data      string `json:"data,omitempty"`
+	Filename  string `json:"filename,omitempty"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Citations *bool  `json:"citations,omitempty"`
+}
+
 type ToolDefinition struct {
 	Type     string             `json:"type"`
-	Function FunctionDefinition `json:"function"`
+	Function FunctionDefinition `json:"function,omitempty"`
+	Hosted   *HostedToolSpec    `json:"hosted,omitempty"`
 }
 
 type FunctionDefinition struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
+}
+
+type HostedToolSpec struct {
+	Name     string         `json:"name"`
+	Provider string         `json:"provider,omitempty"`
+	Config   map[string]any `json:"config,omitempty"`
 }
 
 type ResponseFormat struct {
@@ -158,18 +190,44 @@ type ToolCallFunction struct {
 }
 
 type ChatResponse struct {
-	ID      string       `json:"id"`
-	Object  string       `json:"object"`
-	Created int64        `json:"created"`
-	Model   string       `json:"model"`
-	Choices []ChatChoice `json:"choices"`
-	Usage   Usage        `json:"usage"`
+	ID      string               `json:"id"`
+	Object  string               `json:"object"`
+	Created int64                `json:"created"`
+	Model   string               `json:"model"`
+	Choices []ChatChoice         `json:"choices"`
+	Usage   Usage                `json:"usage"`
+	Polaris *ChatPolarisMetadata `json:"polaris,omitempty"`
+}
+
+type ChatPolarisMetadata struct {
+	FileUnderstanding *FileUnderstandingUsage `json:"file_understanding,omitempty"`
+}
+
+type FileUnderstandingUsage struct {
+	Used      bool                           `json:"used"`
+	Mode      string                         `json:"mode,omitempty"`
+	Profile   string                         `json:"profile,omitempty"`
+	Warning   string                         `json:"warning,omitempty"`
+	Artifacts []FileUnderstandingArtifactRef `json:"artifacts,omitempty"`
+}
+
+type FileUnderstandingArtifactRef struct {
+	FileID    string `json:"file_id,omitempty"`
+	Sha256    string `json:"sha256,omitempty"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Filename  string `json:"filename,omitempty"`
+	Kind      string `json:"kind,omitempty"`
+	Processor string `json:"processor,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Source    string `json:"source,omitempty"`
 }
 
 type ChatChoice struct {
 	Index        int         `json:"index"`
 	Message      ChatMessage `json:"message"`
 	FinishReason string      `json:"finish_reason"`
+	Citations    []Citation  `json:"citations,omitempty"`
+	Refusal      *string     `json:"refusal,omitempty"`
 }
 
 type ChatChunk struct {
@@ -195,8 +253,31 @@ type ChatDelta struct {
 }
 
 type Usage struct {
-	PromptTokens     int              `json:"prompt_tokens"`
-	CompletionTokens int              `json:"completion_tokens"`
-	TotalTokens      int              `json:"total_tokens"`
-	Source           TokenCountSource `json:"source,omitempty"`
+	PromptTokens       int              `json:"prompt_tokens"`
+	CompletionTokens   int              `json:"completion_tokens"`
+	TotalTokens        int              `json:"total_tokens"`
+	CachedInputTokens  int              `json:"cached_input_tokens,omitempty"`
+	CacheWrite5mTokens int              `json:"cache_write_5m_tokens,omitempty"`
+	CacheWrite1hTokens int              `json:"cache_write_1h_tokens,omitempty"`
+	ReasoningTokens    int              `json:"reasoning_tokens,omitempty"`
+	Source             TokenCountSource `json:"source,omitempty"`
+}
+
+type Citation struct {
+	Kind      string           `json:"kind"`
+	SourceID  string           `json:"source_id,omitempty"`
+	Title     string           `json:"title,omitempty"`
+	URL       string           `json:"url,omitempty"`
+	Locator   *CitationLocator `json:"locator,omitempty"`
+	CitedText string           `json:"cited_text,omitempty"`
+	Provider  string           `json:"provider,omitempty"`
+	RawMeta   json.RawMessage  `json:"raw,omitempty"`
+}
+
+type CitationLocator struct {
+	StartChar int `json:"start_char,omitempty"`
+	EndChar   int `json:"end_char,omitempty"`
+	PageStart int `json:"page_start,omitempty"`
+	PageEnd   int `json:"page_end,omitempty"`
+	BlockIdx  int `json:"block_idx,omitempty"`
 }

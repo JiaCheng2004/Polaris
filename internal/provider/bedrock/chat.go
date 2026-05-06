@@ -312,6 +312,9 @@ func translateTools(tools []modality.ToolDefinition, rawChoice json.RawMessage) 
 		Tools: make([]bedrockTool, 0, len(tools)),
 	}
 	for _, tool := range tools {
+		if tool.Type != "" && tool.Type != "function" {
+			continue
+		}
 		config.Tools = append(config.Tools, bedrockTool{
 			ToolSpec: bedrockToolSpec{
 				Name:        tool.Function.Name,

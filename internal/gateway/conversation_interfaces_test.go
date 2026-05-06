@@ -382,7 +382,7 @@ func TestTokenCountEndpointReturnsEstimatedCounts(t *testing.T) {
 	if response.InputTokens <= 0 || response.OutputTokensEstimate != 16384 {
 		t.Fatalf("unexpected token counts %#v", response)
 	}
-	if response.Source != "estimated" || len(response.Notes) == 0 {
+	if response.Source != "tiktoken" || len(response.Notes) == 0 {
 		t.Fatalf("unexpected token count metadata %#v", response)
 	}
 }

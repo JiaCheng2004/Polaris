@@ -8,10 +8,14 @@ import (
 )
 
 type Usage struct {
-	PromptTokens     int    `json:"prompt_tokens"`
-	CompletionTokens int    `json:"completion_tokens"`
-	TotalTokens      int    `json:"total_tokens"`
-	Source           string `json:"source,omitempty"`
+	PromptTokens       int    `json:"prompt_tokens"`
+	CompletionTokens   int    `json:"completion_tokens"`
+	TotalTokens        int    `json:"total_tokens"`
+	CachedInputTokens  int    `json:"cached_input_tokens,omitempty"`
+	CacheWrite5mTokens int    `json:"cache_write_5m_tokens,omitempty"`
+	CacheWrite1hTokens int    `json:"cache_write_1h_tokens,omitempty"`
+	ReasoningTokens    int    `json:"reasoning_tokens,omitempty"`
+	Source             string `json:"source,omitempty"`
 }
 
 type RoutingOptions struct {
@@ -25,19 +29,97 @@ type RoutingOptions struct {
 	LatencyTier         string   `json:"latency_tier,omitempty"`
 }
 
+type FileUploadRequest struct {
+	File        []byte            `json:"-"`
+	Filename    string            `json:"-"`
+	ContentType string            `json:"-"`
+	Purpose     string            `json:"purpose,omitempty"`
+	MimeType    string            `json:"mime_type,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	ExpiresAt   string            `json:"expires_at,omitempty"`
+}
+
+type FileURLUploadRequest struct {
+	URL       string            `json:"url"`
+	Filename  string            `json:"filename,omitempty"`
+	MimeType  string            `json:"mime_type,omitempty"`
+	Purpose   string            `json:"purpose,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	ExpiresAt string            `json:"expires_at,omitempty"`
+}
+
+type FileObject struct {
+	ID        string              `json:"id"`
+	Object    string              `json:"object"`
+	Bytes     int64               `json:"bytes"`
+	CreatedAt int64               `json:"created_at"`
+	Filename  string              `json:"filename"`
+	Purpose   string              `json:"purpose"`
+	Polaris   FilePolarisMetadata `json:"polaris"`
+}
+
+type FilePolarisMetadata struct {
+	Sha256                string            `json:"sha256"`
+	MimeType              string            `json:"mime_type"`
+	ProjectID             string            `json:"project_id"`
+	ExpiresAt             *int64            `json:"expires_at,omitempty"`
+	MaterializedProviders []string          `json:"materialized_providers,omitempty"`
+	HasInlineBytes        bool              `json:"has_inline_bytes"`
+	HasBlobBacking        bool              `json:"has_blob_backing"`
+	OriginURL             string            `json:"origin_url,omitempty"`
+	Metadata              map[string]string `json:"metadata,omitempty"`
+	ContentURL            string            `json:"content_url,omitempty"`
+}
+
+type FileList struct {
+	Object  string       `json:"object"`
+	Data    []FileObject `json:"data"`
+	HasMore bool         `json:"has_more"`
+}
+
+type ListFilesParams struct {
+	Limit   int
+	After   string
+	Purpose string
+}
+
+type FileMaterialization struct {
+	Object         string `json:"object"`
+	FileID         string `json:"file_id"`
+	Provider       string `json:"provider"`
+	ProviderFileID string `json:"provider_file_id"`
+	Purpose        string `json:"purpose"`
+	Bytes          int64  `json:"bytes"`
+	MimeType       string `json:"mime_type"`
+	CreatedAt      int64  `json:"created_at"`
+	ExpiresAt      *int64 `json:"expires_at,omitempty"`
+	Cached         bool   `json:"cached"`
+}
+
 type ChatCompletionRequest struct {
-	Model          string            `json:"model"`
-	Routing        *RoutingOptions   `json:"routing,omitempty"`
-	Messages       []ChatMessage     `json:"messages"`
-	Temperature    *float64          `json:"temperature,omitempty"`
-	TopP           *float64          `json:"top_p,omitempty"`
-	MaxTokens      int               `json:"max_tokens,omitempty"`
-	Stream         bool              `json:"stream,omitempty"`
-	Tools          []ToolDefinition  `json:"tools,omitempty"`
-	ToolChoice     json.RawMessage   `json:"tool_choice,omitempty"`
-	ResponseFormat *ResponseFormat   `json:"response_format,omitempty"`
-	Stop           []string          `json:"stop,omitempty"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
+	Model          string              `json:"model"`
+	Routing        *RoutingOptions     `json:"routing,omitempty"`
+	Messages       []ChatMessage       `json:"messages"`
+	Polaris        *PolarisChatOptions `json:"polaris,omitempty"`
+	Temperature    *float64            `json:"temperature,omitempty"`
+	TopP           *float64            `json:"top_p,omitempty"`
+	MaxTokens      int                 `json:"max_tokens,omitempty"`
+	Stream         bool                `json:"stream,omitempty"`
+	Tools          []ToolDefinition    `json:"tools,omitempty"`
+	ToolChoice     json.RawMessage     `json:"tool_choice,omitempty"`
+	ResponseFormat *ResponseFormat     `json:"response_format,omitempty"`
+	Stop           []string            `json:"stop,omitempty"`
+	Metadata       map[string]string   `json:"metadata,omitempty"`
+}
+
+type PolarisChatOptions struct {
+	FileUnderstanding *PolarisFileUnderstandingOptions `json:"file_understanding,omitempty"`
+}
+
+type PolarisFileUnderstandingOptions struct {
+	Enabled *bool  `json:"enabled,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+	Profile string `json:"profile,omitempty"`
 }
 
 type ChatMessage struct {
@@ -101,6 +183,8 @@ type ContentPart struct {
 	Text       string          `json:"text,omitempty"`
 	ImageURL   *ImageURLPart   `json:"image_url,omitempty"`
 	InputAudio *InputAudioPart `json:"input_audio,omitempty"`
+	File       *FilePart       `json:"file,omitempty"`
+	Document   *FilePart       `json:"document,omitempty"`
 }
 
 type ImageURLPart struct {
@@ -111,6 +195,15 @@ type ImageURLPart struct {
 type InputAudioPart struct {
 	Data   string `json:"data"`
 	Format string `json:"format"`
+}
+
+type FilePart struct {
+	FileID    string `json:"file_id,omitempty"`
+	URL       string `json:"url,omitempty"`
+	Data      string `json:"data,omitempty"`
+	Filename  string `json:"filename,omitempty"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Citations *bool  `json:"citations,omitempty"`
 }
 
 type ToolDefinition struct {
@@ -154,6 +247,30 @@ type ChatCompletionResponse struct {
 	Model   string                 `json:"model"`
 	Choices []ChatCompletionChoice `json:"choices"`
 	Usage   Usage                  `json:"usage"`
+	Polaris *ChatPolarisMetadata   `json:"polaris,omitempty"`
+}
+
+type ChatPolarisMetadata struct {
+	FileUnderstanding *FileUnderstandingUsage `json:"file_understanding,omitempty"`
+}
+
+type FileUnderstandingUsage struct {
+	Used      bool                           `json:"used"`
+	Mode      string                         `json:"mode,omitempty"`
+	Profile   string                         `json:"profile,omitempty"`
+	Warning   string                         `json:"warning,omitempty"`
+	Artifacts []FileUnderstandingArtifactRef `json:"artifacts,omitempty"`
+}
+
+type FileUnderstandingArtifactRef struct {
+	FileID    string `json:"file_id,omitempty"`
+	Sha256    string `json:"sha256,omitempty"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Filename  string `json:"filename,omitempty"`
+	Kind      string `json:"kind,omitempty"`
+	Processor string `json:"processor,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Source    string `json:"source,omitempty"`
 }
 
 type ChatCompletionChoice struct {

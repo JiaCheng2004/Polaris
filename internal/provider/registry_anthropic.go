@@ -14,6 +14,8 @@ func init() {
 
 func registerAnthropicProvider(registry *Registry, warnings *[]string, providerName string, providerCfg config.ProviderConfig) {
 	client := anthropic.NewClient(providerCfg)
+	registry.filesAdapters[providerName] = anthropic.NewFilesAdapter(client, providerName)
+	registry.batchAdapters[providerName] = anthropic.NewBatchAdapter(client, providerName)
 	for modelName, modelCfg := range providerCfg.Models {
 		if !runtimeSupportedModality(modelCfg.Modality) {
 			*warnings = append(*warnings, fmt.Sprintf("model %s/%s uses unsupported modality %s in this runtime build", providerName, modelName, modelCfg.Modality))

@@ -48,6 +48,11 @@ func (c *Catalog) Estimate(req EstimateRequest) EstimateResult {
 
 	addUnitCost(result.BreakdownUSD, "audio_seconds", req.AudioSeconds, rates.InputPerAudioSecond)
 	addUnitCost(result.BreakdownUSD, "video_seconds", req.VideoSeconds, rates.InputPerVideoSecond)
+	addUnitCost(result.BreakdownUSD, "pdf_pages", float64(req.PDFPages), rates.InputPerPDFPage)
+	addUnitCost(result.BreakdownUSD, "image_tiles", float64(req.ImageTiles), rates.InputPerImageTile)
+	addUnitCost(result.BreakdownUSD, "input_audio_file_seconds", req.InputAudioFileSeconds, rates.InputPerAudioFileSecond)
+	addUnitCost(result.BreakdownUSD, "file_storage_gb_hours", req.FileStorageGBHours, rates.PerFileStorageGBHour)
+	addUnitCost(result.BreakdownUSD, "file_bytes_ingested_gb", float64(req.FileBytesIngested)/(1024*1024*1024), rates.PerFileBytesIngestedGB)
 	addUnitCost(result.BreakdownUSD, "characters", float64(req.Characters), rates.InputPerCharacter)
 	addImageCost(result.BreakdownUSD, req.Images, rates)
 	if rates.PerCall > 0 {
@@ -149,6 +154,21 @@ func applyRateOverride(base Rates, override Rates) Rates {
 	if override.OutputPerVideoSecond != 0 {
 		base.OutputPerVideoSecond = override.OutputPerVideoSecond
 	}
+	if override.InputPerPDFPage != 0 {
+		base.InputPerPDFPage = override.InputPerPDFPage
+	}
+	if override.InputPerImageTile != 0 {
+		base.InputPerImageTile = override.InputPerImageTile
+	}
+	if override.InputPerAudioFileSecond != 0 {
+		base.InputPerAudioFileSecond = override.InputPerAudioFileSecond
+	}
+	if override.PerFileStorageGBHour != 0 {
+		base.PerFileStorageGBHour = override.PerFileStorageGBHour
+	}
+	if override.PerFileBytesIngestedGB != 0 {
+		base.PerFileBytesIngestedGB = override.PerFileBytesIngestedGB
+	}
 	if override.InputPerCharacter != 0 {
 		base.InputPerCharacter = override.InputPerCharacter
 	}
@@ -181,6 +201,11 @@ func multiplyRates(rates Rates, multiplier float64) Rates {
 	rates.OutputPerAudioSecond *= multiplier
 	rates.InputPerVideoSecond *= multiplier
 	rates.OutputPerVideoSecond *= multiplier
+	rates.InputPerPDFPage *= multiplier
+	rates.InputPerImageTile *= multiplier
+	rates.InputPerAudioFileSecond *= multiplier
+	rates.PerFileStorageGBHour *= multiplier
+	rates.PerFileBytesIngestedGB *= multiplier
 	rates.InputPerCharacter *= multiplier
 	rates.InputPerImage *= multiplier
 	rates.OutputPerImage *= multiplier
@@ -287,6 +312,11 @@ func hasBillableActivity(req EstimateRequest) bool {
 		req.OutputImageTokens > 0 ||
 		req.AudioSeconds > 0 ||
 		req.VideoSeconds > 0 ||
+		req.PDFPages > 0 ||
+		req.ImageTiles > 0 ||
+		req.InputAudioFileSeconds > 0 ||
+		req.FileStorageGBHours > 0 ||
+		req.FileBytesIngested > 0 ||
 		req.Characters > 0 ||
 		req.Images > 0 ||
 		len(req.UnitCounts) > 0

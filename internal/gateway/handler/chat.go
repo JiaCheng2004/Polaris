@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
@@ -11,6 +12,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
+	"github.com/JiaCheng2004/Polaris/internal/store"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +21,7 @@ type ChatHandler struct {
 	runtime *gwruntime.Holder
 	metrics *metrics.Recorder
 	cache   cachepkg.Cache
+	store   store.Store
 }
 
 type chatTarget struct {
@@ -27,8 +30,8 @@ type chatTarget struct {
 	resolution provider.Resolution
 }
 
-func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache) *ChatHandler {
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache}
+func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store) *ChatHandler {
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {
@@ -114,6 +117,7 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 
 	releaseStream := h.metrics.StartStream(selected.model.ID, selected.model.Provider)
 	defer releaseStream()
+	polarisStream := strings.Contains(c.GetHeader("Accept"), "application/x-polaris-stream+json")
 
 	for chunk := range stream {
 		if chunk.Err != nil {
@@ -145,7 +149,11 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 			outcome.TotalTokens = chunk.Usage.TotalTokens
 			outcome.TokenSource = providerUsageSource(*chunk.Usage)
 		}
-		if err := writeSSEData(c, chunk); err != nil {
+		var frame any = chunk
+		if polarisStream {
+			frame = streamEventsFromChunk(chunk)
+		}
+		if err := writeSSEData(c, frame); err != nil {
 			outcome.ErrorType = "provider_error"
 			middleware.SetRequestOutcome(c, outcome)
 			return
@@ -154,6 +162,28 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 
 	middleware.SetRequestOutcome(c, outcome)
 	_ = writeSSEDone(c)
+}
+
+func streamEventsFromChunk(chunk modality.ChatChunk) []modality.StreamEvent {
+	var events []modality.StreamEvent
+	for _, choice := range chunk.Choices {
+		if choice.Delta.Content != "" {
+			events = append(events, modality.StreamEvent{Kind: modality.StreamEventTextDelta, Text: choice.Delta.Content})
+		}
+		if len(choice.Delta.ToolCalls) > 0 {
+			events = append(events, modality.StreamEvent{Kind: modality.StreamEventToolCallDelta, ToolCalls: choice.Delta.ToolCalls})
+		}
+		if choice.FinishReason != nil {
+			events = append(events, modality.StreamEvent{Kind: modality.StreamEventDone})
+		}
+	}
+	if chunk.Usage != nil {
+		events = append(events, modality.StreamEvent{Kind: modality.StreamEventUsage, Usage: chunk.Usage})
+	}
+	if len(events) == 0 {
+		events = append(events, modality.StreamEvent{Kind: modality.StreamEventTextDelta})
+	}
+	return events
 }
 
 func shouldRetryWithFallback(apiErr *httputil.APIError) bool {

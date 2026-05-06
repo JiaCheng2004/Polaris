@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS budgets (
     mode            TEXT NOT NULL,
     limit_usd       REAL NOT NULL DEFAULT 0,
     limit_requests  INTEGER NOT NULL DEFAULT 0,
+    limit_file_bytes INTEGER NOT NULL DEFAULT 0,
+    limit_file_count INTEGER NOT NULL DEFAULT 0,
     window          TEXT NOT NULL DEFAULT 'monthly',
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(project_id) REFERENCES projects(id)

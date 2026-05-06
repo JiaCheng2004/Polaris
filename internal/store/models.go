@@ -62,14 +62,64 @@ func (m BudgetMode) Valid() bool {
 }
 
 type Budget struct {
-	ID            string
-	ProjectID     string
-	Name          string
-	Mode          BudgetMode
-	LimitUSD      float64
-	LimitRequests int64
-	Window        string
-	CreatedAt     time.Time
+	ID             string
+	ProjectID      string
+	Name           string
+	Mode           BudgetMode
+	LimitUSD       float64
+	LimitRequests  int64
+	LimitFileBytes int64
+	LimitFileCount int64
+	Window         string
+	CreatedAt      time.Time
+}
+
+type File struct {
+	PolarisID        string
+	ProjectID        string
+	KeyID            string
+	Sha256           string
+	Size             int64
+	MimeType         string
+	OriginalFilename string
+	Purpose          modality.FilePurpose
+	OriginURL        string
+	InlineBytes      []byte
+	BlobKey          string
+	Metadata         map[string]string
+	CreatedAt        time.Time
+	ExpiresAt        *time.Time
+	DeletedAt        *time.Time
+}
+
+type FileFilter struct {
+	ProjectID string
+	Purpose   modality.FilePurpose
+	Limit     int
+	AfterID   string
+}
+
+type FileProviderHandle struct {
+	PolarisID      string
+	Provider       string
+	ProviderFileID string
+	Purpose        modality.FilePurpose
+	SizeBytes      int64
+	MimeType       string
+	ExpiresAt      *time.Time
+	CreatedAt      time.Time
+}
+
+type FileUnderstandingArtifact struct {
+	Sha256       string
+	Processor    string
+	Version      string
+	MimeType     string
+	Text         string
+	Warning      string
+	MetadataJSON string
+	ArtifactJSON string
+	CreatedAt    time.Time
 }
 
 type AuditEvent struct {
