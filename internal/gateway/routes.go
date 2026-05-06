@@ -9,8 +9,10 @@ import (
 type routeHandlers struct {
 	audio        *handler.AudioHandler
 	chat         *handler.ChatHandler
+	batches      *handler.BatchesHandler
 	controlPlane *handler.ControlPlaneHandler
 	embed        *handler.EmbedHandler
+	files        *handler.FilesHandler
 	health       *handler.HealthHandler
 	image        *handler.ImageHandler
 	interpreting *handler.InterpretingHandler
@@ -49,12 +51,14 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 }
 
 func buildRouteHandlers(deps Dependencies) routeHandlers {
-	chatHandler := handler.NewChatHandler(deps.Runtime, deps.Metrics, deps.Cache)
+	chatHandler := handler.NewChatHandler(deps.Runtime, deps.Metrics, deps.Cache, deps.Store)
 	return routeHandlers{
 		audio:        handler.NewAudioHandler(deps.Runtime),
+		batches:      handler.NewBatchesHandler(deps.Runtime, deps.Store),
 		chat:         chatHandler,
 		controlPlane: handler.NewControlPlaneHandler(deps.Runtime, deps.Store, deps.VirtualKeyCache, deps.AuditLogger, deps.ToolRegistry),
 		embed:        handler.NewEmbedHandler(deps.Runtime, deps.Cache),
+		files:        handler.NewFilesHandler(deps.Runtime, deps.Store, deps.AuditLogger, deps.Logger),
 		health:       handler.NewHealthHandler(deps.Store, deps.Cache, deps.Runtime),
 		image:        handler.NewImageHandler(deps.Runtime, deps.Cache),
 		interpreting: handler.NewInterpretingHandler(deps.Runtime),

@@ -257,12 +257,14 @@ func (h *ControlPlaneHandler) ListPolicies(c *gin.Context) {
 }
 
 type createBudgetRequest struct {
-	ProjectID     string  `json:"project_id"`
-	Name          string  `json:"name"`
-	Mode          string  `json:"mode"`
-	LimitUSD      float64 `json:"limit_usd"`
-	LimitRequests int64   `json:"limit_requests"`
-	Window        string  `json:"window"`
+	ProjectID      string  `json:"project_id"`
+	Name           string  `json:"name"`
+	Mode           string  `json:"mode"`
+	LimitUSD       float64 `json:"limit_usd"`
+	LimitRequests  int64   `json:"limit_requests"`
+	LimitFileBytes int64   `json:"limit_file_bytes"`
+	LimitFileCount int64   `json:"limit_file_count"`
+	Window         string  `json:"window"`
 }
 
 func (h *ControlPlaneHandler) CreateBudget(c *gin.Context) {
@@ -285,14 +287,16 @@ func (h *ControlPlaneHandler) CreateBudget(c *gin.Context) {
 	}
 
 	budget := store.Budget{
-		ID:            "bud_" + budgetID,
-		ProjectID:     req.ProjectID,
-		Name:          req.Name,
-		Mode:          mode,
-		LimitUSD:      req.LimitUSD,
-		LimitRequests: req.LimitRequests,
-		Window:        strings.TrimSpace(req.Window),
-		CreatedAt:     time.Now().UTC(),
+		ID:             "bud_" + budgetID,
+		ProjectID:      req.ProjectID,
+		Name:           req.Name,
+		Mode:           mode,
+		LimitUSD:       req.LimitUSD,
+		LimitRequests:  req.LimitRequests,
+		LimitFileBytes: req.LimitFileBytes,
+		LimitFileCount: req.LimitFileCount,
+		Window:         strings.TrimSpace(req.Window),
+		CreatedAt:      time.Now().UTC(),
 	}
 	if budget.Window == "" {
 		budget.Window = "monthly"

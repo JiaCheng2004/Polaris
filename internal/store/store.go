@@ -28,6 +28,22 @@ type Store interface {
 	CreateBudget(ctx context.Context, budget Budget) error
 	ListBudgets(ctx context.Context, projectID string) ([]Budget, error)
 
+	CreateFile(ctx context.Context, file File) error
+	GetFile(ctx context.Context, polarisID string) (*File, error)
+	GetFileForProject(ctx context.Context, polarisID, projectID string) (*File, error)
+	ListFiles(ctx context.Context, filter FileFilter) ([]File, error)
+	DeleteFile(ctx context.Context, polarisID string) error
+	GetFileInline(ctx context.Context, polarisID string) ([]byte, error)
+	PutFileProviderHandle(ctx context.Context, handle FileProviderHandle) error
+	GetFileProviderHandle(ctx context.Context, polarisID, provider string) (*FileProviderHandle, bool, error)
+	DeleteFileProviderHandlesByPolarisID(ctx context.Context, polarisID string) error
+	PurgeExpiredFiles(ctx context.Context, now time.Time) (int64, error)
+	SumProjectFileBytes(ctx context.Context, projectID string) (int64, error)
+	CountProjectFiles(ctx context.Context, projectID string) (int64, error)
+	CountFilesByBlobKey(ctx context.Context, blobKey string) (int64, error)
+	PutFileUnderstandingArtifact(ctx context.Context, artifact FileUnderstandingArtifact) error
+	GetFileUnderstandingArtifact(ctx context.Context, sha256, processor, version string) (*FileUnderstandingArtifact, bool, error)
+
 	LogAuditEvent(ctx context.Context, event AuditEvent) error
 	LogAuditEventBatch(ctx context.Context, events []AuditEvent) error
 

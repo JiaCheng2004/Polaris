@@ -11,6 +11,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/common/chattools"
 )
 
 type ChatAdapter struct {
@@ -20,17 +21,17 @@ type ChatAdapter struct {
 }
 
 type chatRequest struct {
-	Model          string                    `json:"model"`
-	Messages       []modality.ChatMessage    `json:"messages"`
-	Temperature    *float64                  `json:"temperature,omitempty"`
-	TopP           *float64                  `json:"top_p,omitempty"`
-	MaxTokens      int                       `json:"max_tokens,omitempty"`
-	Stream         bool                      `json:"stream,omitempty"`
-	Tools          []modality.ToolDefinition `json:"tools,omitempty"`
-	ToolChoice     json.RawMessage           `json:"tool_choice,omitempty"`
-	ResponseFormat *modality.ResponseFormat  `json:"response_format,omitempty"`
-	Stop           []string                  `json:"stop,omitempty"`
-	StreamOptions  *streamOptions            `json:"stream_options,omitempty"`
+	Model          string                   `json:"model"`
+	Messages       []modality.ChatMessage   `json:"messages"`
+	Temperature    *float64                 `json:"temperature,omitempty"`
+	TopP           *float64                 `json:"top_p,omitempty"`
+	MaxTokens      int                      `json:"max_tokens,omitempty"`
+	Stream         bool                     `json:"stream,omitempty"`
+	Tools          []map[string]any         `json:"tools,omitempty"`
+	ToolChoice     json.RawMessage          `json:"tool_choice,omitempty"`
+	ResponseFormat *modality.ResponseFormat `json:"response_format,omitempty"`
+	Stop           []string                 `json:"stop,omitempty"`
+	StreamOptions  *streamOptions           `json:"stream_options,omitempty"`
 }
 
 type streamOptions struct {
@@ -88,7 +89,7 @@ func translateRequest(req *modality.ChatRequest, stream bool, fallbackModel stri
 		TopP:           req.TopP,
 		MaxTokens:      req.MaxTokens,
 		Stream:         stream,
-		Tools:          append([]modality.ToolDefinition(nil), req.Tools...),
+		Tools:          chattools.OpenAITools(req.Tools),
 		ToolChoice:     req.ToolChoice,
 		ResponseFormat: req.ResponseFormat,
 		Stop:           append([]string(nil), req.Stop...),

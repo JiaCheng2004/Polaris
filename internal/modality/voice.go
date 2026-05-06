@@ -22,6 +22,7 @@ type STTRequest struct {
 	File           []byte          `json:"-"`
 	Filename       string          `json:"-"`
 	ContentType    string          `json:"-"`
+	FileSource     *FileSource     `json:"file_source,omitempty"`
 	Language       string          `form:"language" json:"language,omitempty"`
 	ResponseFormat string          `form:"response_format" json:"response_format,omitempty"`
 	Temperature    *float64        `form:"temperature" json:"temperature,omitempty"`

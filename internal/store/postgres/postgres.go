@@ -323,10 +323,16 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if upgradeErr := s.ensureControlPlaneUpgrade(ctx); upgradeErr != nil {
 			return fmt.Errorf("apply postgres migrations: %w (upgrade fallback failed: %v)", err, upgradeErr)
 		}
+		if upgradeErr := s.ensureFilesUpgrade(ctx); upgradeErr != nil {
+			return fmt.Errorf("apply postgres migrations: %w (files upgrade fallback failed: %v)", err, upgradeErr)
+		}
 		return nil
 	}
 	if err := s.ensureControlPlaneUpgrade(ctx); err != nil {
 		return fmt.Errorf("apply postgres control-plane upgrades: %w", err)
+	}
+	if err := s.ensureFilesUpgrade(ctx); err != nil {
+		return fmt.Errorf("apply postgres files upgrades: %w", err)
 	}
 	return nil
 }
@@ -392,9 +398,13 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 			mode TEXT NOT NULL,
 			limit_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
 			limit_requests BIGINT NOT NULL DEFAULT 0,
+			limit_file_bytes BIGINT NOT NULL DEFAULT 0,
+			limit_file_count BIGINT NOT NULL DEFAULT 0,
 			window TEXT NOT NULL DEFAULT 'monthly',
 			created_at TIMESTAMPTZ NOT NULL
 		);`,
+		`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS limit_file_bytes BIGINT NOT NULL DEFAULT 0;`,
+		`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS limit_file_count BIGINT NOT NULL DEFAULT 0;`,
 		`CREATE TABLE IF NOT EXISTS audit_events (
 			id TEXT PRIMARY KEY,
 			project_id TEXT,
@@ -698,9 +708,9 @@ func (s *Store) CreateBudget(ctx context.Context, budget store.Budget) error {
 		budget.CreatedAt = time.Now().UTC()
 	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO budgets (id, project_id, name, mode, limit_usd, limit_requests, window, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, budget.ID, budget.ProjectID, budget.Name, string(budget.Mode), budget.LimitUSD, budget.LimitRequests, budget.Window, budget.CreatedAt.UTC())
+		INSERT INTO budgets (id, project_id, name, mode, limit_usd, limit_requests, limit_file_bytes, limit_file_count, window, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, budget.ID, budget.ProjectID, budget.Name, string(budget.Mode), budget.LimitUSD, budget.LimitRequests, budget.LimitFileBytes, budget.LimitFileCount, budget.Window, budget.CreatedAt.UTC())
 	if err != nil {
 		return fmt.Errorf("insert budget: %w", err)
 	}
@@ -708,7 +718,7 @@ func (s *Store) CreateBudget(ctx context.Context, budget store.Budget) error {
 }
 
 func (s *Store) ListBudgets(ctx context.Context, projectID string) ([]store.Budget, error) {
-	query := `SELECT id, project_id, name, mode, limit_usd, limit_requests, window, created_at FROM budgets`
+	query := `SELECT id, project_id, name, mode, limit_usd, limit_requests, limit_file_bytes, limit_file_count, window, created_at FROM budgets`
 	var args []any
 	if projectID != "" {
 		args = append(args, projectID)
@@ -727,7 +737,7 @@ func (s *Store) ListBudgets(ctx context.Context, projectID string) ([]store.Budg
 	for rows.Next() {
 		var budget store.Budget
 		var mode string
-		if err := rows.Scan(&budget.ID, &budget.ProjectID, &budget.Name, &mode, &budget.LimitUSD, &budget.LimitRequests, &budget.Window, &budget.CreatedAt); err != nil {
+		if err := rows.Scan(&budget.ID, &budget.ProjectID, &budget.Name, &mode, &budget.LimitUSD, &budget.LimitRequests, &budget.LimitFileBytes, &budget.LimitFileCount, &budget.Window, &budget.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan budget: %w", err)
 		}
 		budget.Mode = store.BudgetMode(mode)

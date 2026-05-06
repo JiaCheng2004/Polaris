@@ -50,6 +50,13 @@
       "rationale": "Operator-supplied pricing override path from config; same trust model as the gateway's own config file. Loaded once at startup and on hot-reload via the file watcher."
     },
     {
+      "rule_id": "G304",
+      "file": "internal/store/blob/disk.go",
+      "symbol": "Get",
+      "snippet": "file, err := os.Open(path)",
+      "rationale": "Blob keys are confined by pathForKey with filepath.Clean, absolute-path rejection, parent traversal rejection, and filepath.Rel verification before opening under the configured blob root."
+    },
+    {
       "rule_id": "G704",
       "file": "tests/e2e/live_smoke_harness.go",
       "symbol": "requireOllama",
@@ -62,6 +69,13 @@
       "symbol": "requireOllama",
       "snippet": "resp, err := http.DefaultClient.Do(req)",
       "rationale": "E2E harness validates OLLAMA_BASE_URL as localhost, loopback, or private-network before executing the dev-only request."
+    },
+    {
+      "rule_id": "G704",
+      "file": "internal/gateway/middleware/ssrf.go",
+      "symbol": "Do",
+      "snippet": "return c.client.Do(req)",
+      "rationale": "SSRFClient validates scheme and denylisted hosts before executing requests, uses a custom DialContext that resolves the host and rejects private/reserved IPs, and revalidates every redirect."
     }
   ]
 }

@@ -311,10 +311,16 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if upgradeErr := s.ensureControlPlaneUpgrade(ctx); upgradeErr != nil {
 			return fmt.Errorf("apply sqlite migrations: %w (upgrade fallback failed: %v)", err, upgradeErr)
 		}
+		if upgradeErr := s.ensureFilesUpgrade(ctx); upgradeErr != nil {
+			return fmt.Errorf("apply sqlite migrations: %w (files upgrade fallback failed: %v)", err, upgradeErr)
+		}
 		return nil
 	}
 	if err := s.ensureControlPlaneUpgrade(ctx); err != nil {
 		return fmt.Errorf("apply sqlite control-plane upgrades: %w", err)
+	}
+	if err := s.ensureFilesUpgrade(ctx); err != nil {
+		return fmt.Errorf("apply sqlite files upgrades: %w", err)
 	}
 	return nil
 }
@@ -373,6 +379,8 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 			mode TEXT NOT NULL,
 			limit_usd REAL NOT NULL DEFAULT 0,
 			limit_requests INTEGER NOT NULL DEFAULT 0,
+			limit_file_bytes INTEGER NOT NULL DEFAULT 0,
+			limit_file_count INTEGER NOT NULL DEFAULT 0,
 			window TEXT NOT NULL DEFAULT 'monthly',
 			created_at TIMESTAMP NOT NULL,
 			FOREIGN KEY(project_id) REFERENCES projects(id)
@@ -448,6 +456,22 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 			continue
 		}
 		if _, err := s.db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE request_logs ADD COLUMN %s %s", column, columnType)); err != nil {
+			return err
+		}
+	}
+	budgetColumns := map[string]string{
+		"limit_file_bytes": "INTEGER NOT NULL DEFAULT 0",
+		"limit_file_count": "INTEGER NOT NULL DEFAULT 0",
+	}
+	for column, columnType := range budgetColumns {
+		exists, err := s.sqliteColumnExists(ctx, "budgets", column)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE budgets ADD COLUMN %s %s", column, columnType)); err != nil {
 			return err
 		}
 	}
@@ -738,9 +762,9 @@ func (s *Store) CreateBudget(ctx context.Context, budget store.Budget) error {
 		budget.CreatedAt = time.Now().UTC()
 	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO budgets (id, project_id, name, mode, limit_usd, limit_requests, window, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, budget.ID, budget.ProjectID, budget.Name, string(budget.Mode), budget.LimitUSD, budget.LimitRequests, budget.Window, budget.CreatedAt)
+		INSERT INTO budgets (id, project_id, name, mode, limit_usd, limit_requests, limit_file_bytes, limit_file_count, window, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, budget.ID, budget.ProjectID, budget.Name, string(budget.Mode), budget.LimitUSD, budget.LimitRequests, budget.LimitFileBytes, budget.LimitFileCount, budget.Window, budget.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert budget: %w", err)
 	}
@@ -748,7 +772,7 @@ func (s *Store) CreateBudget(ctx context.Context, budget store.Budget) error {
 }
 
 func (s *Store) ListBudgets(ctx context.Context, projectID string) ([]store.Budget, error) {
-	query := `SELECT id, project_id, name, mode, limit_usd, limit_requests, window, created_at FROM budgets`
+	query := `SELECT id, project_id, name, mode, limit_usd, limit_requests, limit_file_bytes, limit_file_count, window, created_at FROM budgets`
 	var args []any
 	if projectID != "" {
 		query += ` WHERE project_id = ?`
@@ -767,7 +791,7 @@ func (s *Store) ListBudgets(ctx context.Context, projectID string) ([]store.Budg
 	for rows.Next() {
 		var budget store.Budget
 		var mode string
-		if err := rows.Scan(&budget.ID, &budget.ProjectID, &budget.Name, &mode, &budget.LimitUSD, &budget.LimitRequests, &budget.Window, &budget.CreatedAt); err != nil {
+		if err := rows.Scan(&budget.ID, &budget.ProjectID, &budget.Name, &mode, &budget.LimitUSD, &budget.LimitRequests, &budget.LimitFileBytes, &budget.LimitFileCount, &budget.Window, &budget.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan budget: %w", err)
 		}
 		budget.Mode = store.BudgetMode(mode)

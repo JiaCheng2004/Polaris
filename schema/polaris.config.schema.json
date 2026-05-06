@@ -39,6 +39,7 @@
             "enabled": { "type": "boolean" }
           }
         },
+        "files": { "$ref": "#/$defs/files" },
         "pricing": { "$ref": "#/$defs/pricing" },
         "observability": { "$ref": "#/$defs/observability" }
       }
@@ -153,6 +154,119 @@
         }
       }
     },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingestion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_upload_bytes": { "type": "integer", "minimum": 0 },
+            "allowed_mime": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "inline_max_bytes": { "type": "integer", "minimum": 0 },
+            "blob_store": { "enum": ["none", "disk", "s3"] },
+            "disk_path": { "type": "string" },
+            "s3": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": { "type": "string" },
+                "bucket": { "type": "string" },
+                "region": { "type": "string" },
+                "access_key_id": { "type": "string" },
+                "secret_access_key": { "type": "string" },
+                "session_token": { "type": "string" },
+                "use_ssl": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "downloads": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "token_ttl": { "$ref": "#/$defs/duration" }
+          }
+        },
+        "ssrf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed_schemes": {
+              "type": "array",
+              "items": { "enum": ["http", "https"] }
+            },
+            "deny_hosts": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "materialization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "inline_fallback_max": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "understanding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": { "enum": ["disabled", "explicit", "auto_fallback"] },
+            "profile": { "enum": ["fast", "balanced", "quality"] },
+            "max_bytes": { "type": "integer", "minimum": 0 },
+            "max_text_chars": { "type": "integer", "minimum": 0 },
+            "cache_artifacts": { "type": "boolean" },
+            "chunking": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "max_chars": { "type": "integer", "minimum": 0 },
+                "overlap_chars": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "processors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "name": { "type": "string" },
+                  "backend": { "enum": ["http", "remote_http", "tika"] },
+                  "endpoint": { "type": "string" },
+                  "method": { "type": "string" },
+                  "version": { "type": "string" },
+                  "timeout": { "type": "string" },
+                  "priority": { "type": "integer" },
+                  "mime_types": { "type": "array", "items": { "type": "string" } },
+                  "file_classes": { "type": "array", "items": { "enum": ["text", "image", "pdf", "office_document", "office_spreadsheet", "office_presentation", "audio", "video", "archive", "unknown"] } },
+                  "artifacts": { "type": "array", "items": { "enum": ["text", "metadata", "ocr_text", "layout", "table", "form", "chunk", "image_caption", "image_metadata", "embedding", "raw"] } },
+                  "capabilities": { "type": "array", "items": { "enum": ["detect", "text_extract", "metadata", "ocr", "layout", "table_extract", "form_extract", "image_caption", "chunk", "embed"] } },
+                  "profiles": { "type": "array", "items": { "enum": ["fast", "balanced", "quality"] } },
+                  "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "ocr": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "pricing": {
       "type": "object",
       "additionalProperties": false,
@@ -234,7 +348,7 @@
       "additionalProperties": true,
       "properties": {
         "modality": {
-          "enum": ["chat", "embed", "image", "video", "voice", "audio", "music", "notes", "podcast", "translation", "interpreting"]
+          "enum": ["chat", "embed", "image", "video", "voice", "audio", "music", "notes", "podcast", "translation", "interpreting", "files", "batch"]
         },
         "capabilities": {
           "type": "array",

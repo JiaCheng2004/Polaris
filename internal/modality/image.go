@@ -17,6 +17,7 @@ type ImageRequest struct {
 	Style           string          `json:"style,omitempty"`
 	ResponseFormat  string          `json:"response_format,omitempty"`
 	ReferenceImages []string        `json:"reference_images,omitempty"`
+	ReferenceFiles  []FileSource    `json:"reference_files,omitempty"`
 }
 
 type ImageEditRequest struct {
@@ -29,6 +30,8 @@ type ImageEditRequest struct {
 	Mask           []byte          `json:"-"`
 	MaskFilename   string          `json:"-"`
 	MaskType       string          `json:"-"`
+	ImageSource    *FileSource     `json:"image_source,omitempty"`
+	MaskSource     *FileSource     `json:"mask_source,omitempty"`
 	N              int             `json:"n,omitempty"`
 	Size           string          `json:"size,omitempty"`
 	ResponseFormat string          `json:"response_format,omitempty"`

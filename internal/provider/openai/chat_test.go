@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -55,6 +56,49 @@ func TestChatAdapterComplete(t *testing.T) {
 	}
 	if len(response.Choices) != 1 || response.Choices[0].Message.Content.Text == nil || *response.Choices[0].Message.Content.Text != "Hello" {
 		t.Fatalf("unexpected response %#v", response)
+	}
+}
+
+func TestChatAdapterUsesMaxCompletionTokensForGPT5(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if _, ok := payload["max_tokens"]; ok {
+			t.Fatalf("unexpected max_tokens in GPT-5 request: %#v", payload)
+		}
+		if got := payload["max_completion_tokens"]; got != float64(32) {
+			t.Fatalf("expected max_completion_tokens=32, got %#v in %#v", got, payload)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"chatcmpl-1",
+			"object":"chat.completion",
+			"created":1744329600,
+			"model":"gpt-5.4-mini",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":10,"completion_tokens":1,"total_tokens":11}
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(config.ProviderConfig{
+		APIKey:  "sk-test",
+		BaseURL: server.URL + "/v1",
+		Timeout: time.Second,
+	})
+	adapter := NewChatAdapter(client, "openai/gpt-5.4-mini")
+
+	if _, err := adapter.Complete(context.Background(), &modality.ChatRequest{
+		Model:     "openai/gpt-5.4-mini",
+		MaxTokens: 32,
+		Messages: []modality.ChatMessage{
+			{Role: "user", Content: modality.NewTextContent("Hello")},
+		},
+	}); err != nil {
+		t.Fatalf("Complete() error = %v", err)
 	}
 }
 

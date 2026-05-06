@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS budgets (
     mode            TEXT NOT NULL,
     limit_usd       DOUBLE PRECISION NOT NULL DEFAULT 0,
     limit_requests  BIGINT NOT NULL DEFAULT 0,
+    limit_file_bytes BIGINT NOT NULL DEFAULT 0,
+    limit_file_count BIGINT NOT NULL DEFAULT 0,
     window          TEXT NOT NULL DEFAULT 'monthly',
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -33,6 +33,8 @@ type Registry struct {
 	audioAdapters                  map[string]modality.AudioAdapter
 	interpretingAdapters           map[string]modality.InterpretingAdapter
 	musicAdapters                  map[string]modality.MusicAdapter
+	filesAdapters                  map[string]modality.FilesAdapter
+	batchAdapters                  map[string]modality.BatchAdapter
 	aliases                        map[string]string
 	familyAliases                  map[string]string
 	families                       map[string]modelFamily
@@ -117,6 +119,8 @@ func New(cfg *config.Config) (*Registry, []string, error) {
 		audioAdapters:                  map[string]modality.AudioAdapter{},
 		interpretingAdapters:           map[string]modality.InterpretingAdapter{},
 		musicAdapters:                  map[string]modality.MusicAdapter{},
+		filesAdapters:                  map[string]modality.FilesAdapter{},
+		batchAdapters:                  map[string]modality.BatchAdapter{},
 		aliases:                        map[string]string{},
 		familyAliases:                  map[string]string{},
 		families:                       map[string]modelFamily{},

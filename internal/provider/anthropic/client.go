@@ -58,12 +58,16 @@ func NewClient(cfg config.ProviderConfig) *Client {
 }
 
 func (c *Client) JSON(ctx context.Context, path string, body any, out any) error {
+	return c.JSONWithBetas(ctx, path, body, out, nil)
+}
+
+func (c *Client) JSONWithBetas(ctx context.Context, path string, body any, out any, betas []string) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal anthropic request: %w", err)
 	}
 
-	resp, err := c.do(ctx, path, payload)
+	resp, err := c.doWithBetas(ctx, path, payload, betas)
 	if err != nil {
 		return err
 	}
@@ -81,12 +85,16 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 }
 
 func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Response, error) {
+	return c.StreamWithBetas(ctx, path, body, nil)
+}
+
+func (c *Client) StreamWithBetas(ctx context.Context, path string, body any, betas []string) (*http.Response, error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal anthropic stream request: %w", err)
 	}
 
-	resp, err := c.do(ctx, path, payload)
+	resp, err := c.doWithBetas(ctx, path, payload, betas)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +107,7 @@ func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Respo
 	return resp, nil
 }
 
-func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Response, error) {
+func (c *Client) doWithBetas(ctx context.Context, path string, payload []byte, betas []string) (*http.Response, error) {
 	attempts := c.maxAttempts
 	if attempts <= 0 {
 		attempts = 1
@@ -115,6 +123,9 @@ func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Res
 		req.Header.Set("anthropic-version", anthropicVersion)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		if len(betas) > 0 {
+			req.Header.Set("anthropic-beta", strings.Join(betas, ","))
+		}
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {

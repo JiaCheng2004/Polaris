@@ -21,6 +21,10 @@ func (h *ChatHandler) completeWithFailover(c *gin.Context, primary chatTarget, f
 	for index, target := range targets {
 		attemptReq := *req
 		attemptReq.Model = target.model.ID
+		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
+		if err != nil {
+			return nil, lastOutcome, "", err
+		}
 
 		start := time.Now()
 		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
@@ -29,7 +33,7 @@ func (h *ChatHandler) completeWithFailover(c *gin.Context, primary chatTarget, f
 			attribute.String("polaris.model", target.model.ID),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 		)
-		response, err := target.adapter.Complete(attemptCtx, &attemptReq)
+		response, err := target.adapter.Complete(attemptCtx, resolvedReq)
 		if err != nil {
 			telemetry.RecordSpanError(attemptSpan, err)
 		}
@@ -54,6 +58,7 @@ func (h *ChatHandler) completeWithFailover(c *gin.Context, primary chatTarget, f
 
 		response.Model = target.model.ID
 		response.Usage = normalizeUsage(response.Usage)
+		attachFileUnderstandingMetadata(response, resolvedReq)
 		outcome := middleware.RequestOutcome{
 			Model:             target.model.ID,
 			Provider:          target.model.Provider,

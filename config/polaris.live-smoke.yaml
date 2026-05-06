@@ -74,6 +74,48 @@ runtime:
       max_entries_per_model: 100
       similarity_threshold: 0.95
 
+  files:
+    enabled: true
+    ingestion:
+      max_upload_bytes: 524288000
+      allowed_mime:
+        - application/pdf
+        - application/json
+        - application/xml
+        - application/x-yaml
+        - application/yaml
+        - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        - application/vnd.openxmlformats-officedocument.presentationml.presentation
+        - text/*
+        - image/*
+        - audio/*
+    storage:
+      inline_max_bytes: 5242880
+      blob_store: none
+      disk_path: ./data/files
+    downloads:
+      token_ttl: 10m
+    ssrf:
+      allowed_schemes: [https]
+      deny_hosts:
+        - 169.254.169.254
+        - metadata.google.internal
+    materialization:
+      inline_fallback_max: 5242880
+    understanding:
+      enabled: true
+      mode: explicit
+      profile: quality
+      max_bytes: 5242880
+      max_text_chars: 16000
+      cache_artifacts: true
+      chunking:
+        enabled: true
+        max_chars: 900
+        overlap_chars: 120
+      processors: []
+
   observability:
     metrics:
       enabled: true
@@ -90,7 +132,7 @@ providers:
         backoff: exponential
         initial_delay: 1s
     models:
-      use: [gpt-5.5, gpt-4o-mini, text-embedding-3-small, gpt-image-1, gpt-image-2, tts-1, whisper-1, gpt-4o-audio, sora-2]
+      use: [gpt-5.4-mini, gpt-5.5, gpt-4o-mini, text-embedding-3-small, gpt-image-1, gpt-image-2, tts-1, whisper-1, gpt-4o-audio, sora-2]
 
   anthropic:
     transport:
@@ -99,7 +141,7 @@ providers:
         backoff: exponential
         initial_delay: 1s
     models:
-      use: [claude-sonnet-4-6]
+      use: [claude-haiku-4-5-20251001, claude-sonnet-4-6]
 
   google:
     transport:
@@ -163,4 +205,4 @@ providers:
 
   qwen:
     models:
-      use: [qwen-max, qwen-image-2.0]
+      use: [qwen-max, qwen3.5-flash, qwen-image-2.0]

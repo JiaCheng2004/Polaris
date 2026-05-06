@@ -23,6 +23,7 @@ type Config struct {
 	ControlPlane  ControlPlaneConfig        `yaml:"control_plane"`
 	Tools         ToolsConfig               `yaml:"tools"`
 	MCP           MCPConfig                 `yaml:"mcp"`
+	Files         FilesConfig               `yaml:"files"`
 	Pricing       PricingConfig             `yaml:"pricing"`
 	Observability ObservabilityConfig       `yaml:"observability"`
 }
@@ -206,6 +207,86 @@ type MCPConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type FilesConfig struct {
+	Enabled       bool                      `yaml:"enabled"`
+	Ingestion     FileIngestionConfig       `yaml:"ingestion"`
+	Storage       FileStorageConfig         `yaml:"storage"`
+	Downloads     FileDownloadsConfig       `yaml:"downloads"`
+	SSRF          FileSSRFConfig            `yaml:"ssrf"`
+	Materialize   FileMaterializationConfig `yaml:"materialization"`
+	Understanding FileUnderstandingConfig   `yaml:"understanding"`
+}
+
+type FileIngestionConfig struct {
+	MaxUploadBytes int64    `yaml:"max_upload_bytes"`
+	AllowedMime    []string `yaml:"allowed_mime"`
+}
+
+type FileStorageConfig struct {
+	InlineMaxBytes int64        `yaml:"inline_max_bytes"`
+	BlobStore      string       `yaml:"blob_store"`
+	DiskPath       string       `yaml:"disk_path"`
+	S3             FileS3Config `yaml:"s3"`
+}
+
+type FileS3Config struct {
+	Endpoint        string `yaml:"endpoint"`
+	Bucket          string `yaml:"bucket"`
+	Region          string `yaml:"region"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	SessionToken    string `yaml:"session_token"`
+	UseSSL          bool   `yaml:"use_ssl"`
+}
+
+type FileDownloadsConfig struct {
+	TokenTTL time.Duration `yaml:"token_ttl"`
+}
+
+type FileSSRFConfig struct {
+	AllowedSchemes []string `yaml:"allowed_schemes"`
+	DenyHosts      []string `yaml:"deny_hosts"`
+}
+
+type FileMaterializationConfig struct {
+	InlineFallbackMax int64 `yaml:"inline_fallback_max"`
+}
+
+type FileUnderstandingConfig struct {
+	Enabled        bool                               `yaml:"enabled"`
+	Mode           string                             `yaml:"mode"`
+	Profile        string                             `yaml:"profile"`
+	MaxBytes       int64                              `yaml:"max_bytes"`
+	MaxTextChars   int                                `yaml:"max_text_chars"`
+	CacheArtifacts bool                               `yaml:"cache_artifacts"`
+	Chunking       FileUnderstandingChunkingConfig    `yaml:"chunking"`
+	Processors     []FileUnderstandingProcessorConfig `yaml:"processors"`
+}
+
+type FileUnderstandingChunkingConfig struct {
+	Enabled      bool `yaml:"enabled"`
+	MaxChars     int  `yaml:"max_chars"`
+	OverlapChars int  `yaml:"overlap_chars"`
+}
+
+type FileUnderstandingProcessorConfig struct {
+	Enabled      bool              `yaml:"enabled"`
+	Name         string            `yaml:"name"`
+	Backend      string            `yaml:"backend"`
+	Endpoint     string            `yaml:"endpoint"`
+	Method       string            `yaml:"method"`
+	Version      string            `yaml:"version"`
+	Timeout      time.Duration     `yaml:"timeout"`
+	Priority     int               `yaml:"priority"`
+	MIMETypes    []string          `yaml:"mime_types"`
+	FileClasses  []string          `yaml:"file_classes"`
+	Artifacts    []string          `yaml:"artifacts"`
+	Capabilities []string          `yaml:"capabilities"`
+	Profiles     []string          `yaml:"profiles"`
+	Headers      map[string]string `yaml:"headers"`
+	OCR          bool              `yaml:"ocr"`
+}
+
 type PricingConfig struct {
 	File                  string `yaml:"file"`
 	ReloadIntervalSeconds int    `yaml:"reload_interval_seconds"`
@@ -255,6 +336,8 @@ type RuntimeOverrides struct {
 var envPattern = regexp.MustCompile(`\$\{([A-Z0-9_]+)\}`)
 
 const DefaultMaxBodyBytes int64 = 64 * 1024 * 1024
+const DefaultMaxFileUploadBytes int64 = 500 * 1024 * 1024
+const DefaultInlineFileBytes int64 = 5 * 1024 * 1024
 
 func Default() Config {
 	return Config{
@@ -307,6 +390,53 @@ func Default() Config {
 			Local: map[string]LocalToolConfig{},
 		},
 		MCP: MCPConfig{},
+		Files: FilesConfig{
+			Enabled: true,
+			Ingestion: FileIngestionConfig{
+				MaxUploadBytes: DefaultMaxFileUploadBytes,
+				AllowedMime: []string{
+					"application/pdf",
+					"application/json",
+					"application/xml",
+					"application/x-yaml",
+					"application/yaml",
+					"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+					"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+					"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+					"text/*",
+					"image/*",
+					"audio/*",
+				},
+			},
+			Storage: FileStorageConfig{
+				InlineMaxBytes: DefaultInlineFileBytes,
+				BlobStore:      "none",
+				DiskPath:       "./data/files",
+			},
+			Downloads: FileDownloadsConfig{
+				TokenTTL: 10 * time.Minute,
+			},
+			SSRF: FileSSRFConfig{
+				AllowedSchemes: []string{"https"},
+				DenyHosts:      []string{"169.254.169.254", "metadata.google.internal"},
+			},
+			Materialize: FileMaterializationConfig{
+				InlineFallbackMax: DefaultInlineFileBytes,
+			},
+			Understanding: FileUnderstandingConfig{
+				Enabled:        false,
+				Mode:           "disabled",
+				Profile:        "fast",
+				MaxBytes:       DefaultInlineFileBytes,
+				MaxTextChars:   12000,
+				CacheArtifacts: true,
+				Chunking: FileUnderstandingChunkingConfig{
+					Enabled:      false,
+					MaxChars:     1800,
+					OverlapChars: 200,
+				},
+			},
+		},
 		Pricing: PricingConfig{
 			ReloadIntervalSeconds: 30,
 		},
@@ -370,6 +500,27 @@ func DefaultCORSConfig() CORSConfig {
 func EffectiveMaxBodyBytes(value int64) int64 {
 	if value <= 0 {
 		return DefaultMaxBodyBytes
+	}
+	return value
+}
+
+func EffectiveMaxFileUploadBytes(value int64) int64 {
+	if value <= 0 {
+		return DefaultMaxFileUploadBytes
+	}
+	return value
+}
+
+func EffectiveInlineFileBytes(value int64) int64 {
+	if value <= 0 {
+		return DefaultInlineFileBytes
+	}
+	return value
+}
+
+func EffectiveFileDownloadTTL(value time.Duration) time.Duration {
+	if value <= 0 {
+		return 10 * time.Minute
 	}
 	return value
 }
@@ -466,6 +617,26 @@ func ApplyEnvOverrides(cfg *Config) error {
 	}
 	if value := os.Getenv("POLARIS_CACHE_URL"); value != "" {
 		cfg.Cache.URL = value
+	}
+	if value := os.Getenv("POLARIS_FILES_ENABLED"); value != "" {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_FILES_ENABLED: %w", err)
+		}
+		cfg.Files.Enabled = enabled
+	}
+	if value := os.Getenv("POLARIS_FILES_MAX_UPLOAD_BYTES"); value != "" {
+		maxUploadBytes, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse POLARIS_FILES_MAX_UPLOAD_BYTES: %w", err)
+		}
+		cfg.Files.Ingestion.MaxUploadBytes = maxUploadBytes
+	}
+	if value := os.Getenv("POLARIS_FILES_BLOB_STORE"); value != "" {
+		cfg.Files.Storage.BlobStore = value
+	}
+	if value := os.Getenv("POLARIS_FILES_DISK_PATH"); value != "" {
+		cfg.Files.Storage.DiskPath = value
 	}
 	if value := os.Getenv("POLARIS_OTEL_ENDPOINT"); value != "" {
 		cfg.Observability.Traces.Endpoint = value

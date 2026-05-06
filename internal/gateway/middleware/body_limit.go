@@ -14,6 +14,9 @@ func BodyLimit(runtime *gwruntime.Holder) gin.HandlerFunc {
 		maxBytes := config.DefaultMaxBodyBytes
 		if snapshot := RuntimeSnapshot(c, runtime); snapshot != nil && snapshot.Config != nil {
 			maxBytes = config.EffectiveMaxBodyBytes(snapshot.Config.Server.MaxBodyBytes)
+			if c.Request.Method == http.MethodPost && c.Request.URL != nil && c.Request.URL.Path == "/v1/files" {
+				maxBytes = config.EffectiveMaxFileUploadBytes(snapshot.Config.Files.Ingestion.MaxUploadBytes)
+			}
 		}
 
 		if c.Request.ContentLength > maxBytes {

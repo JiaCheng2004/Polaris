@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -14,7 +15,11 @@ import (
 )
 
 func (h *ChatHandler) prepareConversation(c *gin.Context, req *modality.ChatRequest) (chatTarget, []chatTarget, error) {
-	requiredCapabilities, err := requiredCapabilities(req)
+	allowDerivedFileUnderstanding := false
+	if snapshot := middleware.RuntimeSnapshot(c, h.runtime); snapshot != nil && snapshot.Config != nil {
+		allowDerivedFileUnderstanding = fileUnderstandingPolicy(req, snapshot.Config.Files).Enabled
+	}
+	requiredCapabilities, err := requiredCapabilities(req, allowDerivedFileUnderstanding)
 	if err != nil {
 		return chatTarget{}, nil, err
 	}
@@ -27,6 +32,9 @@ func (h *ChatHandler) prepareConversation(c *gin.Context, req *modality.ChatRequ
 
 	primary, err := h.resolveChatTarget(c, registry, auth, req.Model, req.Routing, requiredCapabilities)
 	if err != nil {
+		if errors.Is(err, provider.ErrCapabilityMissing) && requestHasFileParts(req) && !allowDerivedFileUnderstanding {
+			return chatTarget{}, nil, fileUnderstandingRequiredError("")
+		}
 		return chatTarget{}, nil, err
 	}
 	fallbacks := h.resolveFallbackTargets(c, registry, auth, primary.model.ID, requiredCapabilities)
@@ -58,6 +66,10 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 	for index, target := range targets {
 		attemptReq := *req
 		attemptReq.Model = target.model.ID
+		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
+		if err != nil {
+			return nil, chatTarget{}, lastOutcome, "", err
+		}
 
 		start := time.Now()
 		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
@@ -66,7 +78,7 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 			attribute.String("polaris.model", target.model.ID),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 		)
-		stream, err := target.adapter.Stream(attemptCtx, &attemptReq)
+		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
 		if err != nil {
 			telemetry.RecordSpanError(attemptSpan, err)
 		}
@@ -122,6 +134,10 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 	for index, target := range fallbacks {
 		attemptReq := *req
 		attemptReq.Model = target.model.ID
+		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
+		if err != nil {
+			return nil, lastOutcome, "", err
+		}
 
 		start := time.Now()
 		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
@@ -130,7 +146,7 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 			attribute.String("polaris.model", target.model.ID),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 		)
-		response, err := target.adapter.Complete(attemptCtx, &attemptReq)
+		response, err := target.adapter.Complete(attemptCtx, resolvedReq)
 		if err != nil {
 			telemetry.RecordSpanError(attemptSpan, err)
 		}
@@ -157,6 +173,7 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 
 		response.Model = target.model.ID
 		response.Usage = normalizeUsage(response.Usage)
+		attachFileUnderstandingMetadata(response, resolvedReq)
 		fallbackModel := target.model.ID
 		outcome := middleware.RequestOutcome{
 			Model:             target.model.ID,
@@ -190,6 +207,10 @@ func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary cha
 	for index, target := range fallbacks {
 		attemptReq := *req
 		attemptReq.Model = target.model.ID
+		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
+		if err != nil {
+			return nil, chatTarget{}, lastOutcome, "", err
+		}
 
 		start := time.Now()
 		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
@@ -198,7 +219,7 @@ func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary cha
 			attribute.String("polaris.model", target.model.ID),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 		)
-		stream, err := target.adapter.Stream(attemptCtx, &attemptReq)
+		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
 		if err != nil {
 			telemetry.RecordSpanError(attemptSpan, err)
 		}

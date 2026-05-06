@@ -28,6 +28,16 @@ func registerV1CoreRoutes(v1 *gin.RouterGroup, handlers routeHandlers) {
 	v1.GET("/models", handlers.models.List)
 	v1.GET("/usage", handlers.usage.Get)
 	v1.POST("/tokens/count", handlers.tokens.Count)
+	v1.POST("/files", handlers.files.Upload)
+	v1.GET("/files", handlers.files.List)
+	v1.GET("/files/:id", handlers.files.Get)
+	v1.DELETE("/files/:id", handlers.files.Delete)
+	v1.GET("/files/:id/content", handlers.files.Content)
+	v1.POST("/files/:id/materialize", handlers.files.Materialize)
+	v1.POST("/batches", handlers.batches.Create)
+	v1.GET("/batches/:id", handlers.batches.Get)
+	v1.GET("/batches/:id/output", handlers.batches.Output)
+	v1.DELETE("/batches/:id", handlers.batches.Delete)
 }
 
 func registerV1ConversationRoutes(v1 *gin.RouterGroup, handlers routeHandlers) {

@@ -77,6 +77,74 @@ runtime:
       max_entries_per_model: 100
       similarity_threshold: 0.95
 
+  files:
+    enabled: true
+    ingestion:
+      max_upload_bytes: 524288000
+      allowed_mime:
+        - application/pdf
+        - application/json
+        - application/xml
+        - application/x-yaml
+        - application/yaml
+        - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        - application/vnd.openxmlformats-officedocument.presentationml.presentation
+        - text/*
+        - image/*
+        - audio/*
+    storage:
+      inline_max_bytes: 5242880
+      blob_store: none # none | disk | s3
+      disk_path: ./data/files
+      s3:
+        endpoint: ${POLARIS_FILES_S3_ENDPOINT}
+        bucket: ${POLARIS_FILES_S3_BUCKET}
+        region: ${POLARIS_FILES_S3_REGION}
+        access_key_id: ${POLARIS_FILES_S3_ACCESS_KEY_ID}
+        secret_access_key: ${POLARIS_FILES_S3_SECRET_ACCESS_KEY}
+        use_ssl: true
+    downloads:
+      token_ttl: 10m
+    ssrf:
+      allowed_schemes: [https]
+      deny_hosts:
+        - 169.254.169.254
+        - metadata.google.internal
+    materialization:
+      inline_fallback_max: 5242880
+    understanding:
+      enabled: false
+      mode: disabled # disabled | explicit | auto_fallback
+      profile: fast # fast | balanced | quality
+      max_bytes: 5242880
+      max_text_chars: 12000
+      cache_artifacts: true
+      chunking:
+        enabled: false
+        max_chars: 1800
+        overlap_chars: 200
+      processors:
+        # Optional Apache Tika Server for broad document extraction and OCR.
+        - enabled: false
+          name: tika
+          backend: tika
+          endpoint: http://127.0.0.1:9998
+          profiles: [balanced, quality]
+          priority: 300
+          mime_types: ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/*"]
+          ocr: true
+        # Optional canonical HTTP wrapper for Textract, Document AI, Azure Document Intelligence, VLM captioning, or embedding services.
+        - enabled: false
+          name: document_ai_layout
+          backend: remote_http
+          endpoint: http://127.0.0.1:9009/v1/process
+          profiles: [quality]
+          priority: 500
+          mime_types: ["application/pdf", "image/*"]
+          artifacts: [ocr_text, layout, table, form]
+          capabilities: [ocr, layout, table_extract, form_extract]
+
   control_plane:
     enabled: true
 

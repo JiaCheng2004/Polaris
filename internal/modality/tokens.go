@@ -9,6 +9,7 @@ type TokenCountSource string
 
 const (
 	TokenCountSourceProviderReported TokenCountSource = "provider_reported"
+	TokenCountSourceTiktoken         TokenCountSource = "tiktoken"
 	TokenCountSourceEstimated        TokenCountSource = "estimated"
 	TokenCountSourceUnavailable      TokenCountSource = "unavailable"
 )
