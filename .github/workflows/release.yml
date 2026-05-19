@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.2"
+          go-version: "1.26.3"
 
       - name: Run security check
         run: make security-check
