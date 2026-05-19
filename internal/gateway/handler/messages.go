@@ -205,6 +205,9 @@ func (h *ChatHandler) nativeMessages(c *gin.Context, adapter modality.NativeMess
 		outcome.PromptTokens = response.Usage.PromptTokens
 		outcome.CompletionTokens = response.Usage.CompletionTokens
 		outcome.TotalTokens = response.Usage.TotalTokens
+		outcome.CachedInputTokens = response.Usage.CachedInputTokens
+		outcome.CacheWrite5mTokens = response.Usage.CacheWrite5mTokens
+		outcome.CacheWrite1hTokens = response.Usage.CacheWrite1hTokens
 		outcome.TokenSource = providerUsageSource(*response.Usage)
 	}
 	middleware.SetRequestOutcome(c, outcome)
@@ -245,6 +248,9 @@ func (h *ChatHandler) streamNativeMessages(c *gin.Context, adapter modality.Nati
 			outcome.PromptTokens = event.Usage.PromptTokens
 			outcome.CompletionTokens = event.Usage.CompletionTokens
 			outcome.TotalTokens = event.Usage.TotalTokens
+			outcome.CachedInputTokens = event.Usage.CachedInputTokens
+			outcome.CacheWrite5mTokens = event.Usage.CacheWrite5mTokens
+			outcome.CacheWrite1hTokens = event.Usage.CacheWrite1hTokens
 			outcome.TokenSource = providerUsageSource(*event.Usage)
 		}
 		if err := writeRawSSEEvent(c, event.Event, event.Payload); err != nil {

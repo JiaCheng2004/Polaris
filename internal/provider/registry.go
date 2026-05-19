@@ -20,6 +20,7 @@ var (
 type Registry struct {
 	models                         map[string]Model
 	chatAdapters                   map[string]modality.ChatAdapter
+	nativeMessagesAdapters         map[string]modality.NativeMessagesAdapter
 	embedAdapters                  map[string]modality.EmbedAdapter
 	imageAdapters                  map[string]modality.ImageAdapter
 	videoAdapters                  map[string]modality.VideoAdapter
@@ -106,6 +107,7 @@ func New(cfg *config.Config) (*Registry, []string, error) {
 	registry := &Registry{
 		models:                         map[string]Model{},
 		chatAdapters:                   map[string]modality.ChatAdapter{},
+		nativeMessagesAdapters:         map[string]modality.NativeMessagesAdapter{},
 		embedAdapters:                  map[string]modality.EmbedAdapter{},
 		imageAdapters:                  map[string]modality.ImageAdapter{},
 		videoAdapters:                  map[string]modality.VideoAdapter{},

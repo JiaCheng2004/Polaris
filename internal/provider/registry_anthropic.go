@@ -24,7 +24,9 @@ func registerAnthropicProvider(registry *Registry, warnings *[]string, providerN
 		id := fmt.Sprintf("%s/%s", providerName, modelName)
 		registry.models[id] = modelFromConfig(id, providerName, modelName, modelCfg)
 		if modelCfg.Modality == modality.ModalityChat {
-			registry.chatAdapters[id] = anthropic.NewChatAdapter(client, id, modelCfg.MaxOutputTokens)
+			adapter := anthropic.NewChatAdapter(client, id, modelCfg.MaxOutputTokens)
+			registry.chatAdapters[id] = adapter
+			registry.nativeMessagesAdapters[id] = adapter
 		}
 	}
 }

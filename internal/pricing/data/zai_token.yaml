@@ -1,0 +1,95 @@
+version: 1
+models:
+  zai-token/glm-5.1:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 1.40, output_per_mtok: 4.40 }
+  zai-token/glm-5:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 1.00, output_per_mtok: 3.20 }
+  zai-token/glm-5-turbo:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 1.20, output_per_mtok: 4.00 }
+  zai-token/glm-4.7:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.60, output_per_mtok: 2.20 }
+  zai-token/glm-4.7-flashx:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.07, output_per_mtok: 0.40 }
+  zai-token/glm-4.7-flash:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    notes: "Free tier"
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.00, output_per_mtok: 0.00 }
+  zai-token/glm-4.6:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.60, output_per_mtok: 2.20 }
+  zai-token/glm-4.5:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.60, output_per_mtok: 2.20 }
+  zai-token/glm-4.5-x:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 2.20, output_per_mtok: 8.90 }
+  zai-token/glm-4.5-air:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.20, output_per_mtok: 1.10 }
+  zai-token/glm-4.5-airx:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 1.10, output_per_mtok: 4.50 }
+  zai-token/glm-4.5-flash:
+    mode: chat
+    currency: USD
+    context_window: 204800
+    notes: "Free tier"
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.00, output_per_mtok: 0.00 }
+  zai-token/glm-4-32b-0414-128k:
+    mode: chat
+    currency: USD
+    context_window: 131072
+    source: https://docs.z.ai/guides/overview/pricing
+    effective_from: "2026-05-19"
+    pricing: { input_per_mtok: 0.10, output_per_mtok: 0.10 }

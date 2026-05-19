@@ -76,6 +76,7 @@ const (
 	CapabilityLyricsGeneration          Capability = "lyrics_generation"
 	CapabilityCompositionPlans          Capability = "composition_plans"
 	CapabilityInstrumental              Capability = "instrumental"
+	CapabilityAnthropicMessages         Capability = "anthropic_messages"
 )
 
 func (c Capability) Valid() bool {
@@ -123,7 +124,8 @@ func (c Capability) Valid() bool {
 		CapabilityMusicStems,
 		CapabilityLyricsGeneration,
 		CapabilityCompositionPlans,
-		CapabilityInstrumental:
+		CapabilityInstrumental,
+		CapabilityAnthropicMessages:
 		return true
 	default:
 		return false

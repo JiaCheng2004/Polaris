@@ -62,11 +62,23 @@ func TestBundledDataCoversPrimaryConfiguredModels(t *testing.T) {
 		"bytedance/doubao-seedance-2.0",
 		"bytedance/seedream-4.5",
 		"minimax/music-2.6",
+		"zai-token/glm-5.1",
+		"minimax-token/minimax-m2.7",
 		"elevenlabs/music_v1",
 		"ollama/llama3",
 	} {
 		if _, ok := catalog.Lookup(model); !ok {
 			t.Fatalf("expected bundled pricing for %s", model)
+		}
+	}
+
+	for _, model := range []string{"zai-token/glm-5.1", "minimax-token/minimax-m2.7"} {
+		entry, ok := catalog.Lookup(model)
+		if !ok {
+			t.Fatalf("expected bundled pricing for %s", model)
+		}
+		if entry.Pricing == nil || entry.Pricing.InputPerMTok <= 0 || entry.Pricing.OutputPerMTok <= 0 {
+			t.Fatalf("expected non-zero token rates for %s, got %#v", model, entry.Pricing)
 		}
 	}
 }

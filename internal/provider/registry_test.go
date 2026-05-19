@@ -267,6 +267,81 @@ func TestRegistryRegistersPhaseAProviderFamilies(t *testing.T) {
 	}
 }
 
+func TestRegistryRegistersTokenPlanProviders(t *testing.T) {
+	cfg := &config.Config{
+		Providers: map[string]config.ProviderConfig{
+			"zai-token": {
+				APIKey: "sk-zai",
+				Models: map[string]config.ModelConfig{
+					"glm-5.1": {
+						Modality:     modality.ModalityChat,
+						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityAnthropicMessages},
+					},
+				},
+			},
+			"minimax-token": {
+				APIKey: "sk-minimax",
+				Models: map[string]config.ModelConfig{
+					"minimax-m2.7": {
+						Modality:     modality.ModalityChat,
+						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityAnthropicMessages},
+					},
+				},
+			},
+		},
+	}
+
+	registry, warnings, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+
+	zaiModel, err := registry.ResolveModel("zai-token/glm-5.1")
+	if err != nil {
+		t.Fatalf("ResolveModel(zai-token/glm-5.1) error = %v", err)
+	}
+	if zaiModel.ID != "zai-token/glm-5.1" {
+		t.Fatalf("zai model ID = %s", zaiModel.ID)
+	}
+	zaiAlias, err := registry.ResolveModel("Z.ai GLM-5.1")
+	if err != nil {
+		t.Fatalf("ResolveModel(Z.ai GLM-5.1) error = %v", err)
+	}
+	if zaiAlias.ID != "zai-token/glm-5.1" {
+		t.Fatalf("zai alias resolved to %s", zaiAlias.ID)
+	}
+	if _, _, err := registry.GetChatAdapter("zai-token/glm-5.1"); err != nil {
+		t.Fatalf("GetChatAdapter(zai-token) error = %v", err)
+	}
+	if _, _, err := registry.GetNativeMessagesAdapter("zai-token/glm-5.1"); err != nil {
+		t.Fatalf("GetNativeMessagesAdapter(zai-token) error = %v", err)
+	}
+
+	miniModel, err := registry.ResolveModel("minimax-token/minimax-m2.7")
+	if err != nil {
+		t.Fatalf("ResolveModel(minimax-token/minimax-m2.7) error = %v", err)
+	}
+	if miniModel.ID != "minimax-token/minimax-m2.7" {
+		t.Fatalf("minimax model ID = %s", miniModel.ID)
+	}
+	miniAlias, err := registry.ResolveModel("MiniMax-M2.7")
+	if err != nil {
+		t.Fatalf("ResolveModel(MiniMax-M2.7) error = %v", err)
+	}
+	if miniAlias.ID != "minimax-token/minimax-m2.7" {
+		t.Fatalf("minimax alias resolved to %s", miniAlias.ID)
+	}
+	if _, _, err := registry.GetChatAdapter("minimax-token/minimax-m2.7"); err != nil {
+		t.Fatalf("GetChatAdapter(minimax-token) error = %v", err)
+	}
+	if _, _, err := registry.GetNativeMessagesAdapter("minimax-token/minimax-m2.7"); err != nil {
+		t.Fatalf("GetNativeMessagesAdapter(minimax-token) error = %v", err)
+	}
+}
+
 func TestRegistryAddsCatalogAliasesAndMetadata(t *testing.T) {
 	cfg := &config.Config{
 		Providers: map[string]config.ProviderConfig{

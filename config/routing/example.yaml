@@ -41,6 +41,8 @@ routing:
     default-embed: openai/text-embedding-3-small
     bedrock-embed: bedrock/amazon.titan-embed-text-v2:0
     nvidia-embed: nvidia/nvidia/llama-nemotron-embed-1b-v2
+    zai-token-chat: zai-token/glm-5.1
+    minimax-token-chat: minimax-token/minimax-m2.7
   selectors:
     tooling-chat:
       modality: chat

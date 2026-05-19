@@ -34,6 +34,18 @@ func (r *Registry) GetChatAdapter(name string) (modality.ChatAdapter, Model, err
 	return adapter, model, nil
 }
 
+func (r *Registry) GetNativeMessagesAdapter(name string) (modality.NativeMessagesAdapter, Model, error) {
+	model, err := r.RequireModel(name, modality.ModalityChat)
+	if err != nil {
+		return nil, Model{}, err
+	}
+	adapter, ok := r.nativeMessagesAdapters[model.ID]
+	if !ok {
+		return nil, Model{}, fmt.Errorf("%w: %s", ErrAdapterMissing, model.ID)
+	}
+	return adapter, model, nil
+}
+
 func (r *Registry) GetEmbedAdapter(name string) (modality.EmbedAdapter, Model, error) {
 	model, err := r.RequireModel(name, modality.ModalityEmbed)
 	if err != nil {

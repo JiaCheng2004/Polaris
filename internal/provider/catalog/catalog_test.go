@@ -39,6 +39,12 @@ func TestDefaultCatalogLoadsAndValidates(t *testing.T) {
 	if target, ok := cat.AliasTarget("GLM-5.1"); !ok || target != "glm/glm-5.1" {
 		t.Fatalf("alias target = %q, %v", target, ok)
 	}
+	if _, ok := cat.Lookup("zai-token/glm-5.1"); !ok {
+		t.Fatal("expected zai-token/glm-5.1 in embedded catalog")
+	}
+	if target, ok := cat.AliasTarget("MiniMax-M2.7"); !ok || target != "minimax-token/minimax-m2.7" {
+		t.Fatalf("MiniMax-M2.7 alias target = %q, %v", target, ok)
+	}
 	if family, ok := cat.Family("gpt-5.4"); !ok || family.DisplayName != "GPT-5.4" {
 		t.Fatalf("family = %#v, %v", family, ok)
 	}

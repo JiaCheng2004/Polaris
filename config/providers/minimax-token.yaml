@@ -1,0 +1,24 @@
+version: 2
+
+providers:
+  minimax-token:
+    credentials:
+      api_key: ${MINIMAX_TOKEN_API_KEY}
+    transport:
+      base_url: https://api.minimax.io/anthropic
+      timeout: 120s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use:
+        - minimax-m2.7
+        - minimax-m2
+      overrides:
+        minimax-m2.7:
+          context_window: 200000
+          max_output_tokens: 16384
+        minimax-m2:
+          context_window: 200000
+          max_output_tokens: 16384

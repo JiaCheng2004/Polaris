@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -259,6 +260,68 @@ func liveSmokePlatformCases() []liveSmokeCase {
 					t.Fatalf("GLM chat smoke failed: %v", err)
 				}
 				harness.requireContains(t, resp, "GLM_OK")
+			},
+		},
+		{
+			name:       "zai_token_chat",
+			modelNames: []string{"zai-token/glm-5.1"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "Z.ai Token Plan chat", "zai-token/glm-5.1")
+				harness.requireEnv(t, policy, "Z.ai Token Plan chat", "ZAI_TOKEN_API_KEY")
+				resp, err := harness.client.CreateChatCompletion(ctx, &client.ChatCompletionRequest{
+					Model: "zai-token/glm-5.1",
+					Messages: []client.ChatMessage{
+						{Role: "user", Content: client.NewTextContent("ping")},
+					},
+				})
+				if err != nil {
+					t.Fatalf("zai-token smoke failed: %v", err)
+				}
+				if len(resp.Choices) == 0 {
+					t.Fatalf("empty choices: %#v", resp)
+				}
+			},
+		},
+		{
+			name:       "minimax_token_chat",
+			modelNames: []string{"minimax-token/minimax-m2.7"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "MiniMax Token Plan chat", "minimax-token/minimax-m2.7")
+				harness.requireEnv(t, policy, "MiniMax Token Plan chat", "MINIMAX_TOKEN_API_KEY")
+				resp, err := harness.client.CreateChatCompletion(ctx, &client.ChatCompletionRequest{
+					Model: "minimax-token/minimax-m2.7",
+					Messages: []client.ChatMessage{
+						{Role: "user", Content: client.NewTextContent("ping")},
+					},
+				})
+				if err != nil {
+					t.Fatalf("minimax-token smoke failed: %v", err)
+				}
+				if len(resp.Choices) == 0 {
+					t.Fatalf("empty choices: %#v", resp)
+				}
+			},
+		},
+		{
+			name:       "zai_token_native_messages",
+			modelNames: []string{"zai-token/glm-5.1"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "Z.ai Token Plan native messages", "zai-token/glm-5.1")
+				harness.requireEnv(t, policy, "Z.ai Token Plan native messages", "ZAI_TOKEN_API_KEY")
+				resp, err := harness.client.CreateMessage(ctx, &client.MessagesRequest{
+					Model:     "zai-token/glm-5.1",
+					MaxTokens: 64,
+					Messages: []client.MessagesInputMessage{{
+						Role:    "user",
+						Content: json.RawMessage(`"hi"`),
+					}},
+				})
+				if err != nil {
+					t.Fatalf("zai-token native messages smoke failed: %v", err)
+				}
+				if len(resp.Content) == 0 || strings.TrimSpace(resp.Content[0].Text) == "" || resp.Usage.InputTokens <= 0 {
+					t.Fatalf("unexpected native messages response %#v", resp)
+				}
 			},
 		},
 		{

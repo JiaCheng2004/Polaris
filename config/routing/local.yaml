@@ -13,6 +13,8 @@ routing:
     openai-frontier-chat: openai/gpt-5.5
     openai-image-latest: openai/gpt-image-2
     premium-chat: anthropic/claude-opus-4-6
+    zai-token-chat: zai-token/glm-5.1
+    minimax-token-chat: minimax-token/minimax-m2.7
   selectors:
     tooling-chat:
       modality: chat

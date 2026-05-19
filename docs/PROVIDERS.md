@@ -106,6 +106,13 @@ Polaris beta file understanding is separate from provider-native processing. It 
 - Status: implemented through a chat-first adapter on the GLM REST base
 - Notes: Polaris uses the current GLM chat completion endpoint family rooted at `https://open.bigmodel.cn/api/paas/v4`. The first-cut Polaris scope uses the standard `chat/completions` path and intentionally excludes the coding-plan-specific endpoint family.
 
+### Z.ai Token Plan (`zai-token`)
+
+- Auth: `x-api-key: <ZAI_TOKEN_API_KEY>`, plus `anthropic-version: 2023-06-01`.
+- Scope: chat through the Anthropic Messages wire format. This is distinct from the `glm` provider, which targets the OpenAI-compatible BigModel endpoint.
+- Status: implemented through the shared Anthropic-compatible provider base.
+- Notes: Polaris calls `https://api.z.ai/api/anthropic/v1/messages`. Supported configured models include GLM-5.1, GLM-5, GLM-5-Turbo, GLM-4.7 family, GLM-4.6, GLM-4.5 family, and GLM-4-32B legacy. Token usage comes from the provider `usage` block and is priced through `internal/pricing/data/zai_token.yaml`.
+
 ### Mistral
 
 - Auth: bearer token
@@ -156,6 +163,13 @@ Polaris beta file understanding is separate from provider-native processing. It 
 - Scope: music
 - Status: music generation, cover edit, and lyrics implemented in Phase 5A; release-blocking for `v2.1.0`
 - Notes: Polaris uses MiniMax `/v1/music_generation` for synchronous music generation and cover workflows, always requests provider-native hex audio, and normalizes the decoded bytes back into the shared binary music response contract. Lyrics generation uses `/v1/lyrics_generation`. Token Plan / global keys must point at `https://api.minimax.io`, while China mainland accounts use `https://api.minimaxi.com`; set `providers.minimax.base_url` explicitly instead of assuming one endpoint fits both. MiniMax can also return business errors inside HTTP `200` responses via `base_resp.status_code`, so Polaris treats non-zero `base_resp.status_code` values as provider failures instead of false successes. Real MiniMax generation can take minutes, so `mode=async` is the recommended Polaris path for long-running jobs and the release-facing configs use a generous provider timeout. MiniMax streaming, stems, and composition-plan helpers are intentionally not exposed through the current adapter because those provider paths are not part of the shipped MiniMax music surface in Polaris.
+
+### MiniMax Token Plan (`minimax-token`)
+
+- Auth: `Authorization: Bearer <MINIMAX_TOKEN_API_KEY>`, plus `anthropic-version: 2023-06-01`.
+- Scope: chat through the Anthropic Messages wire format. This is distinct from the `minimax` provider, which currently serves music only.
+- Status: implemented through the shared Anthropic-compatible provider base.
+- Notes: Polaris calls `https://api.minimax.io/anthropic/v1/messages` by default. Operators in China can override `providers.minimax-token.transport.base_url` to `https://api.minimaxi.com/anthropic`. Supported configured models are MiniMax-M2.7 and MiniMax-M2. Token usage comes from the provider `usage` block and is priced through `internal/pricing/data/minimax_token.yaml`.
 
 ### ElevenLabs
 

@@ -1,0 +1,68 @@
+version: 2
+
+providers:
+  zai-token:
+    credentials:
+      api_key: ${ZAI_TOKEN_API_KEY}
+    transport:
+      base_url: https://api.z.ai/api/anthropic
+      timeout: 120s
+      retry:
+        max_attempts: 3
+        backoff: exponential
+        initial_delay: 1s
+    models:
+      use:
+        - glm-5.1
+        - glm-5
+        - glm-5-turbo
+        - glm-4.7
+        - glm-4.7-flashx
+        - glm-4.7-flash
+        - glm-4.6
+        - glm-4.5
+        - glm-4.5-x
+        - glm-4.5-air
+        - glm-4.5-airx
+        - glm-4.5-flash
+        - glm-4-32b-0414-128k
+      overrides:
+        glm-5.1:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-5:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-5-turbo:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.7:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.7-flashx:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.7-flash:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.6:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.5:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.5-x:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.5-air:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.5-airx:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4.5-flash:
+          context_window: 204800
+          max_output_tokens: 16384
+        glm-4-32b-0414-128k:
+          context_window: 131072
+          max_output_tokens: 16384

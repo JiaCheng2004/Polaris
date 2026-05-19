@@ -234,6 +234,8 @@ Phase 5 music hardening is current. The shipped runtime supports:
 - `providers.featherless`
 - `providers.moonshot`
 - `providers.glm`
+- `providers.zai-token`
+- `providers.minimax-token`
 - `providers.mistral`
 - `providers.bedrock`
 - `providers.nvidia`
