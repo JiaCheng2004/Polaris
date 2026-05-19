@@ -14,6 +14,7 @@ routing:
     openai-image-latest: openai/gpt-image-2
     premium-chat: anthropic/claude-opus-4-6
     zai-token-chat: zai-token/glm-5.1
+    # Experimental/opt-in: keep out of default production routes until final-answer behavior is validated.
     minimax-token-chat: minimax-token/minimax-m2.7
   selectors:
     tooling-chat:

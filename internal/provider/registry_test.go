@@ -327,6 +327,12 @@ func TestRegistryRegistersTokenPlanProviders(t *testing.T) {
 	if miniModel.ID != "minimax-token/minimax-m2.7" {
 		t.Fatalf("minimax model ID = %s", miniModel.ID)
 	}
+	if miniModel.Status != "experimental" {
+		t.Fatalf("minimax model status = %q, want experimental", miniModel.Status)
+	}
+	if miniModel.VerificationClass != "opt_in" {
+		t.Fatalf("minimax model verification_class = %q, want opt_in", miniModel.VerificationClass)
+	}
 	miniAlias, err := registry.ResolveModel("MiniMax-M2.7")
 	if err != nil {
 		t.Fatalf("ResolveModel(MiniMax-M2.7) error = %v", err)

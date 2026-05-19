@@ -168,8 +168,9 @@ Polaris beta file understanding is separate from provider-native processing. It 
 
 - Auth: `Authorization: Bearer <MINIMAX_TOKEN_API_KEY>`, plus `anthropic-version: 2023-06-01`.
 - Scope: chat through the Anthropic Messages wire format. This is distinct from the `minimax` provider, which currently serves music only.
-- Status: implemented through the shared Anthropic-compatible provider base.
+- Status: implemented through the shared Anthropic-compatible provider base, but cataloged as `experimental` and `opt_in`.
 - Notes: Polaris calls `https://api.minimax.io/anthropic/v1/messages` by default. Operators in China can override `providers.minimax-token.transport.base_url` to `https://api.minimaxi.com/anthropic`. Supported configured models are MiniMax-M2.7 and MiniMax-M2. Token usage comes from the provider `usage` block and is priced through `internal/pricing/data/minimax_token.yaml`.
+- Safety note: live validation on May 19, 2026 showed MiniMax token-plan can emit reasoning-like content as ordinary Anthropic `text` for some prompts. Polaris does not regex-strip provider text because that can corrupt legitimate output. Keep this provider out of default production routes unless the upstream response contract exposes final-answer text separately or a downstream product has an explicit content-safety guard. The opt-in live-smoke cases for this provider are final-only conformance checks and intentionally fail on non-final text without logging the provider text.
 
 ### ElevenLabs
 

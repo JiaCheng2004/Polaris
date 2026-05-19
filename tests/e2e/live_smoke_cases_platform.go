@@ -283,23 +283,25 @@ func liveSmokePlatformCases() []liveSmokeCase {
 			},
 		},
 		{
-			name:       "minimax_token_chat",
+			name:       "minimax_token_chat_final_only",
 			modelNames: []string{"minimax-token/minimax-m2.7"},
 			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
 				policy := harness.gateCase(t, "MiniMax Token Plan chat", "minimax-token/minimax-m2.7")
 				harness.requireEnv(t, policy, "MiniMax Token Plan chat", "MINIMAX_TOKEN_API_KEY")
 				resp, err := harness.client.CreateChatCompletion(ctx, &client.ChatCompletionRequest{
-					Model: "minimax-token/minimax-m2.7",
+					Model:     "minimax-token/minimax-m2.7",
+					MaxTokens: 512,
 					Messages: []client.ChatMessage{
-						{Role: "user", Content: client.NewTextContent("ping")},
+						{Role: "user", Content: client.NewTextContent("Reply with MINIMAX_TOKEN_OK only.")},
 					},
 				})
 				if err != nil {
 					t.Fatalf("minimax-token smoke failed: %v", err)
 				}
-				if len(resp.Choices) == 0 {
+				if len(resp.Choices) == 0 || resp.Choices[0].Message.Content.Text == nil {
 					t.Fatalf("empty choices: %#v", resp)
 				}
+				harness.requireFinalOnly(t, *resp.Choices[0].Message.Content.Text, "MINIMAX_TOKEN_OK")
 			},
 		},
 		{
@@ -322,6 +324,29 @@ func liveSmokePlatformCases() []liveSmokeCase {
 				if len(resp.Content) == 0 || strings.TrimSpace(resp.Content[0].Text) == "" || resp.Usage.InputTokens <= 0 {
 					t.Fatalf("unexpected native messages response %#v", resp)
 				}
+			},
+		},
+		{
+			name:       "minimax_token_native_messages_final_only",
+			modelNames: []string{"minimax-token/minimax-m2.7"},
+			run: func(t *testing.T, ctx context.Context, harness *liveSmokeHarness) {
+				policy := harness.gateCase(t, "MiniMax Token Plan native messages", "minimax-token/minimax-m2.7")
+				harness.requireEnv(t, policy, "MiniMax Token Plan native messages", "MINIMAX_TOKEN_API_KEY")
+				resp, err := harness.client.CreateMessage(ctx, &client.MessagesRequest{
+					Model:     "minimax-token/minimax-m2.7",
+					MaxTokens: 512,
+					Messages: []client.MessagesInputMessage{{
+						Role:    "user",
+						Content: json.RawMessage(`"Reply with MINIMAX_NATIVE_OK only."`),
+					}},
+				})
+				if err != nil {
+					t.Fatalf("minimax-token native messages smoke failed: %v", err)
+				}
+				if len(resp.Content) == 0 || resp.Usage.InputTokens <= 0 {
+					t.Fatalf("unexpected native messages response %#v", resp)
+				}
+				harness.requireFinalOnly(t, resp.Content[0].Text, "MINIMAX_NATIVE_OK")
 			},
 		},
 		{

@@ -1633,7 +1633,7 @@ models:
     family_priority: 10
     modality: chat
     capabilities: [streaming, function_calling, anthropic_messages]
-    status: ga
+    status: experimental
     verification_class: opt_in
     doc_url: https://platform.minimax.io/docs/guides/text-ai-coding-tools
     last_verified: "2026-05-19"
@@ -1649,7 +1649,7 @@ models:
     family_priority: 20
     modality: chat
     capabilities: [streaming, function_calling, anthropic_messages]
-    status: ga
+    status: experimental
     verification_class: opt_in
     doc_url: https://platform.minimax.io/docs/guides/text-ai-coding-tools
     last_verified: "2026-05-19"

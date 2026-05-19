@@ -420,6 +420,14 @@ func (h *liveSmokeHarness) requireContains(t *testing.T, got string, want string
 	}
 }
 
+func (h *liveSmokeHarness) requireFinalOnly(t *testing.T, got string, want string) {
+	t.Helper()
+	trimmed := strings.TrimSpace(got)
+	if trimmed != want {
+		t.Fatalf("expected final-only response %q, got nonconforming response with %d bytes", want, len(trimmed))
+	}
+}
+
 func (h *liveSmokeHarness) voiceRoundTrip(t *testing.T, ctx context.Context, ttsModel string, sttModel string, voice string, input string, format string) (*client.Audio, *client.TranscriptionResponse) {
 	t.Helper()
 

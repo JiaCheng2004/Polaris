@@ -42,6 +42,16 @@ func TestDefaultCatalogLoadsAndValidates(t *testing.T) {
 	if _, ok := cat.Lookup("zai-token/glm-5.1"); !ok {
 		t.Fatal("expected zai-token/glm-5.1 in embedded catalog")
 	}
+	miniEntry, ok := cat.Lookup("minimax-token/minimax-m2.7")
+	if !ok {
+		t.Fatal("expected minimax-token/minimax-m2.7 in embedded catalog")
+	}
+	if miniEntry.Status != "experimental" {
+		t.Fatalf("minimax-token/minimax-m2.7 status = %q, want experimental", miniEntry.Status)
+	}
+	if miniEntry.VerificationClass != "opt_in" {
+		t.Fatalf("minimax-token/minimax-m2.7 verification_class = %q, want opt_in", miniEntry.VerificationClass)
+	}
 	if target, ok := cat.AliasTarget("MiniMax-M2.7"); !ok || target != "minimax-token/minimax-m2.7" {
 		t.Fatalf("MiniMax-M2.7 alias target = %q, %v", target, ok)
 	}

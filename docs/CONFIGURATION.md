@@ -235,7 +235,7 @@ Phase 5 music hardening is current. The shipped runtime supports:
 - `providers.moonshot`
 - `providers.glm`
 - `providers.zai-token`
-- `providers.minimax-token`
+- `providers.minimax-token` (experimental/opt-in chat; do not route by default until final-answer behavior is validated for your workload)
 - `providers.mistral`
 - `providers.bedrock`
 - `providers.nvidia`
