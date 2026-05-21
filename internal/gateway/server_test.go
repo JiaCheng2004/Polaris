@@ -73,8 +73,31 @@ func TestHealthReadyAndModelsEndpoints(t *testing.T) {
 	}
 
 	var response struct {
-		Object string            `json:"object"`
-		Data   []json.RawMessage `json:"data"`
+		Object string `json:"object"`
+		Data   []struct {
+			ID              string   `json:"id"`
+			Aliases         []string `json:"aliases"`
+			CapabilityFlags struct {
+				Chat      bool `json:"chat"`
+				Streaming bool `json:"streaming"`
+			} `json:"capability_flags"`
+			Lifecycle struct {
+				Enabled   bool   `json:"enabled"`
+				Stability string `json:"stability"`
+			} `json:"lifecycle"`
+			Billing *struct {
+				BillingMode string             `json:"billing_mode"`
+				Unit        string             `json:"unit"`
+				Rates       map[string]float64 `json:"rates"`
+			} `json:"billing"`
+			ResolvesTo string `json:"resolves_to"`
+		} `json:"data"`
+		Routing struct {
+			Defaults map[string]struct {
+				Alias string `json:"alias"`
+				Model string `json:"model"`
+			} `json:"defaults"`
+		} `json:"routing"`
 	}
 	if err := json.Unmarshal(models.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode models response: %v", err)
@@ -83,19 +106,62 @@ func TestHealthReadyAndModelsEndpoints(t *testing.T) {
 		t.Fatalf("expected object=list, got %q", response.Object)
 	}
 	ids := make([]string, 0, len(response.Data))
-	for _, raw := range response.Data {
-		var item struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(raw, &item); err != nil {
-			t.Fatalf("decode model item: %v", err)
-		}
+	var openAIModel *struct {
+		ID              string   `json:"id"`
+		Aliases         []string `json:"aliases"`
+		CapabilityFlags struct {
+			Chat      bool `json:"chat"`
+			Streaming bool `json:"streaming"`
+		} `json:"capability_flags"`
+		Lifecycle struct {
+			Enabled   bool   `json:"enabled"`
+			Stability string `json:"stability"`
+		} `json:"lifecycle"`
+		Billing *struct {
+			BillingMode string             `json:"billing_mode"`
+			Unit        string             `json:"unit"`
+			Rates       map[string]float64 `json:"rates"`
+		} `json:"billing"`
+		ResolvesTo string `json:"resolves_to"`
+	}
+	for i := range response.Data {
+		item := &response.Data[i]
 		ids = append(ids, item.ID)
+		if item.ID == "openai/gpt-4o" {
+			openAIModel = item
+		}
 	}
 	for _, expected := range []string{"openai/gpt-4o", "default-chat", "gpt-4o"} {
 		if !slices.Contains(ids, expected) {
 			t.Fatalf("expected model id %q in response, got %v", expected, ids)
 		}
+	}
+	if openAIModel == nil {
+		t.Fatal("expected openai/gpt-4o metadata")
+	}
+	if !openAIModel.CapabilityFlags.Chat || !openAIModel.CapabilityFlags.Streaming || !openAIModel.Lifecycle.Enabled {
+		t.Fatalf("unexpected model metadata %#v", openAIModel)
+	}
+	if !slices.Contains(openAIModel.Aliases, "default-chat") || response.Routing.Defaults["chat"].Model != "openai/gpt-4o" {
+		t.Fatalf("expected default chat routing metadata, model=%#v routing=%#v", openAIModel, response.Routing)
+	}
+	if openAIModel.Billing == nil || openAIModel.Billing.Unit != "token" || openAIModel.Billing.Rates["input_per_mtok"] == 0 {
+		t.Fatalf("expected pricing metadata, got %#v", openAIModel.Billing)
+	}
+
+	capabilities := httptest.NewRecorder()
+	engine.ServeHTTP(capabilities, httptest.NewRequest(http.MethodGet, "/v1/model-capabilities", nil))
+	if capabilities.Code != http.StatusOK {
+		t.Fatalf("expected /v1/model-capabilities 200, got %d body=%s", capabilities.Code, capabilities.Body.String())
+	}
+	var capabilitiesResponse struct {
+		Object string `json:"object"`
+	}
+	if err := json.Unmarshal(capabilities.Body.Bytes(), &capabilitiesResponse); err != nil {
+		t.Fatalf("decode model-capabilities response: %v", err)
+	}
+	if capabilitiesResponse.Object != "model_capabilities.list" {
+		t.Fatalf("expected object=model_capabilities.list, got %q", capabilitiesResponse.Object)
 	}
 }
 

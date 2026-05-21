@@ -271,7 +271,7 @@ The chat-first expansion families OpenRouter, Together, Groq, Fireworks, Feather
 - `models.use`
 - optional `models.overrides`
 
-The provider model matrix lives in `internal/provider/catalog/models.yaml`, is embedded into the binary at build time, and adds `/v1/models` metadata for provider variants, canonical model families, human aliases, and routing hints such as `cost_tier` and `latency_tier` for configured models. Exact `provider/model` requests always execute directly; family IDs and family aliases resolve to one enabled provider variant by deterministic policy.
+The provider model matrix lives in `internal/provider/catalog/models.yaml`, is embedded into the binary at build time, and adds `/v1/models` plus `/v1/model-capabilities` metadata for provider variants, canonical model families, human aliases, structured capability flags, hosted tools, lifecycle/verification status, pricing metadata, and routing hints such as `cost_tier` and `latency_tier` for configured models. Exact `provider/model` requests always execute directly; family IDs and family aliases resolve to one enabled provider variant by deterministic policy.
 
 You can validate configured model metadata and routing coverage without provider credentials:
 

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -571,6 +572,95 @@ func TestRegistryListModelsIncludesSelectors(t *testing.T) {
 		}
 	}
 	t.Fatal("expected selector alias in ListModels(true)")
+}
+
+func TestRegistryModelMetadataAndRoutingDefaults(t *testing.T) {
+	cfg := &config.Config{
+		Providers: map[string]config.ProviderConfig{
+			"openai": {
+				APIKey: "sk-openai",
+				Models: map[string]config.ModelConfig{
+					"gpt-4o": {
+						Modality: modality.ModalityChat,
+						Capabilities: []modality.Capability{
+							modality.CapabilityStreaming,
+							modality.CapabilityFunctionCalling,
+							modality.CapabilityHostedToolWebSearch,
+						},
+					},
+					"gpt-image-2": {
+						Modality:     modality.ModalityImage,
+						Capabilities: []modality.Capability{modality.CapabilityGeneration, modality.CapabilityEditing},
+					},
+				},
+			},
+			"minimax": {
+				APIKey: "sk-minimax",
+				Models: map[string]config.ModelConfig{
+					"music-2.6": {
+						Modality:     modality.ModalityMusic,
+						Capabilities: []modality.Capability{modality.CapabilityMusicGeneration, modality.CapabilityLyricsGeneration},
+					},
+				},
+			},
+		},
+		Routing: config.RoutingConfig{
+			Aliases: map[string]string{
+				"default-chat":  "openai/gpt-4o",
+				"default-image": "openai/gpt-image-2",
+				"default-music": "minimax/music-2.6",
+			},
+		},
+	}
+
+	registry, warnings, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", warnings)
+	}
+
+	models := registry.ListModels(false)
+	var chat Model
+	for _, model := range models {
+		if model.ID == "openai/gpt-4o" {
+			chat = model
+			break
+		}
+	}
+	if chat.ID == "" {
+		t.Fatal("expected openai/gpt-4o model")
+	}
+	if !chat.CapabilityFlags.Chat || !chat.CapabilityFlags.Streaming || !chat.CapabilityFlags.ToolCalling {
+		t.Fatalf("unexpected chat capability flags %#v", chat.CapabilityFlags)
+	}
+	if !slices.Contains(chat.Aliases, "default-chat") {
+		t.Fatalf("expected default-chat alias in %#v", chat.Aliases)
+	}
+	if len(chat.HostedTools) != 1 || chat.HostedTools[0].Name != "web_search" || !chat.HostedTools[0].ResolvedServerSide {
+		t.Fatalf("unexpected hosted tools %#v", chat.HostedTools)
+	}
+	if !chat.Lifecycle.Enabled || chat.Lifecycle.Stability != "stable" {
+		t.Fatalf("unexpected lifecycle %#v", chat.Lifecycle)
+	}
+
+	routing := registry.RoutingMetadata()
+	if got := routing.Defaults["chat"].Model; got != "openai/gpt-4o" {
+		t.Fatalf("default chat model = %q", got)
+	}
+	if got := routing.Defaults["image_generation"].Model; got != "openai/gpt-image-2" {
+		t.Fatalf("default image model = %q", got)
+	}
+	if got := routing.Defaults["image_edit"].Model; got != "openai/gpt-image-2" {
+		t.Fatalf("default image edit model = %q", got)
+	}
+	if got := routing.Defaults["lyrics_generation"].Model; got != "minimax/music-2.6" {
+		t.Fatalf("default lyrics model = %q", got)
+	}
+	if len(routing.Aliases) != 3 {
+		t.Fatalf("expected configured aliases only, got %#v", routing.Aliases)
+	}
 }
 
 func TestRegistryResolvesModelFamiliesDeterministically(t *testing.T) {

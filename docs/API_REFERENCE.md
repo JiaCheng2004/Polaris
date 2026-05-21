@@ -1899,7 +1899,7 @@ Current runtime note:
 
 ### `GET /v1/models`
 
-List every model registered in the running Polaris instance, with its modality and capabilities.
+List every model registered in the running Polaris instance, with canonical capability, lifecycle, billing, and routing-default metadata. `GET /v1/model-capabilities` returns the same shape with `object: "model_capabilities.list"` for clients that prefer a capability-named endpoint.
 
 **Auth:** required.
 
@@ -1919,6 +1919,37 @@ List every model registered in the running Polaris instance, with its modality a
       "family_display_name": "GPT-4o",
       "modality": "chat",
       "capabilities": ["vision", "function_calling", "streaming", "audio_input", "audio_output"],
+      "aliases": ["default-chat"],
+      "capability_flags": {
+        "chat": true,
+        "vision": true,
+        "file_understanding": false,
+        "image_generation": false,
+        "image_edit": false,
+        "music_generation": false,
+        "lyrics_generation": false,
+        "video_generation": false,
+        "tool_calling": true,
+        "streaming": true
+      },
+      "lifecycle": {
+        "enabled": true,
+        "status": "ga",
+        "stability": "stable",
+        "verification_class": "strict"
+      },
+      "billing": {
+        "billing_mode": "usage_based",
+        "unit": "token",
+        "currency": "USD",
+        "source": "https://platform.openai.com/docs/pricing",
+        "effective_from": "2026-04-01",
+        "rates": {
+          "input_per_mtok": 5,
+          "output_per_mtok": 15,
+          "cache_read_per_mtok": 2.5
+        }
+      },
       "context_window": 128000,
       "max_output_tokens": 16384
     },
@@ -1970,11 +2001,37 @@ List every model registered in the running Polaris instance, with its modality a
       "capabilities": ["stt"],
       "formats": ["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]
     }
-  ]
+  ],
+  "routing": {
+    "defaults": {
+      "chat": {
+        "alias": "default-chat",
+        "model": "openai/gpt-4o",
+        "provider": "openai",
+        "modality": "chat",
+        "capabilities": ["vision", "function_calling", "streaming"]
+      },
+      "music_generation": {
+        "alias": "default-music",
+        "model": "minimax/music-2.6",
+        "provider": "minimax",
+        "modality": "music",
+        "capabilities": ["music_generation", "lyrics_generation"]
+      }
+    }
+  }
 }
 ```
 
 The field set for each entry depends on the modality and mirrors the effective model config expanded from `providers.<name>.models.use` plus `models.overrides`. Phase 3 modality-specific metadata includes `dimensions` for embeddings, `output_formats` for images, `voices` for TTS models, and `formats` for STT models. Video models may also expose `allowed_durations`, `aspect_ratios`, `resolutions`, `max_duration`, and `cancelable`. Music models may expose `output_formats`, `min_duration_ms`, `max_duration_ms`, and `sample_rates_hz`. Audio-session models may expose `voices` and `session_ttl`.
+
+Canonical metadata:
+- `capability_flags`: normalized booleans for client executor selection. Raw provider/catalog capabilities are still exposed in `capabilities`; `file_understanding` may reflect Polaris-derived file context when that runtime feature is enabled.
+- `hosted_tools`: only present when the enabled model declares a Polaris-supported hosted-tool capability; Polaris does not infer tools from vendor marketing claims.
+- `lifecycle`: enabled models expose `enabled: true`, catalog status, stability (`stable`, `experimental`, `deprecated`, or `unknown`), and verification class.
+- `billing`: included only when the runtime pricing catalog has an entry. Known `billing_mode` values are `usage_based`, `token_plan`, `credit`, `quota`, and `unknown`. Unknown quota or concurrency limits are omitted rather than invented.
+- `quota`: included only when a pricing/config entry explicitly declares `quota_bucket`, `daily_limit`, or `concurrency_limit`.
+- `routing.defaults`: configured executor defaults derived from routing aliases such as `default-chat`, `default-image`, `default-video`, and `default-music`.
 
 Family-aware metadata:
 - `kind`: `provider_variant`, `family`, `alias`, or `selector`
@@ -1985,6 +2042,8 @@ Family-aware metadata:
 
 `context_window` is best-effort metadata only: Polaris does not hard-enforce provider token windows, and the upstream provider remains the source of truth for actual token-limit rejection. Aliases are NOT returned by this endpoint unless `include_aliases=true`, in which case alias, selector, and family entries are included with `resolves_to`.
 
+`/v1/model-capabilities` is intentionally additive. It exists so orchestrators can discover capability metadata without treating OpenAI-compatible `/v1/models` semantics as the only contract.
+
 #### Errors
 
 Standard auth errors only.
@@ -1993,6 +2052,11 @@ Standard auth errors only.
 
 ```bash
 curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer $POLARIS_KEY"
+```
+
+```bash
+curl "http://localhost:8080/v1/model-capabilities?include_aliases=true" \
   -H "Authorization: Bearer $POLARIS_KEY"
 ```
 
@@ -2405,6 +2469,7 @@ Metric catalog:
 | `POST` | `/v1/audio/sessions` | audio | required | implemented | [§12](#12-voice--tts--stt) |
 | `GET` | `/v1/audio/sessions/:id/ws` | audio | client secret | implemented | [§12](#12-voice--tts--stt) |
 | `GET` | `/v1/models` | — | required | implemented | [§13](#13-models) |
+| `GET` | `/v1/model-capabilities` | — | required | implemented | [§13](#13-models) |
 | `GET` | `/v1/usage` | — | required | implemented | [§14](#14-usage) |
 | `POST` | `/v1/projects` | — | admin | implemented | [§15](#15-control-plane--api-keys) |
 | `GET` | `/v1/projects` | — | admin | implemented | [§15](#15-control-plane--api-keys) |

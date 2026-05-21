@@ -23,6 +23,13 @@ func registeredLiveSmokeCases() []liveSmokeCase {
 				if len(models.Data) == 0 {
 					t.Fatalf("expected non-empty model catalog")
 				}
+				capabilities, err := harness.client.ListModelCapabilities(ctx, true)
+				if err != nil {
+					t.Fatalf("ListModelCapabilities() error = %v", err)
+				}
+				if capabilities.Object != "model_capabilities.list" || len(capabilities.Data) == 0 {
+					t.Fatalf("unexpected model capabilities response %#v", capabilities)
+				}
 			},
 		},
 	}

@@ -1092,43 +1092,138 @@ type TranscriptSegment struct {
 }
 
 type Model struct {
-	ID                string   `json:"id"`
-	Object            string   `json:"object"`
-	Kind              string   `json:"kind,omitempty"`
-	Provider          string   `json:"provider,omitempty"`
-	ProviderVariant   string   `json:"provider_variant,omitempty"`
-	DisplayName       string   `json:"display_name,omitempty"`
-	FamilyID          string   `json:"family_id,omitempty"`
-	FamilyDisplayName string   `json:"family_display_name,omitempty"`
-	Status            string   `json:"status,omitempty"`
-	VerificationClass string   `json:"verification_class,omitempty"`
-	CostTier          string   `json:"cost_tier,omitempty"`
-	LatencyTier       string   `json:"latency_tier,omitempty"`
-	DocURL            string   `json:"doc_url,omitempty"`
-	LastVerified      string   `json:"last_verified,omitempty"`
-	Modality          string   `json:"modality"`
-	Capabilities      []string `json:"capabilities,omitempty"`
-	ContextWindow     int      `json:"context_window,omitempty"`
-	MaxOutputTokens   int      `json:"max_output_tokens,omitempty"`
-	MaxDuration       int      `json:"max_duration,omitempty"`
-	AllowedDurations  []int    `json:"allowed_durations,omitempty"`
-	AspectRatios      []string `json:"aspect_ratios,omitempty"`
-	Resolutions       []string `json:"resolutions,omitempty"`
-	Cancelable        bool     `json:"cancelable,omitempty"`
-	Voices            []string `json:"voices,omitempty"`
-	Formats           []string `json:"formats,omitempty"`
-	OutputFormats     []string `json:"output_formats,omitempty"`
-	MinDurationMs     int      `json:"min_duration_ms,omitempty"`
-	MaxDurationMs     int      `json:"max_duration_ms,omitempty"`
-	SampleRatesHz     []int    `json:"sample_rates_hz,omitempty"`
-	Dimensions        int      `json:"dimensions,omitempty"`
-	SessionTTL        int64    `json:"session_ttl,omitempty"`
-	ResolvesTo        string   `json:"resolves_to,omitempty"`
+	ID                string                `json:"id"`
+	Object            string                `json:"object"`
+	Kind              string                `json:"kind,omitempty"`
+	Provider          string                `json:"provider,omitempty"`
+	ProviderVariant   string                `json:"provider_variant,omitempty"`
+	DisplayName       string                `json:"display_name,omitempty"`
+	FamilyID          string                `json:"family_id,omitempty"`
+	FamilyDisplayName string                `json:"family_display_name,omitempty"`
+	Status            string                `json:"status,omitempty"`
+	VerificationClass string                `json:"verification_class,omitempty"`
+	CostTier          string                `json:"cost_tier,omitempty"`
+	LatencyTier       string                `json:"latency_tier,omitempty"`
+	DocURL            string                `json:"doc_url,omitempty"`
+	LastVerified      string                `json:"last_verified,omitempty"`
+	Modality          string                `json:"modality"`
+	Capabilities      []string              `json:"capabilities,omitempty"`
+	Aliases           []string              `json:"aliases,omitempty"`
+	CapabilityFlags   ModelCapabilityFlags  `json:"capability_flags"`
+	Lifecycle         ModelLifecycle        `json:"lifecycle"`
+	HostedTools       []ModelHostedTool     `json:"hosted_tools,omitempty"`
+	Billing           *ModelBillingMetadata `json:"billing,omitempty"`
+	Quota             *ModelQuotaMetadata   `json:"quota,omitempty"`
+	ContextWindow     int                   `json:"context_window,omitempty"`
+	MaxOutputTokens   int                   `json:"max_output_tokens,omitempty"`
+	MaxDuration       int                   `json:"max_duration,omitempty"`
+	AllowedDurations  []int                 `json:"allowed_durations,omitempty"`
+	AspectRatios      []string              `json:"aspect_ratios,omitempty"`
+	Resolutions       []string              `json:"resolutions,omitempty"`
+	Cancelable        bool                  `json:"cancelable,omitempty"`
+	Voices            []string              `json:"voices,omitempty"`
+	Formats           []string              `json:"formats,omitempty"`
+	OutputFormats     []string              `json:"output_formats,omitempty"`
+	MinDurationMs     int                   `json:"min_duration_ms,omitempty"`
+	MaxDurationMs     int                   `json:"max_duration_ms,omitempty"`
+	SampleRatesHz     []int                 `json:"sample_rates_hz,omitempty"`
+	Dimensions        int                   `json:"dimensions,omitempty"`
+	SessionTTL        int64                 `json:"session_ttl,omitempty"`
+	ResolvesTo        string                `json:"resolves_to,omitempty"`
+}
+
+type ModelCapabilityFlags struct {
+	Chat              bool `json:"chat"`
+	Vision            bool `json:"vision"`
+	FileUnderstanding bool `json:"file_understanding"`
+	ImageGeneration   bool `json:"image_generation"`
+	ImageEdit         bool `json:"image_edit"`
+	MusicGeneration   bool `json:"music_generation"`
+	LyricsGeneration  bool `json:"lyrics_generation"`
+	VideoGeneration   bool `json:"video_generation"`
+	ToolCalling       bool `json:"tool_calling"`
+	Streaming         bool `json:"streaming"`
+}
+
+type ModelLifecycle struct {
+	Enabled           bool   `json:"enabled"`
+	Status            string `json:"status,omitempty"`
+	Stability         string `json:"stability,omitempty"`
+	VerificationClass string `json:"verification_class,omitempty"`
+}
+
+type ModelHostedTool struct {
+	Name               string `json:"name"`
+	Capability         string `json:"capability"`
+	ResolvedServerSide bool   `json:"resolved_server_side"`
+}
+
+type ModelBillingMetadata struct {
+	BillingMode     string                        `json:"billing_mode,omitempty"`
+	Unit            string                        `json:"unit,omitempty"`
+	Currency        string                        `json:"currency,omitempty"`
+	Source          string                        `json:"source,omitempty"`
+	EffectiveFrom   string                        `json:"effective_from,omitempty"`
+	EffectiveUntil  string                        `json:"effective_until,omitempty"`
+	Notes           string                        `json:"notes,omitempty"`
+	Rates           map[string]float64            `json:"rates,omitempty"`
+	Tiers           map[string]map[string]float64 `json:"tiers,omitempty"`
+	TieredRates     []ModelTieredRate             `json:"tiered_rates,omitempty"`
+	AdditionalUnits map[string]float64            `json:"additional_units,omitempty"`
+}
+
+type ModelTieredRate struct {
+	ID    string             `json:"id,omitempty"`
+	Range [2]int             `json:"range"`
+	Rates map[string]float64 `json:"rates,omitempty"`
+}
+
+type ModelQuotaMetadata struct {
+	QuotaBucket      string   `json:"quota_bucket,omitempty"`
+	Unit             string   `json:"unit,omitempty"`
+	DailyLimit       *float64 `json:"daily_limit,omitempty"`
+	ConcurrencyLimit *int     `json:"concurrency_limit,omitempty"`
+}
+
+type ModelRoutingMetadata struct {
+	Aliases   []ModelRoutingAlias             `json:"aliases,omitempty"`
+	Selectors []ModelRoutingSelector          `json:"selectors,omitempty"`
+	Defaults  map[string]ModelExecutorDefault `json:"defaults,omitempty"`
+}
+
+type ModelRoutingAlias struct {
+	Alias      string `json:"alias"`
+	Target     string `json:"target"`
+	ResolvesTo string `json:"resolves_to"`
+	Kind       string `json:"kind"`
+}
+
+type ModelRoutingSelector struct {
+	Alias               string   `json:"alias"`
+	ResolvesTo          string   `json:"resolves_to,omitempty"`
+	Modality            string   `json:"modality,omitempty"`
+	Capabilities        []string `json:"capabilities,omitempty"`
+	Providers           []string `json:"providers,omitempty"`
+	ExcludeProviders    []string `json:"exclude_providers,omitempty"`
+	Statuses            []string `json:"statuses,omitempty"`
+	VerificationClasses []string `json:"verification_classes,omitempty"`
+	Prefer              []string `json:"prefer,omitempty"`
+	CostTier            string   `json:"cost_tier,omitempty"`
+	LatencyTier         string   `json:"latency_tier,omitempty"`
+}
+
+type ModelExecutorDefault struct {
+	Alias        string   `json:"alias"`
+	Model        string   `json:"model"`
+	Provider     string   `json:"provider,omitempty"`
+	Modality     string   `json:"modality,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 type ModelList struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
+	Object  string                `json:"object"`
+	Data    []Model               `json:"data"`
+	Routing *ModelRoutingMetadata `json:"routing,omitempty"`
 }
 
 type VoiceListRequest struct {

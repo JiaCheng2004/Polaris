@@ -18,19 +18,24 @@ type File struct {
 }
 
 type Entry struct {
-	Mode            string             `yaml:"mode"`
-	Currency        string             `yaml:"currency,omitempty"`
-	ContextWindow   int                `yaml:"context_window,omitempty"`
-	Source          string             `yaml:"source,omitempty"`
-	EffectiveFrom   string             `yaml:"effective_from,omitempty"`
-	EffectiveUntil  string             `yaml:"effective_until,omitempty"`
-	Notes           string             `yaml:"notes,omitempty"`
-	Pricing         *Rates             `yaml:"pricing,omitempty"`
-	Tiers           map[string]Rates   `yaml:"tiers,omitempty"`
-	TieredPricing   []TieredRates      `yaml:"tiered_pricing,omitempty"`
-	AdditionalUnits map[string]float64 `yaml:"additional_units,omitempty"`
-	Deployments     map[string]Rates   `yaml:"deployments,omitempty"`
-	Deprecation     *Deprecation       `yaml:"deprecation,omitempty"`
+	Mode             string             `yaml:"mode"`
+	BillingMode      string             `yaml:"billing_mode,omitempty"`
+	Unit             string             `yaml:"unit,omitempty"`
+	QuotaBucket      string             `yaml:"quota_bucket,omitempty"`
+	DailyLimit       *float64           `yaml:"daily_limit,omitempty"`
+	ConcurrencyLimit *int               `yaml:"concurrency_limit,omitempty"`
+	Currency         string             `yaml:"currency,omitempty"`
+	ContextWindow    int                `yaml:"context_window,omitempty"`
+	Source           string             `yaml:"source,omitempty"`
+	EffectiveFrom    string             `yaml:"effective_from,omitempty"`
+	EffectiveUntil   string             `yaml:"effective_until,omitempty"`
+	Notes            string             `yaml:"notes,omitempty"`
+	Pricing          *Rates             `yaml:"pricing,omitempty"`
+	Tiers            map[string]Rates   `yaml:"tiers,omitempty"`
+	TieredPricing    []TieredRates      `yaml:"tiered_pricing,omitempty"`
+	AdditionalUnits  map[string]float64 `yaml:"additional_units,omitempty"`
+	Deployments      map[string]Rates   `yaml:"deployments,omitempty"`
+	Deprecation      *Deprecation       `yaml:"deprecation,omitempty"`
 }
 
 type Rates struct {
@@ -133,6 +138,15 @@ func validMode(mode string) bool {
 		"podcast",
 		"notes",
 		"translation":
+		return true
+	default:
+		return false
+	}
+}
+
+func validBillingMode(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case "", "usage_based", "token_plan", "credit", "quota", "unknown":
 		return true
 	default:
 		return false

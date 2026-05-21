@@ -41,7 +41,9 @@ paths:
     trace: {operationId: mcpTraceBindingPath, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}, {$ref: "#/components/parameters/WildcardPath"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
   /v1/models:
-    get: {operationId: listModels, tags: [gateway], responses: {"200": {description: Model list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    get: {operationId: listModels, tags: [gateway], parameters: [{$ref: "#/components/parameters/IncludeAliases"}], responses: {"200": {description: Model list, content: {application/json: {schema: {$ref: "#/components/schemas/ModelListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/model-capabilities:
+    get: {operationId: listModelCapabilities, tags: [gateway], parameters: [{$ref: "#/components/parameters/IncludeAliases"}], responses: {"200": {description: Structured model capability metadata, content: {application/json: {schema: {$ref: "#/components/schemas/ModelListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/usage:
     get: {operationId: getUsage, tags: [gateway], responses: {"200": {description: Usage report, content: {application/json: {schema: {$ref: "#/components/schemas/UsageReport"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/chat/completions:
@@ -196,6 +198,11 @@ components:
       in: path
       required: true
       schema: {type: string}
+    IncludeAliases:
+      name: include_aliases
+      in: query
+      required: false
+      schema: {type: boolean}
   requestBodies:
     JSON:
       required: true
@@ -261,6 +268,197 @@ components:
         data:
           type: array
           items: {}
+    ModelListResponse:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          enum: [list, model_capabilities.list]
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+        routing:
+          $ref: "#/components/schemas/ModelRouting"
+    Model:
+      type: object
+      required: [id, object, modality, capability_flags, lifecycle]
+      properties:
+        id: {type: string}
+        object: {type: string, const: model}
+        kind:
+          type: string
+          enum: [provider_variant, family, alias, selector]
+        provider: {type: string}
+        provider_variant: {type: string}
+        display_name: {type: string}
+        family_id: {type: string}
+        family_display_name: {type: string}
+        status: {type: string}
+        verification_class: {type: string}
+        modality: {type: string}
+        capabilities:
+          type: array
+          items: {type: string}
+        aliases:
+          type: array
+          items: {type: string}
+        capability_flags:
+          type: object
+          properties:
+            chat: {type: boolean}
+            vision: {type: boolean}
+            file_understanding: {type: boolean}
+            image_generation: {type: boolean}
+            image_edit: {type: boolean}
+            music_generation: {type: boolean}
+            lyrics_generation: {type: boolean}
+            video_generation: {type: boolean}
+            tool_calling: {type: boolean}
+            streaming: {type: boolean}
+        lifecycle:
+          type: object
+          properties:
+            enabled: {type: boolean}
+            status: {type: string}
+            stability:
+              type: string
+              enum: [stable, experimental, deprecated, unknown]
+            verification_class: {type: string}
+        hosted_tools:
+          type: array
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              capability: {type: string}
+              resolved_server_side: {type: boolean}
+        billing:
+          $ref: "#/components/schemas/ModelBilling"
+        quota:
+          $ref: "#/components/schemas/ModelQuota"
+        context_window: {type: integer}
+        max_output_tokens: {type: integer}
+        max_duration: {type: integer}
+        allowed_durations:
+          type: array
+          items: {type: integer}
+        aspect_ratios:
+          type: array
+          items: {type: string}
+        resolutions:
+          type: array
+          items: {type: string}
+        cancelable: {type: boolean}
+        voices:
+          type: array
+          items: {type: string}
+        formats:
+          type: array
+          items: {type: string}
+        output_formats:
+          type: array
+          items: {type: string}
+        resolves_to: {type: string}
+    ModelBilling:
+      type: object
+      properties:
+        billing_mode:
+          type: string
+          enum: [usage_based, token_plan, credit, quota, unknown]
+        unit: {type: string}
+        currency: {type: string}
+        source: {type: string}
+        effective_from: {type: string}
+        effective_until: {type: string}
+        notes: {type: string}
+        rates:
+          type: object
+          additionalProperties: {type: number}
+        tiers:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: {type: number}
+        tiered_rates:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              range:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items: {type: integer}
+              rates:
+                type: object
+                additionalProperties: {type: number}
+        additional_units:
+          type: object
+          additionalProperties: {type: number}
+    ModelQuota:
+      type: object
+      properties:
+        quota_bucket: {type: string}
+        unit: {type: string}
+        daily_limit:
+          type: [number, "null"]
+        concurrency_limit:
+          type: [integer, "null"]
+    ModelRouting:
+      type: object
+      properties:
+        aliases:
+          type: array
+          items:
+            type: object
+            properties:
+              alias: {type: string}
+              target: {type: string}
+              resolves_to: {type: string}
+              kind: {type: string}
+        selectors:
+          type: array
+          items:
+            type: object
+            properties:
+              alias: {type: string}
+              resolves_to: {type: string}
+              modality: {type: string}
+              capabilities:
+                type: array
+                items: {type: string}
+              providers:
+                type: array
+                items: {type: string}
+              exclude_providers:
+                type: array
+                items: {type: string}
+              statuses:
+                type: array
+                items: {type: string}
+              verification_classes:
+                type: array
+                items: {type: string}
+              prefer:
+                type: array
+                items: {type: string}
+              cost_tier: {type: string}
+              latency_tier: {type: string}
+        defaults:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              alias: {type: string}
+              model: {type: string}
+              provider: {type: string}
+              modality: {type: string}
+              capabilities:
+                type: array
+                items: {type: string}
     FileObject:
       type: object
       required: [id, object, bytes, created_at, filename, purpose, polaris]

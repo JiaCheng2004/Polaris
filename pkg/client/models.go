@@ -18,3 +18,16 @@ func (c *Client) ListModels(ctx context.Context, includeAliases bool) (*ModelLis
 	}
 	return &response, nil
 }
+
+func (c *Client) ListModelCapabilities(ctx context.Context, includeAliases bool) (*ModelList, error) {
+	query := url.Values{}
+	if includeAliases {
+		query.Set("include_aliases", "true")
+	}
+
+	var response ModelList
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/model-capabilities", query, nil, &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}

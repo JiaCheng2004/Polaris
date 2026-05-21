@@ -148,7 +148,7 @@ func (r *Registry) resolveFamilyModel(familyID string, requiredModality modality
 func (r *Registry) ListModels(includeAliases bool) []Model {
 	var items []Model
 	for _, model := range r.models {
-		items = append(items, model)
+		items = append(items, withModelMetadata(model))
 	}
 	slices.SortFunc(items, func(a, b Model) int {
 		return strings.Compare(a.ID, b.ID)
@@ -193,7 +193,7 @@ func (r *Registry) GetFallbacks(modelID string) []string {
 }
 
 func aliasModel(id string, kind string, resolved Model, target string, capabilities []modality.Capability) Model {
-	return Model{
+	return withModelMetadata(Model{
 		ID:                id,
 		Object:            "model",
 		Kind:              kind,
@@ -226,7 +226,7 @@ func aliasModel(id string, kind string, resolved Model, target string, capabilit
 		Dimensions:        resolved.Dimensions,
 		SessionTTL:        resolved.SessionTTL,
 		ResolvesTo:        target,
-	}
+	})
 }
 
 func dedupeModels(items []Model) []Model {

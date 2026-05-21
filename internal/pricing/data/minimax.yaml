@@ -2,6 +2,8 @@ version: 1
 models:
   minimax/music-2.6:
     mode: music
+    billing_mode: credit
+    unit: call
     currency: USD
     source: https://platform.minimax.io/docs/guides/music-generation-api-refer
     effective_from: 2026-04-01
@@ -9,6 +11,8 @@ models:
 
   minimax/music-cover:
     mode: music
+    billing_mode: credit
+    unit: call
     currency: USD
     source: https://platform.minimax.io/docs/guides/music-generation-api-refer
     effective_from: 2026-04-01

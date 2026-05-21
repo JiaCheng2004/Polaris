@@ -27,6 +27,8 @@ version: 1
 models:
   openai/gpt-4o:
     mode: chat
+    billing_mode: usage_based
+    unit: token
     currency: USD
     context_window: 128000
     source: https://platform.openai.com/docs/pricing
@@ -43,6 +45,8 @@ models:
 Supported token rates include `input_per_mtok`, `output_per_mtok`, `output_reasoning_per_mtok`, cache read/write rates, DeepSeek-style `input_cache_hit_per_mtok`, and image token rates.
 
 Supported non-token rates include `input_per_audio_second`, `input_per_video_second`, `input_per_character`, `input_per_image`, `output_per_image`, `output_per_pixel`, and `per_call`.
+
+Optional metadata fields such as `billing_mode`, `unit`, `quota_bucket`, `daily_limit`, and `concurrency_limit` are surfaced through `/v1/models` and `/v1/model-capabilities`. Use them only for statically known provider facts or operator-configured quotas. Unknown limits should be omitted rather than estimated.
 
 Use `tiered_pricing` for context-length bands:
 

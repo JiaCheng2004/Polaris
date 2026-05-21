@@ -36,6 +36,7 @@ type Registry struct {
 	musicAdapters                  map[string]modality.MusicAdapter
 	filesAdapters                  map[string]modality.FilesAdapter
 	batchAdapters                  map[string]modality.BatchAdapter
+	configuredAliases              map[string]string
 	aliases                        map[string]string
 	familyAliases                  map[string]string
 	families                       map[string]modelFamily
@@ -77,6 +78,12 @@ type Model struct {
 	LastVerified      string                `json:"last_verified,omitempty"`
 	Modality          modality.Modality     `json:"modality"`
 	Capabilities      []modality.Capability `json:"capabilities,omitempty"`
+	Aliases           []string              `json:"aliases,omitempty"`
+	CapabilityFlags   ModelCapabilityFlags  `json:"capability_flags"`
+	Lifecycle         ModelLifecycle        `json:"lifecycle"`
+	HostedTools       []ModelHostedTool     `json:"hosted_tools,omitempty"`
+	Billing           *ModelBillingMetadata `json:"billing,omitempty"`
+	Quota             *ModelQuotaMetadata   `json:"quota,omitempty"`
 	ContextWindow     int                   `json:"context_window,omitempty"`
 	MaxOutputTokens   int                   `json:"max_output_tokens,omitempty"`
 	MaxDuration       int                   `json:"max_duration,omitempty"`
@@ -123,6 +130,7 @@ func New(cfg *config.Config) (*Registry, []string, error) {
 		musicAdapters:                  map[string]modality.MusicAdapter{},
 		filesAdapters:                  map[string]modality.FilesAdapter{},
 		batchAdapters:                  map[string]modality.BatchAdapter{},
+		configuredAliases:              map[string]string{},
 		aliases:                        map[string]string{},
 		familyAliases:                  map[string]string{},
 		families:                       map[string]modelFamily{},
@@ -147,6 +155,7 @@ func New(cfg *config.Config) (*Registry, []string, error) {
 	registerCatalogFamilies(registry)
 	registerSelectors(registry, cfg.Routing, &warnings)
 	registerFallbacks(registry, cfg.Routing)
+	registry.refreshModelMetadata()
 
 	return registry, warnings, nil
 }

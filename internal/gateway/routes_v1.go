@@ -26,6 +26,7 @@ func registerV1CoreRoutes(v1 *gin.RouterGroup, handlers routeHandlers) {
 	v1.GET("/keys", handlers.keys.List)
 	v1.DELETE("/keys/:id", handlers.keys.Delete)
 	v1.GET("/models", handlers.models.List)
+	v1.GET("/model-capabilities", handlers.models.Capabilities)
 	v1.GET("/usage", handlers.usage.Get)
 	v1.POST("/tokens/count", handlers.tokens.Count)
 	v1.POST("/files", handlers.files.Upload)

@@ -15,6 +15,7 @@ func registerConfiguredAliases(registry *Registry, routing config.RoutingConfig,
 			*warnings = append(*warnings, fmt.Sprintf("alias %s points to unavailable model %s", alias, target))
 			continue
 		}
+		registry.configuredAliases[alias] = target
 		registry.aliases[alias] = target
 	}
 }

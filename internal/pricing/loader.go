@@ -108,6 +108,15 @@ func validateEntry(key string, entry Entry) error {
 	if !validMode(entry.Mode) {
 		return fmt.Errorf("mode %q is invalid", entry.Mode)
 	}
+	if !validBillingMode(entry.BillingMode) {
+		return fmt.Errorf("billing_mode %q is invalid", entry.BillingMode)
+	}
+	if entry.DailyLimit != nil && *entry.DailyLimit < 0 {
+		return fmt.Errorf("daily_limit must not be negative")
+	}
+	if entry.ConcurrencyLimit != nil && *entry.ConcurrencyLimit < 0 {
+		return fmt.Errorf("concurrency_limit must not be negative")
+	}
 	if entry.Pricing != nil && len(entry.TieredPricing) > 0 {
 		return fmt.Errorf("pricing and tiered_pricing are mutually exclusive")
 	}
