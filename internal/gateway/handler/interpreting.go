@@ -138,6 +138,7 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 
 	var (
 		writeMu      sync.Mutex
+		stateMu      sync.Mutex
 		done         = make(chan struct{})
 		writerDone   sync.WaitGroup
 		outcome      = middleware.RequestOutcome{Model: model.ID, Provider: model.Provider, Modality: modality.ModalityInterpreting, InterfaceFamily: "audio_interpreting", StatusCode: http.StatusSwitchingProtocols, TokenSource: modality.TokenCountSourceUnavailable}
@@ -164,6 +165,7 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 					return
 				}
 				if event.Usage != nil {
+					stateMu.Lock()
 					if event.Usage.InputAudioSeconds > 0 {
 						usage.InputAudioSeconds = event.Usage.InputAudioSeconds
 					}
@@ -174,10 +176,13 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 						usage.TotalTokens = event.Usage.TotalTokens
 						usage.Source = event.Usage.Source
 					}
+					stateMu.Unlock()
 				}
 				if event.Error != nil && strings.TrimSpace(event.Error.Type) != "" {
+					stateMu.Lock()
 					lastErrorTyp = event.Error.Type
 					outcome.StatusCode = http.StatusBadGateway
+					stateMu.Unlock()
 				}
 				if err := writeEvent(event); err != nil {
 					return
@@ -207,8 +212,10 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 		var event modality.InterpretingClientEvent
 		if err := conn.ReadJSON(&event); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				stateMu.Lock()
 				lastErrorTyp = "provider_transport_error"
 				outcome.StatusCode = http.StatusBadGateway
+				stateMu.Unlock()
 			}
 			break
 		}
@@ -236,9 +243,11 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 
 	close(done)
 	writerDone.Wait()
+	stateMu.Lock()
 	outcome.ErrorType = lastErrorTyp
 	outcome.TotalTokens = usage.TotalTokens
 	outcome.TokenSource = countsTokenSource(0, 0, usage.TotalTokens)
+	stateMu.Unlock()
 	middleware.SetRequestOutcome(c, outcome)
 }
 
