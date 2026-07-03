@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "unknown_model",
+    "message": "Requested model is not registered.",
+    "param": "model",
+    "type": "model_not_found"
+  }
+}

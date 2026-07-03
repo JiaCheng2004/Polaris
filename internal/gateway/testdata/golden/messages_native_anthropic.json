@@ -1,0 +1,17 @@
+{
+  "content": [
+    {
+      "text": "pong",
+      "type": "text"
+    }
+  ],
+  "id": "msg_golden",
+  "model": "anthropic/claude-sonnet-4-6",
+  "role": "assistant",
+  "stop_reason": "end_turn",
+  "type": "message",
+  "usage": {
+    "input_tokens": 1,
+    "output_tokens": 1
+  }
+}

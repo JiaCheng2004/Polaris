@@ -1,0 +1,41 @@
+data: {
+  "choices": [
+    {
+      "delta": {
+        "role": "assistant"
+      },
+      "finish_reason": null,
+      "index": 0
+    }
+  ],
+  "created": "<redacted>",
+  "id": "chatcmpl-golden",
+  "model": "openai/gpt-4o",
+  "object": "chat.completion.chunk"
+}
+
+data: {
+  "choices": [
+    {
+      "delta": {
+        "content": "pong"
+      },
+      "finish_reason": "stop",
+      "index": 0
+    }
+  ],
+  "created": "<redacted>",
+  "id": "chatcmpl-golden",
+  "model": "openai/gpt-4o",
+  "object": "chat.completion.chunk",
+  "usage": {
+    "completion_tokens": 1,
+    "prompt_tokens": 1,
+    "source": "provider_reported",
+    "total_tokens": 2
+  }
+}
+
+data: [DONE]
+
+

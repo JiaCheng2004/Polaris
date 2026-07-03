@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "invalid_json",
+    "message": "Request body must be valid JSON.",
+    "type": "invalid_request_error"
+  }
+}

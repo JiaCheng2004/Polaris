@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "missing_model",
+    "message": "Field 'model' is required.",
+    "param": "model",
+    "type": "invalid_request_error"
+  }
+}

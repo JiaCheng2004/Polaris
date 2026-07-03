@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "unknown_alias",
+    "message": "Model alias is not defined.",
+    "param": "model",
+    "type": "model_not_found"
+  }
+}
