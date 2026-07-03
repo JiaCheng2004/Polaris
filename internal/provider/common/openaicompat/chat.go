@@ -57,7 +57,7 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 			_ = resp.Body.Close()
 		}()
 
-		if err := DecodeStream(a.client.providerName, resp.Body, req.Model, a.model, stream); err != nil {
+		if err := DecodeStream(a.client.ProviderName(), resp.Body, req.Model, a.model, stream); err != nil {
 			stream <- modality.ChatChunk{Err: err}
 		}
 	}()

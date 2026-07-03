@@ -1,10 +1,8 @@
 package anthropiccompat
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,27 +10,30 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
+// Client is the shared Anthropic-compatible transport (Anthropic Messages wire
+// format), used by the native Anthropic adapter and the token-plan providers
+// (zaitoken, minimaxtoken). It wraps the unified transport.Client and adds a
+// per-request anthropic-beta header mechanism.
 type Client struct {
-	providerSlug  string
-	providerName  string
-	baseURL       string
-	apiKey        string
-	httpClient    *http.Client
-	maxAttempts   int
-	initialDelay  time.Duration
-	staticHeaders map[string]string
+	core         *transport.Client
+	baseURL      string
+	apiKey       string
+	httpClient   *http.Client
+	maxAttempts  int
+	initialDelay time.Duration
 }
 
+// NewClient builds an Anthropic-compatible client. Authentication flows through
+// staticHeaders (x-api-key + anthropic-version, or Authorization: Bearer for
+// token-plan providers), matching each caller's scheme.
 func NewClient(providerSlug, providerName string, cfg config.ProviderConfig, defaultBaseURL string, staticHeaders map[string]string) *Client {
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = strings.TrimRight(defaultBaseURL, "/")
 	}
-
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = 1
@@ -46,91 +47,79 @@ func NewClient(providerSlug, providerName string, cfg config.ProviderConfig, def
 		timeout = 2 * time.Minute
 	}
 
-	headersCopy := make(map[string]string, len(staticHeaders))
-	for key, value := range staticHeaders {
-		headersCopy[key] = value
-	}
+	core := transport.New(transport.Options{
+		BaseURL:       baseURL,
+		ProviderName:  providerName,
+		ProviderSlug:  providerSlug,
+		StaticHeaders: staticHeaders,
+		Timeout:       timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
+		},
+		ErrorTranslator: translateAnthropicError,
+	})
 
 	return &Client{
-		providerSlug: providerSlug,
-		providerName: providerName,
+		core:         core,
 		baseURL:      baseURL,
 		apiKey:       cfg.APIKey,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport(providerSlug, nil),
-		},
-		maxAttempts:   maxAttempts,
-		initialDelay:  initialDelay,
-		staticHeaders: headersCopy,
+		httpClient:   core.HTTPClient(),
+		maxAttempts:  maxAttempts,
+		initialDelay: initialDelay,
 	}
 }
 
-func (c *Client) BaseURL() string {
-	return c.baseURL
-}
+func (c *Client) BaseURL() string { return c.baseURL }
 
-func (c *Client) APIKey() string {
-	return c.apiKey
-}
+func (c *Client) APIKey() string { return c.apiKey }
 
-func (c *Client) HTTPClient() *http.Client {
-	return c.httpClient
-}
+func (c *Client) HTTPClient() *http.Client { return c.httpClient }
 
-func (c *Client) MaxAttempts() int {
-	return c.maxAttempts
-}
+func (c *Client) MaxAttempts() int { return c.maxAttempts }
 
-func (c *Client) InitialDelay() time.Duration {
-	return c.initialDelay
-}
+func (c *Client) InitialDelay() time.Duration { return c.initialDelay }
 
+// ProviderName returns the display name used in error messages.
+func (c *Client) ProviderName() string { return c.core.ProviderName() }
+
+// Core exposes the underlying transport.Client.
+func (c *Client) Core() *transport.Client { return c.core }
+
+// JSON POSTs body and decodes a success response into out. The response return
+// is retained for signature compatibility and is always nil.
 func (c *Client) JSON(ctx context.Context, path string, body any, out any) (*http.Response, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal %s request: %w", strings.ToLower(c.providerName), err)
-	}
-
-	resp, err := c.do(ctx, path, payload)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return resp, c.APIError(resp)
-	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return resp, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", fmt.Sprintf("%s returned an invalid JSON response.", c.providerName))
-	}
-	return resp, nil
+	return c.JSONWithBetas(ctx, path, body, out, nil)
 }
 
+// JSONWithBetas is JSON with an anthropic-beta header carrying the given beta
+// feature flags.
+func (c *Client) JSONWithBetas(ctx context.Context, path string, body any, out any, betas []string) (*http.Response, error) {
+	if err := c.core.JSON(ctx, http.MethodPost, path, body, out, betaOption(betas)); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+// Stream POSTs body and returns the raw response for SSE reading.
 func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Response, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal %s stream request: %w", strings.ToLower(c.providerName), err)
-	}
-
-	resp, err := c.do(ctx, path, payload)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= http.StatusBadRequest {
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-		return nil, c.APIError(resp)
-	}
-	return resp, nil
+	return c.StreamWithBetas(ctx, path, body, nil)
 }
 
-func (c *Client) APIError(resp *http.Response) error {
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+// StreamWithBetas is Stream with an anthropic-beta header.
+func (c *Client) StreamWithBetas(ctx context.Context, path string, body any, betas []string) (*http.Response, error) {
+	return c.core.Stream(ctx, http.MethodPost, path, body, transport.WithAccept("application/json"), betaOption(betas))
+}
 
+func betaOption(betas []string) transport.ReqOption {
+	if len(betas) == 0 {
+		return func(*transport.Request) {}
+	}
+	return transport.WithHeader("anthropic-beta", strings.Join(betas, ","))
+}
+
+func translateAnthropicError(providerName string, status int, body []byte) *apierror.APIError {
 	type anthropicErrorEnvelope struct {
 		Error struct {
 			Type    string `json:"type"`
@@ -152,52 +141,16 @@ func (c *Client) APIError(resp *http.Response) error {
 		errorType = strings.TrimSpace(parsed.Type)
 	}
 
-	return apierror.ProviderAPIError(c.providerName, resp.StatusCode, apierror.ProviderErrorDetails{
+	return apierror.ProviderAPIError(providerName, status, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Type:    errorType,
 	})
 }
 
-func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Response, error) {
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-		if err != nil {
-			return nil, fmt.Errorf("build %s request: %w", strings.ToLower(c.providerName), err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		for key, value := range c.staticHeaders {
-			req.Header.Set(key, value)
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && retrypkg.RetryableTransportError(err) {
-				if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, retrypkg.TranslateTransportError(err, c.providerName)
-		}
-
-		if retrypkg.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-
-		return resp, nil
-	}
-
-	return nil, retrypkg.TranslateTransportError(lastErr, c.providerName)
+// APIError parses an Anthropic-compatible error body into a canonical APIError,
+// for adapters that issue their own requests.
+func (c *Client) APIError(resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	return translateAnthropicError(c.core.ProviderName(), resp.StatusCode, body)
 }

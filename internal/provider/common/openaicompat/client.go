@@ -1,10 +1,8 @@
 package openaicompat
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,27 +10,30 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
+// Client is the shared OpenAI-compatible transport used by every provider whose
+// wire format matches OpenAI's /chat/completions and /embeddings surfaces. It
+// wraps the unified transport.Client, preserving the accessor and JSON/Stream
+// API that provider adapters depend on.
 type Client struct {
-	providerSlug  string
-	providerName  string
-	baseURL       string
-	apiKey        string
-	httpClient    *http.Client
-	maxAttempts   int
-	initialDelay  time.Duration
-	staticHeaders map[string]string
+	core         *transport.Client
+	baseURL      string
+	apiKey       string
+	httpClient   *http.Client
+	maxAttempts  int
+	initialDelay time.Duration
 }
 
+// NewClient builds an OpenAI-compatible client. providerSlug is the low-cardinality
+// span/metric label; providerName is the display name in error messages.
 func NewClient(providerSlug string, providerName string, cfg config.ProviderConfig, defaultBaseURL string, staticHeaders map[string]string) *Client {
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = strings.TrimRight(defaultBaseURL, "/")
 	}
-
 	maxAttempts := cfg.Retry.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = 1
@@ -46,91 +47,68 @@ func NewClient(providerSlug string, providerName string, cfg config.ProviderConf
 		timeout = time.Minute
 	}
 
-	headersCopy := make(map[string]string, len(staticHeaders))
-	for key, value := range staticHeaders {
-		headersCopy[key] = value
-	}
+	core := transport.New(transport.Options{
+		BaseURL:       baseURL,
+		ProviderName:  providerName,
+		ProviderSlug:  providerSlug,
+		Auth:          transport.BearerAuth(cfg.APIKey),
+		StaticHeaders: staticHeaders,
+		Timeout:       timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
+		},
+		ErrorTranslator: translateOpenAIError,
+	})
 
 	return &Client{
-		providerSlug: providerSlug,
-		providerName: providerName,
+		core:         core,
 		baseURL:      baseURL,
 		apiKey:       cfg.APIKey,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport(providerSlug, nil),
-		},
-		maxAttempts:   maxAttempts,
-		initialDelay:  initialDelay,
-		staticHeaders: headersCopy,
+		httpClient:   core.HTTPClient(),
+		maxAttempts:  maxAttempts,
+		initialDelay: initialDelay,
 	}
 }
 
-func (c *Client) BaseURL() string {
-	return c.baseURL
-}
+func (c *Client) BaseURL() string { return c.baseURL }
 
-func (c *Client) APIKey() string {
-	return c.apiKey
-}
+func (c *Client) APIKey() string { return c.apiKey }
 
-func (c *Client) HTTPClient() *http.Client {
-	return c.httpClient
-}
+func (c *Client) HTTPClient() *http.Client { return c.httpClient }
 
-func (c *Client) MaxAttempts() int {
-	return c.maxAttempts
-}
+func (c *Client) MaxAttempts() int { return c.maxAttempts }
 
-func (c *Client) InitialDelay() time.Duration {
-	return c.initialDelay
-}
+func (c *Client) InitialDelay() time.Duration { return c.initialDelay }
 
+// ProviderName returns the display name used in error and log messages.
+func (c *Client) ProviderName() string { return c.core.ProviderName() }
+
+// Core exposes the underlying transport.Client for adapters that need bespoke
+// request shapes (query params, alternate paths).
+func (c *Client) Core() *transport.Client { return c.core }
+
+// JSON POSTs body as JSON and decodes a success response into out.
 func (c *Client) JSON(ctx context.Context, path string, body any, out any) error {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshal %s request: %w", strings.ToLower(c.providerName), err)
-	}
-
-	resp, err := c.do(ctx, path, payload)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return c.APIError(resp)
-	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", fmt.Sprintf("%s returned an invalid JSON response.", c.providerName))
-	}
-	return nil
+	return c.core.JSON(ctx, http.MethodPost, path, body, out)
 }
 
+// Stream POSTs body and returns the raw response for SSE reading. The Accept
+// header is application/json, matching the historical behavior of this client.
 func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Response, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal %s stream request: %w", strings.ToLower(c.providerName), err)
-	}
-
-	resp, err := c.do(ctx, path, payload)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= http.StatusBadRequest {
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-		return nil, c.APIError(resp)
-	}
-	return resp, nil
+	return c.core.Stream(ctx, http.MethodPost, path, body, transport.WithAccept("application/json"))
 }
 
+// APIError parses an OpenAI-compatible error response body into a canonical
+// APIError. Retained for adapters (e.g. multipart image edits) that issue their
+// own requests and handle the error status directly.
 func (c *Client) APIError(resp *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	return translateOpenAIError(c.core.ProviderName(), resp.StatusCode, body)
+}
 
+func translateOpenAIError(providerName string, status int, body []byte) *apierror.APIError {
 	type errorEnvelope struct {
 		Error struct {
 			Message string `json:"message"`
@@ -149,13 +127,12 @@ func (c *Client) APIError(resp *http.Response) error {
 	if message == "" {
 		message = strings.TrimSpace(parsed.Message)
 	}
-
 	code := strings.TrimSpace(parsed.Error.Code)
 	if code == "" {
 		code = strings.TrimSpace(parsed.Code)
 	}
 
-	return apierror.ProviderAPIError(c.providerName, resp.StatusCode, apierror.ProviderErrorDetails{
+	return apierror.ProviderAPIError(providerName, status, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Code:    code,
@@ -164,49 +141,10 @@ func (c *Client) APIError(resp *http.Response) error {
 	})
 }
 
-func (c *Client) do(ctx context.Context, path string, payload []byte) (*http.Response, error) {
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-		if err != nil {
-			return nil, fmt.Errorf("build %s request: %w", strings.ToLower(c.providerName), err)
-		}
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		for key, value := range c.staticHeaders {
-			req.Header.Set(key, value)
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && RetryableTransportError(err) {
-				if sleepErr := SleepWithContext(ctx, BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, TranslateTransportError(err, c.providerName)
-		}
-
-		if RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := SleepWithContext(ctx, BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-
-		return resp, nil
-	}
-
-	return nil, TranslateTransportError(lastErr, c.providerName)
-}
+// Retry-classification re-exports retained for the few providers (bedrock,
+// replicate, qwen image/files) that issue bespoke requests and reuse this
+// package's retry helpers. They will move onto the transport core in a later
+// step, at which point common/retry is removed.
 
 func RetryableStatus(status int) bool {
 	return retrypkg.RetryableStatus(status)
