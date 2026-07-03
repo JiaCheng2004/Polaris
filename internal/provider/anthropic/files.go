@@ -128,17 +128,17 @@ func (r anthropicFileResponse) handle(provider string, fallbackPurpose modality.
 }
 
 func (a *FilesAdapter) multipart(ctx context.Context, path string, payload []byte, contentType string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.baseURL+path, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.BaseURL()+path, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("build anthropic files request: %w", err)
 	}
-	req.Header.Set("x-api-key", a.client.apiKey)
+	req.Header.Set("x-api-key", a.client.APIKey())
 	req.Header.Set("anthropic-version", anthropicVersion)
 	req.Header.Set("anthropic-beta", anthropicFilesBeta)
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return retrypkg.TranslateTransportError(err, "Anthropic")
 	}
@@ -146,7 +146,7 @@ func (a *FilesAdapter) multipart(ctx context.Context, path string, payload []byt
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return a.client.apiError(resp)
+		return a.client.APIError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Anthropic returned an invalid file response.")
@@ -163,11 +163,11 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 		}
 		reader = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, a.client.baseURL+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, a.client.BaseURL()+path, reader)
 	if err != nil {
 		return fmt.Errorf("build anthropic files request: %w", err)
 	}
-	req.Header.Set("x-api-key", a.client.apiKey)
+	req.Header.Set("x-api-key", a.client.APIKey())
 	req.Header.Set("anthropic-version", anthropicVersion)
 	req.Header.Set("anthropic-beta", anthropicFilesBeta)
 	req.Header.Set("Accept", "application/json")
@@ -175,7 +175,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return retrypkg.TranslateTransportError(err, "Anthropic")
 	}
@@ -183,7 +183,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return a.client.apiError(resp)
+		return a.client.APIError(resp)
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

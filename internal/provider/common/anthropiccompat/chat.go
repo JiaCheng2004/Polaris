@@ -18,29 +18,75 @@ import (
 type RequestTranslator func(req *modality.ChatRequest, stream bool, providerModel string) any
 type ModelMapper func(providerModel string) string
 
+// Options configures a ChatAdapter. The zero value is the plain
+// Anthropic-compatible behavior used by the token-plan providers; the native
+// Anthropic adapter enables thinking, hosted tools, and per-request betas.
+type Options struct {
+	DefaultMaxTokens  int
+	Translator        RequestTranslator
+	ModelMapper       ModelMapper
+	EnableThinking    bool
+	EnableHostedTools bool
+	Betas             func(*modality.ChatRequest) []string
+}
+
 type ChatAdapter struct {
-	client           *Client
-	model            string
-	translator       RequestTranslator
-	defaultMaxTokens int
-	modelMapper      ModelMapper
+	client            *Client
+	model             string
+	translator        RequestTranslator
+	defaultMaxTokens  int
+	modelMapper       ModelMapper
+	enableThinking    bool
+	enableHostedTools bool
+	betas             func(*modality.ChatRequest) []string
 }
 
 func NewChatAdapter(client *Client, model string, defaultMaxTokens int, translator RequestTranslator) *ChatAdapter {
-	return NewChatAdapterWithModelMapper(client, model, defaultMaxTokens, translator, nil)
+	return NewChatAdapterWithOptions(client, model, Options{DefaultMaxTokens: defaultMaxTokens, Translator: translator})
 }
 
 func NewChatAdapterWithModelMapper(client *Client, model string, defaultMaxTokens int, translator RequestTranslator, modelMapper ModelMapper) *ChatAdapter {
-	if defaultMaxTokens <= 0 {
-		defaultMaxTokens = 4096
+	return NewChatAdapterWithOptions(client, model, Options{DefaultMaxTokens: defaultMaxTokens, Translator: translator, ModelMapper: modelMapper})
+}
+
+// NewChatAdapterWithOptions builds a ChatAdapter with the full option set.
+func NewChatAdapterWithOptions(client *Client, model string, opts Options) *ChatAdapter {
+	if opts.DefaultMaxTokens <= 0 {
+		opts.DefaultMaxTokens = 4096
 	}
 	return &ChatAdapter{
-		client:           client,
-		model:            model,
-		translator:       translator,
-		defaultMaxTokens: defaultMaxTokens,
-		modelMapper:      modelMapper,
+		client:            client,
+		model:             model,
+		translator:        opts.Translator,
+		defaultMaxTokens:  opts.DefaultMaxTokens,
+		modelMapper:       opts.ModelMapper,
+		enableThinking:    opts.EnableThinking,
+		enableHostedTools: opts.EnableHostedTools,
+		betas:             opts.Betas,
 	}
+}
+
+func (a *ChatAdapter) requestBetas(req *modality.ChatRequest) []string {
+	if a.betas == nil {
+		return nil
+	}
+	return a.betas(req)
+}
+
+// CountTokensPayload builds the request body for Anthropic's count_tokens
+// endpoint from a chat request, reusing the standard message/tool translation.
+func (a *ChatAdapter) CountTokensPayload(req *modality.ChatRequest) (any, error) {
+	full, err := defaultTranslateRequest(req, false, a.wireModelName(req.Model), a.defaultMaxTokens, a.enableThinking, a.enableHostedTools)
+	if err != nil {
+		return nil, err
+	}
+	return anthropicCountTokensRequest{
+		Model:      full.Model,
+		Messages:   full.Messages,
+		System:     full.System,
+		Tools:      full.Tools,
+		ToolChoice: full.ToolChoice,
+	}, nil
 }
 
 func (a *ChatAdapter) Complete(ctx context.Context, req *modality.ChatRequest) (*modality.ChatResponse, error) {
@@ -50,7 +96,7 @@ func (a *ChatAdapter) Complete(ctx context.Context, req *modality.ChatRequest) (
 	}
 
 	var response anthropicMessagesResponse
-	if _, err := a.client.JSON(ctx, "/v1/messages", payload, &response); err != nil {
+	if _, err := a.client.JSONWithBetas(ctx, "/v1/messages", payload, &response, a.requestBetas(req)); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +109,7 @@ func (a *ChatAdapter) Stream(ctx context.Context, req *modality.ChatRequest) (<-
 		return nil, err
 	}
 
-	resp, err := a.client.Stream(ctx, "/v1/messages", payload)
+	resp, err := a.client.StreamWithBetas(ctx, "/v1/messages", payload, a.requestBetas(req))
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +140,26 @@ type anthropicMessagesRequest struct {
 	StopSequences []string           `json:"stop_sequences,omitempty"`
 	Tools         []anthropicTool    `json:"tools,omitempty"`
 	ToolChoice    map[string]any     `json:"tool_choice,omitempty"`
+	Thinking      *anthropicThinking `json:"thinking,omitempty"`
 	Metadata      map[string]string  `json:"metadata,omitempty"`
+}
+
+type anthropicThinking struct {
+	Type         string `json:"type"`
+	BudgetTokens int    `json:"budget_tokens"`
+}
+
+type anthropicCountTokensRequest struct {
+	Model      string             `json:"model"`
+	Messages   []anthropicMessage `json:"messages"`
+	System     string             `json:"system,omitempty"`
+	Tools      []anthropicTool    `json:"tools,omitempty"`
+	ToolChoice map[string]any     `json:"tool_choice,omitempty"`
+}
+
+// CountTokensResponse is the parsed body of Anthropic's /v1/messages/count_tokens.
+type CountTokensResponse struct {
+	InputTokens int `json:"input_tokens"`
 }
 
 type anthropicMessage struct {
@@ -128,8 +193,33 @@ type anthropicCitations struct {
 
 type anthropicTool struct {
 	Name        string          `json:"name"`
+	Type        string          `json:"type,omitempty"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema,omitempty"`
+	Config      map[string]any  `json:"-"`
+}
+
+// MarshalJSON emits the base tool fields plus any hosted-tool Config keys. For a
+// plain function tool (no Type/Config) it produces the standard
+// name/description/input_schema object.
+func (t anthropicTool) MarshalJSON() ([]byte, error) {
+	out := map[string]any{}
+	for key, value := range t.Config {
+		out[key] = value
+	}
+	if t.Name != "" {
+		out["name"] = t.Name
+	}
+	if t.Type != "" {
+		out["type"] = t.Type
+	}
+	if t.Description != "" {
+		out["description"] = t.Description
+	}
+	if len(t.InputSchema) > 0 {
+		out["input_schema"] = t.InputSchema
+	}
+	return json.Marshal(out)
 }
 
 type anthropicMessagesResponse struct {
@@ -174,7 +264,7 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest, stream bool) (
 	if a.translator != nil {
 		return a.translator(req, stream, providerModel), nil
 	}
-	return defaultTranslateRequest(req, stream, providerModel, a.defaultMaxTokens)
+	return defaultTranslateRequest(req, stream, providerModel, a.defaultMaxTokens, a.enableThinking, a.enableHostedTools)
 }
 
 func (a *ChatAdapter) wireModelName(requestModel string) string {
@@ -185,7 +275,7 @@ func (a *ChatAdapter) wireModelName(requestModel string) string {
 	return model
 }
 
-func defaultTranslateRequest(req *modality.ChatRequest, stream bool, providerModel string, defaultMaxTokens int) (anthropicMessagesRequest, error) {
+func defaultTranslateRequest(req *modality.ChatRequest, stream bool, providerModel string, defaultMaxTokens int, enableThinking bool, enableHostedTools bool) (anthropicMessagesRequest, error) {
 	payload := anthropicMessagesRequest{
 		Model:         providerModel,
 		MaxTokens:     req.MaxTokens,
@@ -224,7 +314,10 @@ func defaultTranslateRequest(req *modality.ChatRequest, stream bool, providerMod
 	payload.System = strings.Join(systemParts, "\n\n")
 
 	for _, tool := range req.Tools {
-		translatedTool, ok := translateAnthropicToolDefinition(tool)
+		translatedTool, ok, err := translateAnthropicToolDefinition(tool, enableHostedTools)
+		if err != nil {
+			return anthropicMessagesRequest{}, err
+		}
 		if ok {
 			payload.Tools = append(payload.Tools, translatedTool)
 		}
@@ -237,21 +330,51 @@ func defaultTranslateRequest(req *modality.ChatRequest, stream bool, providerMod
 		payload.ToolChoice = toolChoice
 	}
 
+	if enableThinking {
+		if budget := modality.ReasoningBudgetTokens(req.Reasoning, req.Model); budget > 0 {
+			payload.Thinking = &anthropicThinking{Type: "enabled", BudgetTokens: budget}
+		}
+	}
+
 	return payload, nil
 }
 
-func translateAnthropicToolDefinition(tool modality.ToolDefinition) (anthropicTool, bool) {
-	if strings.TrimSpace(tool.Type) != "" && strings.TrimSpace(tool.Type) != "function" {
-		return anthropicTool{}, false
+func translateAnthropicToolDefinition(tool modality.ToolDefinition, allowHosted bool) (anthropicTool, bool, error) {
+	switch strings.TrimSpace(tool.Type) {
+	case "", "function":
+		if strings.TrimSpace(tool.Function.Name) == "" {
+			return anthropicTool{}, false, nil
+		}
+		return anthropicTool{
+			Name:        tool.Function.Name,
+			Description: tool.Function.Description,
+			InputSchema: tool.Function.Parameters,
+		}, true, nil
+	case "hosted":
+		if !allowHosted || tool.Hosted == nil {
+			return anthropicTool{}, false, nil
+		}
+		config := map[string]any{}
+		for key, value := range tool.Hosted.Config {
+			config[key] = value
+		}
+		switch strings.TrimSpace(tool.Hosted.Name) {
+		case "web_search":
+			return anthropicTool{Type: "web_search_20260209", Config: config}, true, nil
+		case "code_interpreter":
+			return anthropicTool{Type: "code_execution_20260120", Config: config}, true, nil
+		case "computer_use":
+			return anthropicTool{Type: "computer_20251124", Config: config}, true, nil
+		case "url_context":
+			return anthropicTool{Type: "web_fetch_20260209", Config: config}, true, nil
+		case "mcp":
+			return anthropicTool{Type: "mcp_toolset", Config: config}, true, nil
+		default:
+			return anthropicTool{}, false, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Anthropic does not support the requested hosted tool.")
+		}
+	default:
+		return anthropicTool{}, false, nil
 	}
-	if strings.TrimSpace(tool.Function.Name) == "" {
-		return anthropicTool{}, false
-	}
-	return anthropicTool{
-		Name:        tool.Function.Name,
-		Description: tool.Function.Description,
-		InputSchema: tool.Function.Parameters,
-	}, true
 }
 
 func translateMessage(message modality.ChatMessage) (anthropicMessage, error) {

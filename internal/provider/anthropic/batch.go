@@ -27,15 +27,17 @@ func (a *BatchAdapter) Create(ctx context.Context, req *modality.BatchRequest) (
 		"metadata":      req.Metadata,
 	}
 	var response anthropicBatch
-	if err := a.client.JSON(ctx, "/v1/messages/batches", body, &response); err != nil {
+	if _, err := a.client.JSON(ctx, "/v1/messages/batches", body, &response); err != nil {
 		return nil, err
 	}
 	return response.job(req.Model), nil
 }
 
 func (a *BatchAdapter) Get(ctx context.Context, providerJobID string) (*modality.BatchStatus, error) {
+	// B1: batch retrieval is a GET; the shared compat JSON always POSTs, so issue
+	// the request through the transport core with an explicit GET and no body.
 	var response anthropicBatch
-	if err := a.client.JSON(ctx, "/v1/messages/batches/"+strings.TrimSpace(providerJobID), map[string]any{}, &response); err != nil {
+	if err := a.client.Core().JSON(ctx, http.MethodGet, "/v1/messages/batches/"+strings.TrimSpace(providerJobID), nil, &response); err != nil {
 		return nil, err
 	}
 	status := modality.BatchStatus{BatchJob: *response.job("")}
@@ -44,7 +46,8 @@ func (a *BatchAdapter) Get(ctx context.Context, providerJobID string) (*modality
 
 func (a *BatchAdapter) Cancel(ctx context.Context, providerJobID string) error {
 	var response anthropicBatch
-	return a.client.JSON(ctx, "/v1/messages/batches/"+strings.TrimSpace(providerJobID)+"/cancel", map[string]any{}, &response)
+	_, err := a.client.JSON(ctx, "/v1/messages/batches/"+strings.TrimSpace(providerJobID)+"/cancel", map[string]any{}, &response)
+	return err
 }
 
 func (a *BatchAdapter) Output(ctx context.Context, providerJobID string) (io.ReadCloser, error) {
