@@ -4,7 +4,7 @@
 
 **一个无状态、配置驱动的 AI 网关，用一套统一接口连接多个模型供应商和多种模态能力。**
 
-[![Go](https://img.shields.io/badge/Go-1.26.2-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.26.4-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![API](https://img.shields.io/badge/API-v1-2563EB?style=for-the-badge)](./docs/API_REFERENCE.md)
 [![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
@@ -54,7 +54,7 @@ Polaris 不是工作流编排框架、提示词框架、RAG 引擎、模型托�
 
 ### 1. 前置要求
 
-- Go `1.26.2`
+- Go `1.26.4`
 - Git
 - Docker Desktop 或 Docker Engine，仅在你需要 Compose 或 Docker 验证时使用
 - 至少一个供应商密钥用于真实模型请求；如果使用 Ollama 这类本地供应商则不需要云端密钥

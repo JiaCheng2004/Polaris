@@ -4,7 +4,7 @@
 
 **A stateless, config-driven AI gateway for routing one application across many model providers and modalities.**
 
-[![Go](https://img.shields.io/badge/Go-1.26.3-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.26.4-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![API](https://img.shields.io/badge/API-v1-2563EB?style=for-the-badge)](./docs/API_REFERENCE.md)
 [![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
@@ -56,7 +56,7 @@ Use this rule of thumb:
 
 ### 1. Prerequisites
 
-- Go `1.26.3`
+- Go `1.26.4`
 - Git
 - Docker Desktop or Docker Engine, only if you use Compose or Docker validation
 - At least one provider credential for real model calls, unless you use a local provider such as Ollama
