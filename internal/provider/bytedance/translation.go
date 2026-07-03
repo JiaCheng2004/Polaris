@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -68,7 +68,7 @@ func NewTranslationAdapter(client *Client, model string, endpoint string) *Trans
 
 func (a *TranslationAdapter) Translate(ctx context.Context, req *modality.TranslationRequest) (*modality.TranslationResponse, error) {
 	if strings.TrimSpace(a.client.speechAPIKey) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance translation requires providers.bytedance.speech_api_key.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance translation requires providers.bytedance.speech_api_key.")
 	}
 
 	payload := translationRequest{
@@ -108,7 +108,7 @@ func (a *TranslationAdapter) Translate(ctx context.Context, req *modality.Transl
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid translation response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid translation response.")
 	}
 
 	var parsed translationResponseEnvelope
@@ -116,7 +116,7 @@ func (a *TranslationAdapter) Translate(ctx context.Context, req *modality.Transl
 		if resp.StatusCode >= http.StatusBadRequest {
 			return nil, bytedanceTranslationError(resp.StatusCode, 0, strings.TrimSpace(string(body)))
 		}
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid translation JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid translation JSON response.")
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest || parsed.Code != bytedanceTranslationSuccessCode {
@@ -159,20 +159,20 @@ func bytedanceTranslationError(status int, code int, message string) error {
 
 	switch code {
 	case 45000001:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "", message)
 	case 45000130:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "context_limit_exceeded", "", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "context_limit_exceeded", "", message)
 	case 55000001:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
 	}
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
 	case status == http.StatusTooManyRequests:
-		return httputil.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
+		return apierror.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
 	case status >= http.StatusInternalServerError:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
 	default:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
 	}
 }

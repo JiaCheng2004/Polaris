@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -96,12 +96,12 @@ func (a *MusicAdapter) Generate(ctx context.Context, req *modality.MusicGenerati
 }
 
 func (a *MusicAdapter) StreamGenerate(ctx context.Context, req *modality.MusicGenerationRequest) (*modality.MusicStream, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "music_streaming_not_supported", "model", "MiniMax music streaming is not enabled in this Polaris build.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "music_streaming_not_supported", "model", "MiniMax music streaming is not enabled in this Polaris build.")
 }
 
 func (a *MusicAdapter) Edit(ctx context.Context, req *modality.MusicEditRequest) (*modality.MusicOperationResult, error) {
 	if strings.ToLower(strings.TrimSpace(req.Operation)) != "cover" {
-		return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "MiniMax currently supports only the cover edit operation.")
+		return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "MiniMax currently supports only the cover edit operation.")
 	}
 
 	audioURL, audioBase64, err := resolveMiniMaxReferenceAudio(req)
@@ -131,11 +131,11 @@ func (a *MusicAdapter) Edit(ctx context.Context, req *modality.MusicEditRequest)
 }
 
 func (a *MusicAdapter) StreamEdit(ctx context.Context, req *modality.MusicEditRequest) (*modality.MusicStream, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "music_streaming_not_supported", "model", "MiniMax music streaming is not enabled in this Polaris build.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "music_streaming_not_supported", "model", "MiniMax music streaming is not enabled in this Polaris build.")
 }
 
 func (a *MusicAdapter) SeparateStems(ctx context.Context, req *modality.MusicStemRequest) (*modality.MusicOperationResult, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "music_stems_not_supported", "model", "MiniMax music stems separation is not supported.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "music_stems_not_supported", "model", "MiniMax music stems separation is not supported.")
 }
 
 func (a *MusicAdapter) GenerateLyrics(ctx context.Context, req *modality.MusicLyricsRequest) (*modality.MusicLyricsResponse, error) {
@@ -164,16 +164,16 @@ func (a *MusicAdapter) GenerateLyrics(ctx context.Context, req *modality.MusicLy
 }
 
 func (a *MusicAdapter) CreatePlan(ctx context.Context, req *modality.MusicPlanRequest) (*modality.MusicPlanResponse, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "composition_plans_not_supported", "model", "MiniMax music composition plans are not supported.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "composition_plans_not_supported", "model", "MiniMax music composition plans are not supported.")
 }
 
 func decodeMiniMaxMusicResponse(response *musicGenerateResponse, requestedFormat string) (*modality.MusicOperationResult, error) {
 	if response == nil || strings.TrimSpace(response.Data.Audio) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned an empty music response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned an empty music response.")
 	}
 	raw, err := hex.DecodeString(strings.TrimSpace(response.Data.Audio))
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned invalid hex audio data.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned invalid hex audio data.")
 	}
 	format := strings.ToLower(strings.TrimSpace(requestedFormat))
 	if format == "" {
@@ -202,7 +202,7 @@ func resolveMiniMaxReferenceAudio(req *modality.MusicEditRequest) (string, strin
 		if strings.HasPrefix(strings.ToLower(value), "data:") {
 			comma := strings.Index(value, ",")
 			if comma < 0 || comma == len(value)-1 {
-				return "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_source_audio", "source_audio", "Field 'source_audio' must be a valid data URL.")
+				return "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_source_audio", "source_audio", "Field 'source_audio' must be a valid data URL.")
 			}
 			return "", value[comma+1:], nil
 		}
@@ -210,7 +210,7 @@ func resolveMiniMaxReferenceAudio(req *modality.MusicEditRequest) (string, strin
 	case len(req.File) > 0:
 		return "", base64.StdEncoding.EncodeToString(req.File), nil
 	default:
-		return "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_audio", "source_audio", "MiniMax cover requires source audio from 'source_audio', an uploaded file, or a previous music job.")
+		return "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_audio", "source_audio", "MiniMax cover requires source audio from 'source_audio', an uploaded file, or a previous music job.")
 	}
 }
 
@@ -268,9 +268,9 @@ func minimaxBaseRespError(statusCode int, statusMsg string) error {
 		return nil
 	}
 	if strings.Contains(strings.ToLower(strings.TrimSpace(statusMsg)), "invalid api key") {
-		return httputil.ProviderAuthError("MiniMax", statusMsg)
+		return apierror.ProviderAuthError("MiniMax", statusMsg)
 	}
-	return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmptyMiniMax(statusMsg, "MiniMax returned an error."))
+	return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmptyMiniMax(statusMsg, "MiniMax returned an error."))
 }
 
 func firstNonEmptyMiniMax(values ...string) string {

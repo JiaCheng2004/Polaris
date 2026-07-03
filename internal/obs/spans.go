@@ -1,4 +1,8 @@
-package telemetry
+// Package obs provides Polaris's neutral observability primitives — tracing
+// span helpers, the OTLP tracer bootstrap, and the provider HTTP RoundTripper
+// that emits client spans. It is a foundation package so provider adapters and
+// the transport core can be instrumented without importing the gateway layer.
+package obs
 
 import (
 	"context"

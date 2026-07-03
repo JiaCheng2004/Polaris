@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
 )
@@ -139,7 +139,7 @@ func (a *ImageAdapter) json(ctx context.Context, path string, body any, out any)
 		return a.client.APIError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (a *ImageAdapter) translateImageResponse(ctx context.Context, response imag
 		}
 	}
 	if len(items) == 0 {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen returned an image response without image data.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen returned an image response without image data.")
 	}
 	return &modality.ImageResponse{
 		Created: time.Now().Unix(),
@@ -230,11 +230,11 @@ func (a *ImageAdapter) fetchImageAsBase64(ctx context.Context, imageURL string) 
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen image download failed.")
+		return "", apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen image download failed.")
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 25<<20))
 	if err != nil {
-		return "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen image download failed.")
+		return "", apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Qwen image download failed.")
 	}
 	return base64.StdEncoding.EncodeToString(data), nil
 }
@@ -287,7 +287,7 @@ func referenceImageParts(values []string) ([]imageContentPart, error) {
 	parts := make([]imageContentPart, 0, len(values))
 	for _, value := range values {
 		if strings.TrimSpace(value) == "" {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_reference_image", "reference_images", "Reference images must not be empty.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_reference_image", "reference_images", "Reference images must not be empty.")
 		}
 		if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "data:") {
 			value = "data:image/png;base64," + value

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
@@ -46,7 +46,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("ollama", nil),
+			Transport: obs.NewProviderTransport("ollama", nil),
 		},
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
@@ -71,7 +71,7 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 		return c.apiError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Ollama returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Ollama returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -155,10 +155,10 @@ func (c *Client) apiError(resp *http.Response) error {
 
 	switch resp.StatusCode {
 	case http.StatusNotFound:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_model_unavailable", "", strings.TrimSpace(parsed.Error))
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_model_unavailable", "", strings.TrimSpace(parsed.Error))
 	}
 
-	return httputil.ProviderAPIError("Ollama", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("Ollama", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: parsed.Error,
 		Body:    string(body),
 	})

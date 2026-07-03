@@ -7,14 +7,15 @@
 package ast
 
 import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
 	event "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/common/event"
 	rpcmeta "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/common/rpcmeta"
 	base "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/products/understanding/base"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (

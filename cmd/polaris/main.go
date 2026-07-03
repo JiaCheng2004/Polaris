@@ -15,7 +15,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/pricing"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/provider/verification"
@@ -140,7 +140,7 @@ func run() error {
 		}()
 	}
 	toolRegistry := tooling.NewRegistry()
-	tracing, err := telemetry.Setup(context.Background(), cfg.Observability.Traces)
+	tracing, err := obs.Setup(context.Background(), cfg.Observability.Traces)
 	if err != nil {
 		return err
 	}

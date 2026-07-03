@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -118,13 +118,13 @@ func (a *voiceAssetAdapter) GetVoice(ctx context.Context, req *modality.VoiceLoo
 			return &cloned, nil
 		}
 	}
-	return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "voice_not_found", "id", "Voice was not found.")
+	return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "voice_not_found", "id", "Voice was not found.")
 }
 
 func (a *voiceAssetAdapter) CreateClone(ctx context.Context, req *modality.VoiceCloneRequest) (*modality.VoiceCatalogItem, error) {
 	audioData, err := decodeBase64Audio(req.Audio)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Field 'audio' must be valid base64 audio.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Field 'audio' must be valid base64 audio.")
 	}
 	payload := voiceCloneRequest{
 		SpeakerID: strings.TrimSpace(req.VoiceID),
@@ -183,7 +183,7 @@ func (a *voiceAssetAdapter) ActivateVoice(ctx context.Context, req *modality.Voi
 }
 
 func (a *voiceAssetAdapter) DeleteVoice(ctx context.Context, req *modality.VoiceLookupRequest) error {
-	return httputil.NewError(http.StatusBadRequest, "capability_not_supported", "voice_delete_not_supported", "id", "ByteDance does not expose voice deletion through the current Polaris runtime.")
+	return apierror.NewError(http.StatusBadRequest, "capability_not_supported", "voice_delete_not_supported", "id", "ByteDance does not expose voice deletion through the current Polaris runtime.")
 }
 
 func (a *voiceAssetAdapter) fetchCustomVoices(ctx context.Context, state string, speakerIDs []string) ([]modality.VoiceCatalogItem, error) {
@@ -222,7 +222,7 @@ func (a *voiceAssetAdapter) fetchCustomVoices(ctx context.Context, state string,
 
 func (a *voiceAssetAdapter) postSpeechJSON(ctx context.Context, endpoint string, body any, out any) error {
 	if strings.TrimSpace(a.client.speechAPIKey) == "" {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance voice asset APIs require providers.bytedance.speech_api_key.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance voice asset APIs require providers.bytedance.speech_api_key.")
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -248,7 +248,7 @@ func (a *voiceAssetAdapter) postSpeechJSON(ctx context.Context, endpoint string,
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an unreadable voice asset response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an unreadable voice asset response.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return bytedanceSpeechJSONError(resp.StatusCode, raw)
@@ -257,7 +257,7 @@ func (a *voiceAssetAdapter) postSpeechJSON(ctx context.Context, endpoint string,
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid JSON voice asset response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid JSON voice asset response.")
 	}
 	if envelope, ok := out.(*bytedanceVoiceOperationResponse); ok && envelope.Code != 0 && envelope.Code != bytedanceSpeechSuccessCode {
 		return bytedanceSpeechJSONCodeError(envelope.Code, envelope.Message)
@@ -509,7 +509,7 @@ func bytedanceSpeechJSONError(status int, raw []byte) error {
 			}
 		}
 	}
-	return httputil.ProviderAPIError("ByteDance", status, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("ByteDance", status, apierror.ProviderErrorDetails{
 		Message: strings.TrimSpace(string(raw)),
 		Body:    string(raw),
 	})
@@ -519,11 +519,11 @@ func bytedanceSpeechJSONCodeError(code int, message string) error {
 	message = firstNonEmpty(strings.TrimSpace(message), "ByteDance returned a speech API error.")
 	switch code {
 	case 45001107:
-		return httputil.NewError(http.StatusNotFound, "invalid_request_error", "voice_not_found", "id", message)
+		return apierror.NewError(http.StatusNotFound, "invalid_request_error", "voice_not_found", "id", message)
 	case 45001123:
-		return httputil.NewError(http.StatusConflict, "invalid_request_error", "voice_limit_reached", "", message)
+		return apierror.NewError(http.StatusConflict, "invalid_request_error", "voice_limit_reached", "", message)
 	default:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
 	}
 }
 

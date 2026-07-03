@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 )
@@ -54,7 +54,7 @@ func NewCascadeAdapter(model string, chatModel string, sttModel string, ttsModel
 
 func (a *CascadeAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
 	if a == nil || a.chat == nil || a.transcribe == nil || a.synthesize == nil {
-		return nil, httputil.NewError(503, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return nil, apierror.NewError(503, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {
@@ -94,13 +94,13 @@ func (a *CascadeAdapter) normalizeConfig(cfg *modality.AudioSessionConfig) (*mod
 		normalized.SampleRateHz = 16000
 	}
 	if normalized.SampleRateHz != 16000 {
-		return nil, httputil.NewError(400, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return nil, apierror.NewError(400, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if normalized.InputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(400, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return nil, apierror.NewError(400, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if normalized.OutputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(400, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return nil, apierror.NewError(400, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if normalized.TurnDetection == nil {
 		normalized.TurnDetection = &modality.TurnDetectionConfig{Mode: modality.TurnDetectionManual}
@@ -111,7 +111,7 @@ func (a *CascadeAdapter) normalizeConfig(cfg *modality.AudioSessionConfig) (*mod
 		normalized.TurnDetection.Mode = mode
 	}
 	if _, ok := a.turnModes[mode]; !ok {
-		return nil, httputil.NewError(400, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+		return nil, apierror.NewError(400, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 	}
 	return &normalized, nil
 }
@@ -146,7 +146,7 @@ func (s *CascadeSession) Send(event modality.AudioClientEvent) error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return httputil.NewError(410, "invalid_request_error", "session_closed", "", "Audio session is closed.")
+		return apierror.NewError(410, "invalid_request_error", "session_closed", "", "Audio session is closed.")
 	}
 	s.mu.Unlock()
 
@@ -166,7 +166,7 @@ func (s *CascadeSession) Send(event modality.AudioClientEvent) error {
 	case modality.AudioClientEventSessionClose:
 		return s.Close()
 	default:
-		return httputil.NewError(400, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
+		return apierror.NewError(400, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
 	}
 }
 
@@ -211,7 +211,7 @@ func (s *CascadeSession) updateSession(update *modality.AudioSessionConfig) erro
 	defer s.mu.Unlock()
 
 	if strings.TrimSpace(update.Model) != "" && strings.TrimSpace(update.Model) != strings.TrimSpace(s.cfg.Model) {
-		return httputil.NewError(400, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
+		return apierror.NewError(400, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
 	}
 	if update.Voice != "" {
 		s.cfg.Voice = update.Voice
@@ -220,13 +220,13 @@ func (s *CascadeSession) updateSession(update *modality.AudioSessionConfig) erro
 		s.cfg.Instructions = update.Instructions
 	}
 	if update.InputAudioFormat != "" && update.InputAudioFormat != modality.AudioFormatPCM16 {
-		return httputil.NewError(400, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return apierror.NewError(400, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if update.OutputAudioFormat != "" && update.OutputAudioFormat != modality.AudioFormatPCM16 {
-		return httputil.NewError(400, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return apierror.NewError(400, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if update.SampleRateHz != 0 && update.SampleRateHz != 16000 {
-		return httputil.NewError(400, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return apierror.NewError(400, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if update.TurnDetection != nil {
 		mode := strings.TrimSpace(update.TurnDetection.Mode)
@@ -234,7 +234,7 @@ func (s *CascadeSession) updateSession(update *modality.AudioSessionConfig) erro
 			mode = modality.TurnDetectionManual
 		}
 		if mode != modality.TurnDetectionManual && mode != modality.TurnDetectionServerVAD {
-			return httputil.NewError(400, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+			return apierror.NewError(400, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 		}
 		s.cfg.TurnDetection = update.TurnDetection
 		s.cfg.TurnDetection.Mode = mode
@@ -249,7 +249,7 @@ func (s *CascadeSession) updateSession(update *modality.AudioSessionConfig) erro
 func (s *CascadeSession) appendAudio(encoded string) error {
 	payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 	if err != nil {
-		return httputil.NewError(400, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
+		return apierror.NewError(400, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -261,7 +261,7 @@ func (s *CascadeSession) commitAudio() error {
 	s.mu.Lock()
 	if len(s.pendingPCM) == 0 {
 		s.mu.Unlock()
-		return httputil.NewError(400, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
+		return apierror.NewError(400, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
 	}
 	pcm := append([]byte(nil), s.pendingPCM...)
 	s.pendingPCM = nil
@@ -269,7 +269,7 @@ func (s *CascadeSession) commitAudio() error {
 
 	wav, err := pcm16ToWAV(pcm, 16000)
 	if err != nil {
-		return httputil.NewError(400, "invalid_request_error", "invalid_audio", "audio", err.Error())
+		return apierror.NewError(400, "invalid_request_error", "invalid_audio", "audio", err.Error())
 	}
 	resp, err := s.transcribe(s.ctx, &modality.STTRequest{
 		Model:          s.sttModel,
@@ -311,7 +311,7 @@ func (s *CascadeSession) commitAudio() error {
 func (s *CascadeSession) setInputText(text string) error {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return httputil.NewError(400, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
+		return apierror.NewError(400, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
 	}
 	s.mu.Lock()
 	s.pendingText = trimmed
@@ -323,12 +323,12 @@ func (s *CascadeSession) createResponse(response *modality.AudioResponseConfig) 
 	s.mu.Lock()
 	if s.activeCancel != nil {
 		s.mu.Unlock()
-		return httputil.NewError(409, "invalid_request_error", "response_in_progress", "", "Audio session is already generating a response.")
+		return apierror.NewError(409, "invalid_request_error", "response_in_progress", "", "Audio session is already generating a response.")
 	}
 	pendingText := strings.TrimSpace(s.pendingText)
 	if pendingText == "" {
 		s.mu.Unlock()
-		return httputil.NewError(400, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
+		return apierror.NewError(400, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
 	}
 	history := append([]modality.ChatMessage(nil), s.history...)
 	cfg := s.cfg
@@ -382,7 +382,7 @@ func (s *CascadeSession) runResponse(ctx context.Context, cancel context.CancelF
 
 	assistantText := strings.TrimSpace(firstChoiceText(chatResp))
 	if assistantText == "" {
-		s.failResponse(httputil.NewError(502, "provider_error", "provider_invalid_response", "", "Audio chat provider returned an empty assistant response."))
+		s.failResponse(apierror.NewError(502, "provider_error", "provider_invalid_response", "", "Audio chat provider returned an empty assistant response."))
 		return
 	}
 
@@ -397,7 +397,7 @@ func (s *CascadeSession) runResponse(ctx context.Context, cancel context.CancelF
 		return
 	}
 	if audioResp == nil || len(audioResp.Data) == 0 {
-		s.failResponse(httputil.NewError(502, "provider_error", "provider_invalid_response", "", "Audio synthesis provider returned an empty response."))
+		s.failResponse(apierror.NewError(502, "provider_error", "provider_invalid_response", "", "Audio synthesis provider returned an empty response."))
 		return
 	}
 
@@ -470,9 +470,9 @@ func (s *CascadeSession) failResponse(err error) {
 	s.activeCancel = nil
 	s.mu.Unlock()
 
-	apiErr, ok := err.(*httputil.APIError)
+	apiErr, ok := err.(*apierror.APIError)
 	if !ok {
-		apiErr = httputil.NewError(500, "internal_error", "internal_error", "", err.Error())
+		apiErr = apierror.NewError(500, "internal_error", "internal_error", "", err.Error())
 	}
 	s.emit(modality.AudioServerEvent{
 		Type:    modality.AudioServerEventError,

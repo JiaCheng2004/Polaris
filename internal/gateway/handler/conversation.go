@@ -7,8 +7,8 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -72,7 +72,7 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 		}
 
 		start := time.Now()
-		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
+		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
 			attribute.Int("polaris.fallback_attempt", index+1),
 			attribute.String("polaris.provider", target.model.Provider),
 			attribute.String("polaris.model", target.model.ID),
@@ -80,7 +80,7 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 		)
 		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
 		if err != nil {
-			telemetry.RecordSpanError(attemptSpan, err)
+			obs.RecordSpanError(attemptSpan, err)
 		}
 		attemptSpan.End()
 		providerLatencyMs := int(time.Since(start).Milliseconds())
@@ -114,7 +114,7 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 		if index > 0 {
 			fallbackModel = target.model.ID
 			outcome.FallbackModel = fallbackModel
-			telemetry.AnnotateCurrentSpan(c.Request.Context(),
+			obs.AnnotateCurrentSpan(c.Request.Context(),
 				attribute.String("polaris.fallback_from", primary.model.ID),
 				attribute.String("polaris.fallback_to", fallbackModel),
 			)
@@ -140,7 +140,7 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 		}
 
 		start := time.Now()
-		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
+		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
 			attribute.Int("polaris.fallback_attempt", index+2),
 			attribute.String("polaris.provider", target.model.Provider),
 			attribute.String("polaris.model", target.model.ID),
@@ -148,7 +148,7 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 		)
 		response, err := target.adapter.Complete(attemptCtx, resolvedReq)
 		if err != nil {
-			telemetry.RecordSpanError(attemptSpan, err)
+			obs.RecordSpanError(attemptSpan, err)
 		}
 		attemptSpan.End()
 
@@ -188,7 +188,7 @@ func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatT
 			TokenSource:       providerUsageSource(response.Usage),
 			FallbackModel:     fallbackModel,
 		}
-		telemetry.AnnotateCurrentSpan(c.Request.Context(),
+		obs.AnnotateCurrentSpan(c.Request.Context(),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 			attribute.String("polaris.fallback_to", fallbackModel),
 		)
@@ -213,7 +213,7 @@ func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary cha
 		}
 
 		start := time.Now()
-		attemptCtx, attemptSpan := telemetry.StartInternalSpan(c.Request.Context(), "fallback.attempt",
+		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
 			attribute.Int("polaris.fallback_attempt", index+2),
 			attribute.String("polaris.provider", target.model.Provider),
 			attribute.String("polaris.model", target.model.ID),
@@ -221,7 +221,7 @@ func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary cha
 		)
 		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
 		if err != nil {
-			telemetry.RecordSpanError(attemptSpan, err)
+			obs.RecordSpanError(attemptSpan, err)
 		}
 		attemptSpan.End()
 
@@ -254,7 +254,7 @@ func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary cha
 			ProviderLatencyMs: providerLatencyMs,
 			FallbackModel:     fallbackModel,
 		}
-		telemetry.AnnotateCurrentSpan(c.Request.Context(),
+		obs.AnnotateCurrentSpan(c.Request.Context(),
 			attribute.String("polaris.fallback_from", primary.model.ID),
 			attribute.String("polaris.fallback_to", fallbackModel),
 		)

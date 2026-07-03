@@ -42,9 +42,9 @@ type goldenCase struct {
 }
 
 func TestGoldenWireContracts(t *testing.T) {
-	openai := httptest.NewServer(http.HandlerFunc(goldenOpenAIMock(t)))
+	openai := httptest.NewServer(goldenOpenAIMock(t))
 	defer openai.Close()
-	anthropicSrv := httptest.NewServer(http.HandlerFunc(goldenAnthropicMock(t)))
+	anthropicSrv := httptest.NewServer(goldenAnthropicMock(t))
 	defer anthropicSrv.Close()
 
 	cfg := goldenConfig(openai.URL+"/v1", anthropicSrv.URL)
@@ -234,8 +234,8 @@ func goldenConfig(openaiBaseURL, anthropicBaseURL string) *config.Config {
 func goldenOpenAIMock(t *testing.T) http.HandlerFunc {
 	t.Helper()
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/v1/chat/completions":
+		switch r.URL.Path {
+		case "/v1/chat/completions":
 			var body struct {
 				Stream bool `json:"stream"`
 			}
@@ -251,7 +251,7 @@ func goldenOpenAIMock(t *testing.T) http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"chatcmpl-golden","object":"chat.completion","created":1700000000,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
-		case r.URL.Path == "/v1/embeddings":
+		case "/v1/embeddings":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"object":"list","model":"text-embedding-3-small","data":[{"object":"embedding","index":0,"embedding":[0.1,0.2,0.3]}],"usage":{"prompt_tokens":1,"total_tokens":1}}`))
 		default:

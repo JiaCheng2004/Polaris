@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 )
 
 const maxBackoffDelay = 5 * time.Second
@@ -25,19 +25,6 @@ func RetryableTransportError(err error) bool {
 	}
 	var netErr net.Error
 	return errors.As(err, &netErr)
-}
-
-func ShouldRetryAPIError(apiErr *httputil.APIError) bool {
-	if apiErr == nil {
-		return false
-	}
-	if apiErr.Status == http.StatusTooManyRequests || apiErr.Type == "rate_limit_error" || apiErr.Code == "provider_rate_limit" {
-		return true
-	}
-	if apiErr.Status == http.StatusGatewayTimeout || apiErr.Type == "timeout_error" || apiErr.Code == "provider_timeout" {
-		return true
-	}
-	return apiErr.Code == "provider_server_error"
 }
 
 func BackoffDelay(initial time.Duration, attempt int) time.Duration {
@@ -70,5 +57,5 @@ func SleepWithContext(ctx context.Context, delay time.Duration) error {
 }
 
 func TranslateTransportError(err error, providerName string) error {
-	return httputil.ProviderTransportError(err, providerName)
+	return apierror.ProviderTransportError(err, providerName)
 }

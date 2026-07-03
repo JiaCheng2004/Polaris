@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
@@ -99,7 +99,7 @@ func openAIRealtimeURL(baseURL string) string {
 
 func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
 	if a == nil || a.client == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {
@@ -132,13 +132,13 @@ func (a *realtimeAudioAdapter) normalizeConfig(cfg *modality.AudioSessionConfig)
 		normalized.SampleRateHz = 16000
 	}
 	if normalized.SampleRateHz != 16000 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if normalized.InputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if normalized.OutputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if normalized.TurnDetection == nil {
 		normalized.TurnDetection = &modality.TurnDetectionConfig{Mode: modality.TurnDetectionManual}
@@ -148,7 +148,7 @@ func (a *realtimeAudioAdapter) normalizeConfig(cfg *modality.AudioSessionConfig)
 		mode = modality.TurnDetectionManual
 	}
 	if _, ok := a.turnModes[mode]; !ok {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 	}
 	normalized.TurnDetection.Mode = mode
 	return &normalized, nil
@@ -158,7 +158,7 @@ func (s *realtimeAudioSession) Send(event modality.AudioClientEvent) error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Audio session is closed.")
+		return apierror.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Audio session is closed.")
 	}
 	s.mu.Unlock()
 
@@ -178,7 +178,7 @@ func (s *realtimeAudioSession) Send(event modality.AudioClientEvent) error {
 	case modality.AudioClientEventSessionClose:
 		return s.Close()
 	default:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
 	}
 }
 
@@ -209,19 +209,19 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 	s.mu.Lock()
 	if strings.TrimSpace(update.Model) != "" && strings.TrimSpace(update.Model) != strings.TrimSpace(s.cfg.Model) {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
 	}
 	if update.InputAudioFormat != "" && update.InputAudioFormat != modality.AudioFormatPCM16 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if update.OutputAudioFormat != "" && update.OutputAudioFormat != modality.AudioFormatPCM16 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if update.SampleRateHz != 0 && update.SampleRateHz != 16000 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if update.TurnDetection != nil {
 		mode := strings.TrimSpace(update.TurnDetection.Mode)
@@ -230,7 +230,7 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 		}
 		if _, ok := s.adapter.turnModes[mode]; !ok {
 			s.mu.Unlock()
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+			return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 		}
 		s.cfg.TurnDetection = &modality.TurnDetectionConfig{
 			Mode:            mode,
@@ -241,7 +241,7 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 	if strings.TrimSpace(update.Voice) != "" {
 		if s.voiceLocked && strings.TrimSpace(update.Voice) != strings.TrimSpace(s.cfg.Voice) {
 			s.mu.Unlock()
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "voice_immutable", "voice", "Audio session voice cannot be changed after audio output has started.")
+			return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "voice_immutable", "voice", "Audio session voice cannot be changed after audio output has started.")
 		}
 		s.cfg.Voice = strings.TrimSpace(update.Voice)
 	}
@@ -262,10 +262,10 @@ func (s *realtimeAudioSession) appendAudio(encoded string) error {
 	trimmed := strings.TrimSpace(encoded)
 	payload, err := base64.StdEncoding.DecodeString(trimmed)
 	if err != nil {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
 	}
 	if len(payload) == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -285,7 +285,7 @@ func (s *realtimeAudioSession) commitAudio() error {
 	mode := s.cfg.TurnDetection.Mode
 	s.mu.Unlock()
 	if pendingAudio == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
 	}
 	if mode != modality.TurnDetectionManual {
 		return nil
@@ -299,7 +299,7 @@ func (s *realtimeAudioSession) commitAudio() error {
 func (s *realtimeAudioSession) setInputText(text string) error {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
 	}
 	s.mu.Lock()
 	s.pendingText = trimmed
@@ -313,7 +313,7 @@ func (s *realtimeAudioSession) createResponse(response *modality.AudioResponseCo
 	pendingAudio := s.pendingAudio
 	s.mu.Unlock()
 	if pendingText == "" && pendingAudio == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -382,7 +382,7 @@ func (s *realtimeAudioSession) start() error {
 	realtimeURL := s.adapter.url + "?model=" + url.QueryEscape(s.adapter.providerModel)
 	conn, _, err := dialer.DialContext(s.ctx, realtimeURL, headers)
 	if err != nil {
-		return httputil.ProviderTransportError(err, "OpenAI")
+		return apierror.ProviderTransportError(err, "OpenAI")
 	}
 
 	s.mu.Lock()
@@ -421,10 +421,10 @@ func (s *realtimeAudioSession) writeJSON(payload map[string]any) error {
 	conn := s.conn
 	s.mu.Unlock()
 	if conn == nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "", "OpenAI realtime session is not connected.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "", "OpenAI realtime session is not connected.")
 	}
 	if err := conn.WriteJSON(payload); err != nil {
-		return httputil.ProviderTransportError(err, "OpenAI")
+		return apierror.ProviderTransportError(err, "OpenAI")
 	}
 	return nil
 }

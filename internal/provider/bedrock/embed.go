@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -37,10 +37,10 @@ func NewEmbedAdapter(client *Client, model string) *EmbedAdapter {
 
 func (a *EmbedAdapter) Embed(ctx context.Context, req *modality.EmbedRequest) (*modality.EmbedResponse, error) {
 	if req.EncodingFormat != "" && req.EncodingFormat != "float" && req.EncodingFormat != "base64" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_encoding_format", "encoding_format", "Field 'encoding_format' must be 'float' or 'base64'.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_encoding_format", "encoding_format", "Field 'encoding_format' must be 'float' or 'base64'.")
 	}
 	if req.Dimensions != nil && *req.Dimensions != 256 && *req.Dimensions != 512 && *req.Dimensions != 1024 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_dimensions", "dimensions", "Amazon Titan Text Embeddings V2 only supports dimensions 256, 512, or 1024.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_dimensions", "dimensions", "Amazon Titan Text Embeddings V2 only supports dimensions 256, 512, or 1024.")
 	}
 
 	values := req.Input.Values()
@@ -60,7 +60,7 @@ func (a *EmbedAdapter) Embed(ctx context.Context, req *modality.EmbedRequest) (*
 			return nil, err
 		}
 		if len(response.Embedding) == 0 {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Amazon Bedrock returned an embedding response without embedding data.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Amazon Bedrock returned an embedding response without embedding data.")
 		}
 
 		usage.PromptTokens += response.InputTextTokenCount

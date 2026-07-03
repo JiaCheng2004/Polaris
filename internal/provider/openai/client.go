@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
@@ -48,7 +48,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("openai", nil),
+			Transport: obs.NewProviderTransport("openai", nil),
 		},
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
@@ -73,7 +73,7 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 		return c.apiError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -153,7 +153,7 @@ func (c *Client) apiError(resp *http.Response) error {
 	var parsed openAIErrorEnvelope
 	_ = json.Unmarshal(body, &parsed)
 
-	return httputil.ProviderAPIError("OpenAI", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("OpenAI", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: parsed.Error.Message,
 		Body:    string(body),
 		Code:    parsed.Error.Code,

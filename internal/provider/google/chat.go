@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -266,7 +266,7 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 		case "tool":
 			name := firstNonEmpty(message.Name, toolNamesByID[message.ToolCallID])
 			if name == "" {
-				return generateContentRequest{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_tool_name", "messages.name", "Tool messages for Google models must include a tool name or follow a matching assistant tool call.")
+				return generateContentRequest{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_tool_name", "messages.name", "Tool messages for Google models must include a tool name or follow a matching assistant tool call.")
 			}
 			text, err := contentToText(message.Content)
 			if err != nil {
@@ -287,7 +287,7 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 				},
 			})
 		default:
-			return generateContentRequest{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_role", "messages.role", "Unsupported message role.")
+			return generateContentRequest{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_role", "messages.role", "Unsupported message role.")
 		}
 	}
 
@@ -346,11 +346,11 @@ func (a *ChatAdapter) translateRequest(req *modality.ChatRequest) (generateConte
 			case "json_schema":
 				generationConfig.ResponseMimeType = "application/json"
 				if req.ResponseFormat.JSONSchema == nil || len(req.ResponseFormat.JSONSchema.Schema) == 0 {
-					return generateContentRequest{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_json_schema", "response_format", "json_schema response formats must include json_schema.schema.")
+					return generateContentRequest{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_json_schema", "response_format", "json_schema response formats must include json_schema.schema.")
 				}
 				var schema map[string]any
 				if err := json.Unmarshal(req.ResponseFormat.JSONSchema.Schema, &schema); err != nil {
-					return generateContentRequest{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json_schema", "response_format", "json_schema.schema must be valid JSON.")
+					return generateContentRequest{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json_schema", "response_format", "json_schema.schema must be valid JSON.")
 				}
 				generationConfig.ResponseSchema = schema
 			}
@@ -379,7 +379,7 @@ func translateGoogleHostedTool(spec *modality.HostedToolSpec) (googleTool, bool,
 	case "file_search":
 		return googleTool{FileSearch: &config}, true, nil
 	default:
-		return googleTool{}, false, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Google does not support the requested hosted tool.")
+		return googleTool{}, false, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Google does not support the requested hosted tool.")
 	}
 }
 
@@ -394,7 +394,7 @@ func translateToolChoice(raw json.RawMessage) (*googleToolConfig, error) {
 		case "none":
 			return &googleToolConfig{FunctionCallingConfig: googleFunctionCallingConfig{Mode: "NONE"}}, nil
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
 		}
 	}
 
@@ -405,10 +405,10 @@ func translateToolChoice(raw json.RawMessage) (*googleToolConfig, error) {
 		} `json:"function"`
 	}
 	if err := json.Unmarshal(raw, &objectChoice); err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "tool_choice must be a string or function selector object.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "tool_choice must be a string or function selector object.")
 	}
 	if objectChoice.Type != "function" || strings.TrimSpace(objectChoice.Function.Name) == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Function tool_choice must include function.name.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Function tool_choice must include function.name.")
 	}
 	return &googleToolConfig{
 		FunctionCallingConfig: googleFunctionCallingConfig{
@@ -433,7 +433,7 @@ func translateContentParts(content modality.MessageContent) ([]googlePart, error
 			parts = append(parts, googlePart{Text: part.Text})
 		case "image_url":
 			if part.ImageURL == nil || strings.TrimSpace(part.ImageURL.URL) == "" {
-				return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
+				return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
 			}
 			translated, err := translateImagePart(part.ImageURL.URL)
 			if err != nil {
@@ -442,7 +442,7 @@ func translateContentParts(content modality.MessageContent) ([]googlePart, error
 			parts = append(parts, translated)
 		case "input_audio":
 			if part.InputAudio == nil || strings.TrimSpace(part.InputAudio.Data) == "" || strings.TrimSpace(part.InputAudio.Format) == "" {
-				return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "messages.content.input_audio", "Audio content must include input_audio.data and input_audio.format.")
+				return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "messages.content.input_audio", "Audio content must include input_audio.data and input_audio.format.")
 			}
 			parts = append(parts, googlePart{
 				InlineData: &googleBlob{
@@ -457,7 +457,7 @@ func translateContentParts(content modality.MessageContent) ([]googlePart, error
 			}
 			parts = append(parts, translated)
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 	return parts, nil
@@ -469,7 +469,7 @@ func translateFilePart(part modality.ContentPart) (googlePart, error) {
 		filePart = part.Document
 	}
 	if filePart == nil {
-		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
+		return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
 	}
 	mimeType := firstNonEmpty(filePart.MimeType, "application/octet-stream")
 	switch {
@@ -480,7 +480,7 @@ func translateFilePart(part modality.ContentPart) (googlePart, error) {
 	case strings.TrimSpace(filePart.URL) != "":
 		return googlePart{FileData: &googleBlob{MimeType: mimeType, FileURI: strings.TrimSpace(filePart.URL)}}, nil
 	default:
-		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
+		return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
 	}
 }
 
@@ -488,7 +488,7 @@ func translateImagePart(raw string) (googlePart, error) {
 	if strings.HasPrefix(raw, "data:") {
 		header, data, ok := strings.Cut(strings.TrimPrefix(raw, "data:"), ",")
 		if !ok {
-			return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
+			return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
 		}
 		mediaType := "image/png"
 		if value, _, _ := strings.Cut(header, ";"); value != "" {
@@ -520,7 +520,7 @@ func contentToText(content modality.MessageContent) (string, error) {
 	var parts []string
 	for _, part := range content.Parts {
 		if part.Type != "text" {
-			return "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
+			return "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
 		}
 		parts = append(parts, part.Text)
 	}

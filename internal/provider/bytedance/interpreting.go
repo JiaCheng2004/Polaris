@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	eventpb "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/common/event"
 	rpcmetapb "github.com/JiaCheng2004/Polaris/internal/provider/bytedance/astpb/common/rpcmeta"
@@ -75,10 +75,10 @@ func NewInterpretingAdapter(client *Client, model string, endpoint string) modal
 
 func (a *interpretingAdapter) ConnectInterpreting(ctx context.Context, cfg *modality.InterpretingSessionConfig) (modality.InterpretingSession, error) {
 	if a == nil || a.client == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Interpreting adapter is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Interpreting adapter is unavailable.")
 	}
 	if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance simultaneous interpretation requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance simultaneous interpretation requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {
@@ -109,13 +109,13 @@ func (a *interpretingAdapter) normalizeConfig(cfg *modality.InterpretingSessionC
 		normalized.Mode = modality.InterpretingModeSpeechToSpeech
 	case modality.InterpretingModeSpeechToText:
 	default:
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_mode", "mode", "Supported interpreting modes are speech_to_speech and speech_to_text.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_mode", "mode", "Supported interpreting modes are speech_to_speech and speech_to_text.")
 	}
 	if strings.TrimSpace(normalized.SourceLanguage) == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_language", "source_language", "Field 'source_language' is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_language", "source_language", "Field 'source_language' is required.")
 	}
 	if strings.TrimSpace(normalized.TargetLanguage) == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_target_language", "target_language", "Field 'target_language' is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_target_language", "target_language", "Field 'target_language' is required.")
 	}
 	if strings.TrimSpace(normalized.InputAudioFormat) == "" {
 		normalized.InputAudioFormat = modality.InterpretingAudioFormatPCM16
@@ -123,13 +123,13 @@ func (a *interpretingAdapter) normalizeConfig(cfg *modality.InterpretingSessionC
 	switch normalized.InputAudioFormat {
 	case modality.InterpretingAudioFormatPCM16, modality.InterpretingAudioFormatWAV:
 	default:
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Supported input audio formats are pcm16 and wav.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Supported input audio formats are pcm16 and wav.")
 	}
 	if normalized.InputSampleRateHz == 0 {
 		normalized.InputSampleRateHz = 16000
 	}
 	if normalized.InputSampleRateHz != 16000 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_sample_rate", "input_audio_format", "ByteDance simultaneous interpretation input must be 16000 Hz.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_sample_rate", "input_audio_format", "ByteDance simultaneous interpretation input must be 16000 Hz.")
 	}
 	if normalized.Mode == modality.InterpretingModeSpeechToSpeech {
 		if strings.TrimSpace(normalized.OutputAudioFormat) == "" {
@@ -138,7 +138,7 @@ func (a *interpretingAdapter) normalizeConfig(cfg *modality.InterpretingSessionC
 		switch normalized.OutputAudioFormat {
 		case modality.InterpretingAudioFormatPCM16, modality.InterpretingAudioFormatOpus:
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Supported output audio formats are pcm16 and ogg_opus.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Supported output audio formats are pcm16 and ogg_opus.")
 		}
 		if normalized.OutputSampleRateHz == 0 {
 			if normalized.OutputAudioFormat == modality.InterpretingAudioFormatOpus {
@@ -148,10 +148,10 @@ func (a *interpretingAdapter) normalizeConfig(cfg *modality.InterpretingSessionC
 			}
 		}
 		if normalized.OutputAudioFormat == modality.InterpretingAudioFormatPCM16 && normalized.OutputSampleRateHz != 16000 {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_sample_rate", "output_sample_rate_hz", "PCM16 interpreting output only supports 16000 Hz.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_sample_rate", "output_sample_rate_hz", "PCM16 interpreting output only supports 16000 Hz.")
 		}
 		if normalized.OutputAudioFormat == modality.InterpretingAudioFormatOpus && normalized.OutputSampleRateHz != 48000 {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_sample_rate", "output_sample_rate_hz", "Ogg Opus interpreting output only supports 48000 Hz.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_sample_rate", "output_sample_rate_hz", "Ogg Opus interpreting output only supports 48000 Hz.")
 		}
 	} else {
 		normalized.OutputAudioFormat = ""
@@ -172,11 +172,11 @@ func (s *interpretingSession) Send(event modality.InterpretingClientEvent) error
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Interpreting session is closed.")
+		return apierror.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Interpreting session is closed.")
 	}
 	if s.committed && event.Type != modality.InterpretingClientEventSessionClose {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "session_committed", "", "Interpreting session has already been committed.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "session_committed", "", "Interpreting session has already been committed.")
 	}
 	s.mu.Unlock()
 
@@ -190,7 +190,7 @@ func (s *interpretingSession) Send(event modality.InterpretingClientEvent) error
 	case modality.InterpretingClientEventSessionClose:
 		return s.Close()
 	default:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown interpreting client event type.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown interpreting client event type.")
 	}
 }
 
@@ -221,7 +221,7 @@ func (s *interpretingSession) updateSession(update *modality.InterpretingSession
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.started {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "session_config_immutable", "session", "Interpreting session configuration cannot be changed after the provider session starts.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "session_config_immutable", "session", "Interpreting session configuration cannot be changed after the provider session starts.")
 	}
 	if strings.TrimSpace(update.Mode) != "" {
 		s.cfg.Mode = strings.TrimSpace(update.Mode)
@@ -264,10 +264,10 @@ func (s *interpretingSession) updateSession(update *modality.InterpretingSession
 func (s *interpretingSession) appendAudio(encoded string) error {
 	payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 	if err != nil {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
 	}
 	if len(payload) == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -304,7 +304,7 @@ func (s *interpretingSession) commitAudio() error {
 	}
 	s.mu.Unlock()
 	if pending == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -350,12 +350,12 @@ func (s *interpretingSession) start() error {
 
 	target, err := url.Parse(s.adapter.streamURL())
 	if err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance interpreting websocket URL is invalid.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance interpreting websocket URL is invalid.")
 	}
 
 	conn, _, err := websocket.DefaultDialer.DialContext(s.ctx, target.String(), headers)
 	if err != nil {
-		return httputil.ProviderTransportError(err, "ByteDance")
+		return apierror.ProviderTransportError(err, "ByteDance")
 	}
 	s.mu.Lock()
 	s.conn = conn
@@ -369,7 +369,7 @@ func (s *interpretingSession) start() error {
 	}
 	inputRate, err := safeconv.Int32FromInt("interpreting input sample rate", s.cfg.InputSampleRateHz)
 	if err != nil {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "input_sample_rate", err.Error())
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "input_sample_rate", err.Error())
 	}
 	startRequest := &astpb.TranslateRequest{
 		RequestMeta: &rpcmetapb.RequestMeta{
@@ -405,7 +405,7 @@ func (s *interpretingSession) start() error {
 	if s.cfg.Mode == modality.InterpretingModeSpeechToSpeech {
 		outputRate, err := safeconv.Int32FromInt("interpreting output sample rate", s.cfg.OutputSampleRateHz)
 		if err != nil {
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "output_sample_rate", err.Error())
+			return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_sample_rate", "output_sample_rate", err.Error())
 		}
 		startRequest.TargetAudio = &basepb.Audio{
 			Format:  providerInterpretingOutputFormat(s.cfg.OutputAudioFormat),
@@ -426,9 +426,9 @@ func (s *interpretingSession) start() error {
 	case err := <-s.startReady:
 		return err
 	case <-time.After(interpretingReadyTimeout):
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance simultaneous interpretation session did not start in time.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance simultaneous interpretation session did not start in time.")
 	case <-s.ctx.Done():
-		return httputil.ProviderTransportError(s.ctx.Err(), "ByteDance")
+		return apierror.ProviderTransportError(s.ctx.Err(), "ByteDance")
 	}
 }
 
@@ -449,7 +449,7 @@ func (s *interpretingSession) readLoop() {
 				return
 			default:
 			}
-			s.failStart(httputil.ProviderTransportError(err, "ByteDance"))
+			s.failStart(apierror.ProviderTransportError(err, "ByteDance"))
 			s.emitError("provider_transport_error", "provider_transport_error", "ByteDance interpreting websocket connection failed.")
 			return
 		}
@@ -458,7 +458,7 @@ func (s *interpretingSession) readLoop() {
 		}
 		response := &astpb.TranslateResponse{}
 		if err := proto.Unmarshal(payload, response); err != nil {
-			s.failStart(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance interpreting websocket returned an invalid protobuf frame."))
+			s.failStart(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance interpreting websocket returned an invalid protobuf frame."))
 			s.emitError("provider_invalid_response", "provider_invalid_response", "ByteDance interpreting websocket returned an invalid protobuf frame.")
 			return
 		}
@@ -471,7 +471,7 @@ func (s *interpretingSession) handleResponse(response *astpb.TranslateResponse) 
 		return
 	}
 	if meta := response.GetResponseMeta(); meta != nil && !interpretingStatusOK(meta.GetStatusCode()) {
-		err := httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmptyString(strings.TrimSpace(meta.GetMessage()), "ByteDance simultaneous interpretation failed."))
+		err := apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmptyString(strings.TrimSpace(meta.GetMessage()), "ByteDance simultaneous interpretation failed."))
 		s.failStart(err)
 		s.emitError("provider_error", "provider_error", firstNonEmptyString(meta.GetMessage(), "ByteDance simultaneous interpretation failed."))
 		return
@@ -556,7 +556,7 @@ func (s *interpretingSession) handleResponse(response *astpb.TranslateResponse) 
 		if meta := response.GetResponseMeta(); meta != nil && strings.TrimSpace(meta.GetMessage()) != "" {
 			errMessage = strings.TrimSpace(meta.GetMessage())
 		}
-		s.failStart(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", errMessage))
+		s.failStart(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", errMessage))
 		s.emitError("provider_error", "provider_error", errMessage)
 	}
 }
@@ -583,16 +583,16 @@ func (s *interpretingSession) emitError(errType string, code string, message str
 func (s *interpretingSession) writeProto(message proto.Message) error {
 	payload, err := proto.Marshal(message)
 	if err != nil {
-		return httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode interpreting request.")
+		return apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode interpreting request.")
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
 	conn := s.currentConn()
 	if conn == nil {
-		return httputil.NewError(http.StatusGone, "provider_error", "provider_transport_error", "", "Interpreting session connection is closed.")
+		return apierror.NewError(http.StatusGone, "provider_error", "provider_transport_error", "", "Interpreting session connection is closed.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, payload); err != nil {
-		return httputil.ProviderTransportError(err, "ByteDance")
+		return apierror.ProviderTransportError(err, "ByteDance")
 	}
 	return nil
 }

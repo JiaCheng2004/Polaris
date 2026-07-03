@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
@@ -27,7 +27,7 @@ func NewFilesAdapter(client *Client, provider string) *FilesAdapter {
 
 func (a *FilesAdapter) Upload(ctx context.Context, req *modality.FileUploadRequest) (*modality.ProviderFileHandle, error) {
 	if req == nil || req.Body == nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File body is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File body is required.")
 	}
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -56,7 +56,7 @@ func (a *FilesAdapter) Upload(ctx context.Context, req *modality.FileUploadReque
 func (a *FilesAdapter) Get(ctx context.Context, providerFileID string) (*modality.ProviderFileHandle, error) {
 	name := googleFileName(providerFileID)
 	if name == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
 	}
 	var response googleFileEnvelope
 	if err := a.jsonRequest(ctx, http.MethodGet, "/v1beta/"+name, nil, &response); err != nil {
@@ -68,14 +68,14 @@ func (a *FilesAdapter) Get(ctx context.Context, providerFileID string) (*modalit
 func (a *FilesAdapter) Delete(ctx context.Context, providerFileID string) error {
 	name := googleFileName(providerFileID)
 	if name == "" {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
 	}
 	return a.jsonRequest(ctx, http.MethodDelete, "/v1beta/"+name, nil, nil)
 }
 
 func (a *FilesAdapter) Materialize(ctx context.Context, req *modality.FileMaterializeRequest) (*modality.ProviderFileHandle, error) {
 	if req == nil || len(req.InlineSrc) == 0 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_bytes", "file", "Google file materialization requires file bytes.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_bytes", "file", "Google file materialization requires file bytes.")
 	}
 	return a.Upload(ctx, &modality.FileUploadRequest{
 		Body:     bytes.NewReader(req.InlineSrc),
@@ -152,7 +152,7 @@ func (a *FilesAdapter) startResumableUpload(ctx context.Context, filename string
 	}
 	uploadURL := strings.TrimSpace(resp.Header.Get("X-Goog-Upload-URL"))
 	if uploadURL == "" {
-		return "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google did not return a resumable upload URL.")
+		return "", apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google did not return a resumable upload URL.")
 	}
 	return uploadURL, nil
 }
@@ -178,7 +178,7 @@ func (a *FilesAdapter) finalizeResumableUpload(ctx context.Context, uploadURL st
 	}
 	var response googleFileEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return googleFileEnvelope{}, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an invalid file response.")
+		return googleFileEnvelope{}, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an invalid file response.")
 	}
 	return response, nil
 }
@@ -213,7 +213,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an invalid file response.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an invalid file response.")
 		}
 	}
 	return nil

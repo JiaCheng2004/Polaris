@@ -14,7 +14,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/tooling"
 	"github.com/gin-gonic/gin"
@@ -42,7 +42,7 @@ func NewMCPHandler(runtime *gwruntime.Holder, appStore store.Store, tools *tooli
 }
 
 func (h *MCPHandler) Serve(c *gin.Context) {
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "mcp.broker")
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "mcp.broker")
 	defer span.End()
 	c.Request = c.Request.WithContext(ctx)
 
@@ -123,7 +123,7 @@ func (h *MCPHandler) Serve(c *gin.Context) {
 }
 
 func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) error {
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "mcp.proxy",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "mcp.proxy",
 		attribute.String("polaris.mcp_binding_id", binding.ID),
 		attribute.String("polaris.mcp_binding_kind", string(binding.Kind)),
 	)
@@ -131,7 +131,7 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 
 	targetURL, err := url.Parse(strings.TrimRight(binding.UpstreamURL, "/") + c.Param("path"))
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadGateway, "provider_error", "mcp_proxy_url_invalid", "binding_id", "Configured MCP upstream URL is invalid.")
 	}
 	targetURL.RawQuery = c.Request.URL.RawQuery
@@ -140,7 +140,7 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 	if c.Request.Body != nil {
 		payload, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			telemetry.RecordSpanError(span, err)
+			obs.RecordSpanError(span, err)
 			if httputil.IsRequestBodyTooLarge(err) {
 				return httputil.RequestBodyTooLargeError(0)
 			}
@@ -151,18 +151,18 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 
 	req, err := http.NewRequestWithContext(ctx, c.Request.Method, targetURL.String(), body)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadGateway, "provider_error", "mcp_proxy_build_failed", "", "Unable to build MCP upstream request.")
 	}
 	copyMCPProxyHeaders(req.Header, c.Request.Header)
 	for key, value := range parseStringMap(binding.HeadersJSON) {
 		req.Header.Set(key, value)
 	}
-	telemetry.InjectHTTPHeaders(ctx, req.Header)
+	obs.InjectHTTPHeaders(ctx, req.Header)
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadGateway, "provider_error", "mcp_proxy_failed", "", "Unable to reach the configured MCP upstream.")
 	}
 	defer func() {
@@ -181,7 +181,7 @@ func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) err
 }
 
 func (h *MCPHandler) serveLocalToolset(c *gin.Context, binding store.MCPBinding) error {
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "mcp.local_toolset",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "mcp.local_toolset",
 		attribute.String("polaris.mcp_binding_id", binding.ID),
 		attribute.String("polaris.mcp_binding_kind", string(binding.Kind)),
 		attribute.String("polaris.toolset_id", binding.ToolsetID),
@@ -212,7 +212,7 @@ func (h *MCPHandler) serveLocalToolset(c *gin.Context, binding store.MCPBinding)
 	}
 	toolset, err := h.store.GetToolset(c.Request.Context(), binding.ToolsetID)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_toolset", "binding_id", "Referenced toolset was not found.")
 	}
 

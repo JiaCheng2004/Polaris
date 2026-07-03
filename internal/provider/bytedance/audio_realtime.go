@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
@@ -230,16 +230,16 @@ func newRealtimeAudioAdapter(client *Client, model string, modelCfg config.Model
 
 func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
 	if a == nil || a.client == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
 	}
 	switch a.authMode {
 	case realtimeAuthAPIKey:
 		if strings.TrimSpace(a.client.speechAPIKey) == "" {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio with realtime_session.auth=api_key requires providers.bytedance.speech_api_key.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio with realtime_session.auth=api_key requires providers.bytedance.speech_api_key.")
 		}
 	default:
 		if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 		}
 	}
 	normalized, err := a.normalizeConfig(cfg)
@@ -276,13 +276,13 @@ func (a *realtimeAudioAdapter) normalizeConfig(cfg *modality.AudioSessionConfig)
 		normalized.SampleRateHz = 16000
 	}
 	if normalized.SampleRateHz != 16000 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if normalized.InputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if normalized.OutputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if normalized.TurnDetection == nil {
 		normalized.TurnDetection = &modality.TurnDetectionConfig{Mode: modality.TurnDetectionManual}
@@ -292,7 +292,7 @@ func (a *realtimeAudioAdapter) normalizeConfig(cfg *modality.AudioSessionConfig)
 		mode = modality.TurnDetectionManual
 	}
 	if _, ok := a.turnModes[mode]; !ok {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 	}
 	normalized.TurnDetection.Mode = mode
 	return &normalized, nil
@@ -302,7 +302,7 @@ func (s *realtimeAudioSession) Send(event modality.AudioClientEvent) error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Audio session is closed.")
+		return apierror.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Audio session is closed.")
 	}
 	s.mu.Unlock()
 
@@ -322,7 +322,7 @@ func (s *realtimeAudioSession) Send(event modality.AudioClientEvent) error {
 	case modality.AudioClientEventSessionClose:
 		return s.Close()
 	default:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown audio client event type.")
 	}
 }
 
@@ -356,19 +356,19 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 	s.mu.Lock()
 	if strings.TrimSpace(update.Model) != "" && strings.TrimSpace(update.Model) != strings.TrimSpace(s.cfg.Model) {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Audio session model cannot be changed after creation.")
 	}
 	if update.InputAudioFormat != "" && update.InputAudioFormat != modality.AudioFormatPCM16 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if update.OutputAudioFormat != "" && update.OutputAudioFormat != modality.AudioFormatPCM16 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_output_audio_format", "output_audio_format", "Only pcm16 output audio is supported.")
 	}
 	if update.SampleRateHz != 0 && update.SampleRateHz != 16000 {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz audio sessions are supported.")
 	}
 	if update.TurnDetection != nil {
 		mode := strings.TrimSpace(update.TurnDetection.Mode)
@@ -377,11 +377,11 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 		}
 		if _, ok := s.adapter.turnModes[mode]; !ok {
 			s.mu.Unlock()
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
+			return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_turn_detection", "turn_detection.mode", "Requested turn detection mode is not supported by this model.")
 		}
 		if s.started && mode != s.cfg.TurnDetection.Mode {
 			s.mu.Unlock()
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "turn_detection_immutable", "turn_detection.mode", "Turn detection mode cannot be changed after the native realtime session starts.")
+			return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "turn_detection_immutable", "turn_detection.mode", "Turn detection mode cannot be changed after the native realtime session starts.")
 		}
 		s.cfg.TurnDetection = &modality.TurnDetectionConfig{
 			Mode:            mode,
@@ -425,10 +425,10 @@ func (s *realtimeAudioSession) updateSession(update *modality.AudioSessionConfig
 func (s *realtimeAudioSession) appendAudio(encoded string) error {
 	payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 	if err != nil {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
 	}
 	if len(payload) == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -448,7 +448,7 @@ func (s *realtimeAudioSession) commitAudio() error {
 	mode := s.cfg.TurnDetection.Mode
 	s.mu.Unlock()
 	if pendingAudio == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
 	}
 	if mode != modality.TurnDetectionManual {
 		return nil
@@ -463,7 +463,7 @@ func (s *realtimeAudioSession) commitAudio() error {
 func (s *realtimeAudioSession) setInputText(text string) error {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_text", "text", "Input text must not be empty.")
 	}
 	s.mu.Lock()
 	s.pendingText = trimmed
@@ -476,7 +476,7 @@ func (s *realtimeAudioSession) createResponse(response *modality.AudioResponseCo
 	pendingText := strings.TrimSpace(s.pendingText)
 	s.mu.Unlock()
 	if pendingText == "" {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_turn_input", "", "No pending audio or text input is available for response generation.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
@@ -530,7 +530,7 @@ func (s *realtimeAudioSession) ensureStarted() error {
 	case <-s.ctx.Done():
 		return s.ctx.Err()
 	case <-time.After(realtimeReadyTimeout):
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance realtime audio session did not start in time.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance realtime audio session did not start in time.")
 	case err := <-s.startReady:
 		return err
 	}
@@ -542,7 +542,7 @@ func (s *realtimeAudioSession) start() error {
 		wsURL = defaultRealtimeDialogueURL
 	}
 	if _, err := url.Parse(wsURL); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance realtime audio URL is invalid.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance realtime audio URL is invalid.")
 	}
 	headers := http.Header{}
 	headers.Set("X-Api-Resource-Id", s.adapter.resourceID)
@@ -562,7 +562,7 @@ func (s *realtimeAudioSession) start() error {
 	conn, resp, err := dialer.DialContext(s.ctx, wsURL, headers)
 	if err != nil {
 		if resp != nil && resp.StatusCode > 0 {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", fmt.Sprintf("ByteDance realtime audio handshake failed with status %d.", resp.StatusCode))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", fmt.Sprintf("ByteDance realtime audio handshake failed with status %d.", resp.StatusCode))
 		}
 		return translateTransportError(err, "ByteDance")
 	}
@@ -640,8 +640,8 @@ func (s *realtimeAudioSession) readLoop(conn *websocket.Conn) {
 				return
 			default:
 			}
-			s.emitError(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection closed unexpectedly."))
-			s.signalStart(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection closed unexpectedly."))
+			s.emitError(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection closed unexpectedly."))
+			s.signalStart(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection closed unexpectedly."))
 			return
 		}
 		if messageType != websocket.BinaryMessage {
@@ -649,8 +649,8 @@ func (s *realtimeAudioSession) readLoop(conn *websocket.Conn) {
 		}
 		frame, err := decodeDialogFrame(payload)
 		if err != nil {
-			s.emitError(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid realtime audio frame."))
-			s.signalStart(httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid realtime audio frame."))
+			s.emitError(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid realtime audio frame."))
+			s.signalStart(apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid realtime audio frame."))
 			return
 		}
 		if err := s.handleFrame(frame); err != nil {
@@ -696,7 +696,7 @@ func (s *realtimeAudioSession) handleJSONEvent(eventID uint32, payload []byte) e
 		var started realtimeSessionStartedPayload
 		if len(payload) > 0 {
 			if err := json.Unmarshal(payload, &started); err != nil {
-				return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid SessionStarted payload.")
+				return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid SessionStarted payload.")
 			}
 		}
 		s.mu.Lock()
@@ -743,7 +743,7 @@ func (s *realtimeAudioSession) handleTTSStart(payload []byte) error {
 	var data realtimeTTSStartPayload
 	if len(payload) > 0 {
 		if err := json.Unmarshal(payload, &data); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTSSentenceStart payload.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTSSentenceStart payload.")
 		}
 	}
 	s.mu.Lock()
@@ -758,7 +758,7 @@ func (s *realtimeAudioSession) handleTTSStart(payload []byte) error {
 func (s *realtimeAudioSession) handleASRResponse(payload []byte) error {
 	var data realtimeASRPayload
 	if err := json.Unmarshal(payload, &data); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid ASR payload.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid ASR payload.")
 	}
 	var latest string
 	for _, result := range data.Results {
@@ -796,7 +796,7 @@ func (s *realtimeAudioSession) handleASREnded() error {
 func (s *realtimeAudioSession) handleChatResponse(payload []byte) error {
 	var data realtimeChatPayload
 	if err := json.Unmarshal(payload, &data); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid chat response payload.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid chat response payload.")
 	}
 	content := data.Content
 	if content == "" {
@@ -829,7 +829,7 @@ func (s *realtimeAudioSession) handleChatEnded(payload []byte) error {
 	var data realtimeEndedPayload
 	if len(payload) > 0 {
 		if err := json.Unmarshal(payload, &data); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid ChatEnded payload.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid ChatEnded payload.")
 		}
 	}
 	s.mu.Lock()
@@ -878,7 +878,7 @@ func (s *realtimeAudioSession) handleTTSEnded(payload []byte) error {
 	var data realtimeEndedPayload
 	if len(payload) > 0 {
 		if err := json.Unmarshal(payload, &data); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTSEnded payload.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTSEnded payload.")
 		}
 	}
 
@@ -913,7 +913,7 @@ func (s *realtimeAudioSession) handleTTSEnded(payload []byte) error {
 func (s *realtimeAudioSession) handleUsage(payload []byte) error {
 	var data realtimeUsagePayload
 	if err := json.Unmarshal(payload, &data); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid usage payload.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid usage payload.")
 	}
 	usage := modality.AudioUsage{
 		InputTextTokens:  data.Usage.InputTextTokens + data.Usage.CachedTextTokens,
@@ -1010,7 +1010,7 @@ func (s *realtimeAudioSession) writeFrame(frame []byte) error {
 	conn := s.conn
 	s.mu.Unlock()
 	if conn == nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection is not available.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance realtime audio connection is not available.")
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
@@ -1041,9 +1041,9 @@ func (s *realtimeAudioSession) emit(event modality.AudioServerEvent) {
 }
 
 func (s *realtimeAudioSession) emitError(err error) {
-	apiErr, ok := err.(*httputil.APIError)
+	apiErr, ok := err.(*apierror.APIError)
 	if !ok {
-		apiErr = httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", err.Error())
+		apiErr = apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", err.Error())
 	}
 	s.emit(modality.AudioServerEvent{
 		Type:    modality.AudioServerEventError,
@@ -1073,7 +1073,7 @@ func (s *realtimeAudioSession) parseRealtimeError(payload []byte, fallback strin
 	if code == "" {
 		code = "provider_realtime_error"
 	}
-	return httputil.NewError(http.StatusBadGateway, "provider_error", code, "", message)
+	return apierror.NewError(http.StatusBadGateway, "provider_error", code, "", message)
 }
 
 func (s *realtimeAudioSession) dialogueErrorFromFrame(frame dialogFrame) error {
@@ -1092,7 +1092,7 @@ func (s *realtimeAudioSession) dialogueErrorFromFrame(frame dialogFrame) error {
 	if frame.Code != nil && *frame.Code != 0 {
 		code = fmt.Sprintf("provider_realtime_error_%d", *frame.Code)
 	}
-	return httputil.NewError(http.StatusBadGateway, "provider_error", code, "", message)
+	return apierror.NewError(http.StatusBadGateway, "provider_error", code, "", message)
 }
 
 func (s *realtimeAudioSession) ensureCurrentTurnLocked(replyID string, questionID string) *realtimeTurnState {

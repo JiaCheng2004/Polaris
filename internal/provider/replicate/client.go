@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
 )
 
@@ -48,7 +48,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		apiKey:  strings.TrimSpace(cfg.APIKey),
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("replicate", nil),
+			Transport: obs.NewProviderTransport("replicate", nil),
 		},
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
@@ -72,7 +72,7 @@ func (c *Client) JSON(ctx context.Context, method string, path string, body any,
 		return nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -86,7 +86,7 @@ func (c *Client) Download(ctx context.Context, rawURL string) (*http.Response, e
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, httputil.ProviderTransportError(err, "Replicate")
+		return nil, apierror.ProviderTransportError(err, "Replicate")
 	}
 	return resp, nil
 }
@@ -136,7 +136,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body any, e
 					continue
 				}
 			}
-			return nil, httputil.ProviderTransportError(err, "Replicate")
+			return nil, apierror.ProviderTransportError(err, "Replicate")
 		}
 		if openaicompat.RetryableStatus(resp.StatusCode) && attempt < attempts {
 			_, _ = io.Copy(io.Discard, resp.Body)
@@ -148,7 +148,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body any, e
 		return resp, nil
 	}
 
-	return nil, httputil.ProviderTransportError(lastErr, "Replicate")
+	return nil, apierror.ProviderTransportError(lastErr, "Replicate")
 }
 
 func (c *Client) apiError(resp *http.Response) error {
@@ -179,7 +179,7 @@ func (c *Client) apiError(resp *http.Response) error {
 		message = "Replicate returned an error."
 	}
 
-	return httputil.ProviderAPIError("Replicate", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("Replicate", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Type:    parsed.Type,

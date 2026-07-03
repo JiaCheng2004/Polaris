@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	awsstream "github.com/JiaCheng2004/Polaris/internal/provider/common/aws"
 )
@@ -292,7 +292,7 @@ func (a *ChatAdapter) translateRequest(ctx context.Context, req *modality.ChatRe
 				}},
 			})
 		default:
-			return converseRequest{}, "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_message_role", "messages.role", "Unsupported chat message role for Amazon Bedrock.")
+			return converseRequest{}, "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_message_role", "messages.role", "Unsupported chat message role for Amazon Bedrock.")
 		}
 	}
 
@@ -338,7 +338,7 @@ func translateTools(tools []modality.ToolDefinition, rawChoice json.RawMessage) 
 		case "none":
 			return nil, nil
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
 		}
 		return config, nil
 	}
@@ -350,10 +350,10 @@ func translateTools(tools []modality.ToolDefinition, rawChoice json.RawMessage) 
 		} `json:"function"`
 	}
 	if err := json.Unmarshal(rawChoice, &objectChoice); err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "tool_choice must be a string or function selector object.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "tool_choice must be a string or function selector object.")
 	}
 	if objectChoice.Type != "function" || strings.TrimSpace(objectChoice.Function.Name) == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Function tool_choice must include function.name.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Function tool_choice must include function.name.")
 	}
 	config.ToolChoice = map[string]any{
 		"tool": map[string]any{
@@ -378,7 +378,7 @@ func (a *ChatAdapter) translateContentBlocks(ctx context.Context, content modali
 			blocks = append(blocks, bedrockContentBlock{Text: part.Text})
 		case "image_url":
 			if part.ImageURL == nil || strings.TrimSpace(part.ImageURL.URL) == "" {
-				return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
+				return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
 			}
 			image, err := a.translateImagePart(ctx, part.ImageURL.URL)
 			if err != nil {
@@ -386,7 +386,7 @@ func (a *ChatAdapter) translateContentBlocks(ctx context.Context, content modali
 			}
 			blocks = append(blocks, bedrockContentBlock{Image: image})
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 	return blocks, nil
@@ -396,7 +396,7 @@ func (a *ChatAdapter) translateImagePart(ctx context.Context, raw string) (*bedr
 	if strings.HasPrefix(raw, "data:") {
 		mimeType, data, err := decodeDataURI(raw)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
 		}
 		format, err := bedrockImageFormat(mimeType)
 		if err != nil {
@@ -426,17 +426,17 @@ func (a *ChatAdapter) translateImagePart(ctx context.Context, raw string) (*bedr
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
 		}
 		defer func() {
 			_ = resp.Body.Close()
 		}()
 		if resp.StatusCode >= http.StatusBadRequest {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
 		}
 		data, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to read the input image.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to read the input image.")
 		}
 		mimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 		if mimeType == "" {
@@ -451,7 +451,7 @@ func (a *ChatAdapter) translateImagePart(ctx context.Context, raw string) (*bedr
 			Source: bedrockImageSource{Bytes: base64.StdEncoding.EncodeToString(data)},
 		}, nil
 	}
-	return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_reference", "messages.content.image_url.url", "Amazon Bedrock image inputs must be data URIs, S3 URIs, or reachable HTTP URLs.")
+	return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_reference", "messages.content.image_url.url", "Amazon Bedrock image inputs must be data URIs, S3 URIs, or reachable HTTP URLs.")
 }
 
 func (a *ChatAdapter) translateResponse(response converseResponse, canonicalModel string) (*modality.ChatResponse, error) {
@@ -512,19 +512,19 @@ func (a *ChatAdapter) decodeStream(r io.Reader, canonicalModel string, dst chan<
 		}
 
 		if event.ValidationException != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ValidationException.Message, "Amazon Bedrock stream validation failed."))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ValidationException.Message, "Amazon Bedrock stream validation failed."))
 		}
 		if event.ThrottlingException != nil {
-			return httputil.NewError(http.StatusTooManyRequests, "provider_error", "provider_rate_limited", "", firstNonEmpty(event.ThrottlingException.Message, "Amazon Bedrock rate limited the request."))
+			return apierror.NewError(http.StatusTooManyRequests, "provider_error", "provider_rate_limited", "", firstNonEmpty(event.ThrottlingException.Message, "Amazon Bedrock rate limited the request."))
 		}
 		if event.ModelStreamErrorException != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ModelStreamErrorException.Message, "Amazon Bedrock stream failed."))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ModelStreamErrorException.Message, "Amazon Bedrock stream failed."))
 		}
 		if event.InternalServerException != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.InternalServerException.Message, "Amazon Bedrock stream failed."))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.InternalServerException.Message, "Amazon Bedrock stream failed."))
 		}
 		if event.ServiceUnavailableException != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ServiceUnavailableException.Message, "Amazon Bedrock stream failed."))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", firstNonEmpty(event.ServiceUnavailableException.Message, "Amazon Bedrock stream failed."))
 		}
 
 		if event.MessageStart != nil {
@@ -656,7 +656,7 @@ func contentToText(content modality.MessageContent) (string, error) {
 	var parts []string
 	for _, part := range content.Parts {
 		if part.Type != "text" {
-			return "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
+			return "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
 		}
 		parts = append(parts, part.Text)
 	}
@@ -696,7 +696,7 @@ func bedrockImageFormat(mediaType string) (string, error) {
 	case "image/jpeg", "image/jpg":
 		return "jpeg", nil
 	default:
-		return "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_format", "messages.content.image_url.url", "Amazon Bedrock only supports PNG and JPEG chat image inputs.")
+		return "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_format", "messages.content.image_url.url", "Amazon Bedrock only supports PNG and JPEG chat image inputs.")
 	}
 }
 

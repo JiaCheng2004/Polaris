@@ -1,4 +1,4 @@
-package httputil
+package apierror
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// ProviderErrorDetails carries the fields a provider adapter parses out of an
+// upstream error response, to be normalized into a canonical APIError.
 type ProviderErrorDetails struct {
 	Message string
 	Body    string
@@ -17,6 +19,8 @@ type ProviderErrorDetails struct {
 	Status  string
 }
 
+// ProviderAPIError maps an upstream provider error (status + parsed details)
+// onto the canonical Polaris error taxonomy.
 func ProviderAPIError(providerName string, status int, details ProviderErrorDetails) *APIError {
 	message := firstNonEmptyText(details.Message, details.Body)
 	if message == "" {
@@ -44,6 +48,7 @@ func ProviderAPIError(providerName string, status int, details ProviderErrorDeta
 	}
 }
 
+// ProviderAuthError builds a canonical provider auth-failure error.
 func ProviderAuthError(providerName string, message string) *APIError {
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -52,6 +57,8 @@ func ProviderAuthError(providerName string, message string) *APIError {
 	return NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
 }
 
+// ProviderTransportError classifies a transport-level failure (timeout vs
+// generic transport error) into a canonical Polaris error.
 func ProviderTransportError(err error, providerName string) *APIError {
 	if err == nil {
 		return NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", strings.TrimSpace(providerName)+" request failed.")

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -63,7 +63,7 @@ func (a *BatchAdapter) Output(ctx context.Context, providerJobID string) (io.Rea
 		return nil, err
 	}
 	if strings.TrimSpace(status.OutputFileID) == "" {
-		return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "batch_output_not_ready", "id", "Batch output is not ready.")
+		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "batch_output_not_ready", "id", "Batch output is not ready.")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.client.baseURL+"/files/"+status.OutputFileID+"/content", nil)
 	if err != nil {
@@ -150,7 +150,7 @@ func (a *BatchAdapter) jsonRequest(ctx context.Context, method string, path stri
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid batch response.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid batch response.")
 		}
 	}
 	return nil

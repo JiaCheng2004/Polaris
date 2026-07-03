@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -58,7 +58,7 @@ func NewVoiceCatalogAdapter(client *Client) *VoiceCatalogAdapter {
 
 func (a *VoiceCatalogAdapter) ListVoices(ctx context.Context, req *modality.VoiceCatalogRequest) (*modality.VoiceCatalogResponse, error) {
 	if strings.EqualFold(req.Type, "custom") {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_voice_type", "type", "Provider-backed ByteDance voice listing currently supports built-in voices only.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_voice_type", "type", "Provider-backed ByteDance voice listing currently supports built-in voices only.")
 	}
 
 	var parsed listBigModelTTSTimbresResponse

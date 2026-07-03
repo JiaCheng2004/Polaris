@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 )
 
 const (
@@ -35,7 +35,7 @@ type bytedanceControlErrorEnvelope struct {
 
 func (c *Client) speechControlJSON(ctx context.Context, action string, version string, body any, out any) error {
 	if strings.TrimSpace(c.accessKeyID) == "" || strings.TrimSpace(c.accessKeySecret) == "" {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance speech control APIs require providers.bytedance.access_key_id and providers.bytedance.access_key_secret.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance speech control APIs require providers.bytedance.access_key_id and providers.bytedance.access_key_secret.")
 	}
 
 	payload, err := json.Marshal(body)
@@ -103,7 +103,7 @@ func (c *Client) speechControlJSON(ctx context.Context, action string, version s
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance speech control returned an unreadable response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance speech control returned an unreadable response.")
 	}
 
 	var envelope bytedanceControlErrorEnvelope
@@ -118,7 +118,7 @@ func (c *Client) speechControlJSON(ctx context.Context, action string, version s
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance speech control returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance speech control returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func bytedanceSpeechControlError(status int, envelope bytedanceControlErrorEnvel
 			message = strings.TrimSpace(envelope.ResponseMetadata.Error.Message)
 		}
 	}
-	return httputil.ProviderAPIError("ByteDance", status, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("ByteDance", status, apierror.ProviderErrorDetails{
 		Message: message,
 		Code:    code,
 		Body:    string(raw),

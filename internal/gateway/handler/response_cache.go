@@ -10,8 +10,8 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
@@ -70,7 +70,7 @@ func (r *responseCache) tryExact(c *gin.Context, key string, model provider.Mode
 	if r == nil || key == "" {
 		return false
 	}
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "cache.lookup",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "cache.lookup",
 		attribute.String("polaris.cache_layer", "response_cache"),
 		attribute.String("polaris.cache_kind", "exact"),
 		attribute.String("polaris.model", model.ID),
@@ -81,21 +81,21 @@ func (r *responseCache) tryExact(c *gin.Context, key string, model provider.Mode
 	if err != nil || !ok {
 		span.SetAttributes(attribute.String("polaris.cache_status", "miss"))
 		if err != nil {
-			telemetry.RecordSpanError(span, err)
+			obs.RecordSpanError(span, err)
 		}
 		c.Header(cacheHeader, "miss")
 		return false
 	}
 	var stored cachedResponse
 	if err := json.Unmarshal([]byte(encoded), &stored); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		span.SetAttributes(attribute.String("polaris.cache_status", "miss"))
 		c.Header(cacheHeader, "miss")
 		return false
 	}
 	body, err := base64.StdEncoding.DecodeString(stored.Body)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		span.SetAttributes(attribute.String("polaris.cache_status", "miss"))
 		c.Header(cacheHeader, "miss")
 		return false
@@ -162,7 +162,7 @@ func (r *responseCache) storeRaw(c *gin.Context, key string, statusCode int, con
 	if r == nil || key == "" || statusCode >= 400 {
 		return
 	}
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "cache.store",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "cache.store",
 		attribute.String("polaris.cache_layer", "response_cache"),
 		attribute.String("polaris.content_type", contentType),
 	)
@@ -173,11 +173,11 @@ func (r *responseCache) storeRaw(c *gin.Context, key string, statusCode int, con
 		Body:        base64.StdEncoding.EncodeToString(body),
 	})
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return
 	}
 	if err := r.cache.Set(ctx, key, string(payload), r.config.TTL); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 	}
 }
 
@@ -234,7 +234,7 @@ func (r *responseCache) trySemanticChat(c *gin.Context, model provider.Model, re
 	if r == nil || !candidate.Enabled {
 		return false
 	}
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "cache.lookup",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "cache.lookup",
 		attribute.String("polaris.cache_layer", "response_cache"),
 		attribute.String("polaris.cache_kind", "semantic"),
 		attribute.String("polaris.model", model.ID),
@@ -245,14 +245,14 @@ func (r *responseCache) trySemanticChat(c *gin.Context, model provider.Model, re
 	if err != nil || !ok {
 		span.SetAttributes(attribute.String("polaris.cache_status", "miss"))
 		if err != nil {
-			telemetry.RecordSpanError(span, err)
+			obs.RecordSpanError(span, err)
 		}
 		c.Header(cacheHeader, "miss")
 		return false
 	}
 	var index []semanticChatIndexEntry
 	if err := json.Unmarshal([]byte(indexRaw), &index); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		span.SetAttributes(attribute.String("polaris.cache_status", "miss"))
 		c.Header(cacheHeader, "miss")
 		return false
@@ -282,7 +282,7 @@ func (r *responseCache) storeSemanticChat(c *gin.Context, candidate semanticChat
 	if r == nil || !candidate.Enabled || candidate.StoreKey == "" || statusCode >= 400 {
 		return
 	}
-	ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "cache.store",
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "cache.store",
 		attribute.String("polaris.cache_layer", "response_cache"),
 		attribute.String("polaris.cache_kind", "semantic"),
 	)
@@ -302,11 +302,11 @@ func (r *responseCache) storeSemanticChat(c *gin.Context, candidate semanticChat
 	}
 	raw, err := json.Marshal(index)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return
 	}
 	if err := r.cache.Set(ctx, candidate.IndexKey, string(raw), r.config.TTL); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 	}
 }
 

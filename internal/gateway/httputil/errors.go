@@ -1,65 +1,44 @@
+// Package httputil holds the gin-coupled HTTP glue for the gateway layer. The
+// canonical error type and provider-error translation now live in
+// internal/apierror; this package re-exports them (so gateway handlers keep a
+// single import) and adds WriteError, the only piece that depends on gin.
 package httputil
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/gin-gonic/gin"
 )
 
-type APIError struct {
-	Status  int
-	Type    string
-	Code    string
-	Param   string
-	Message string
-}
+// Re-exported canonical error types (defined in internal/apierror).
+type (
+	APIError             = apierror.APIError
+	ErrorEnvelope        = apierror.ErrorEnvelope
+	ErrorBody            = apierror.ErrorBody
+	ProviderErrorDetails = apierror.ProviderErrorDetails
+)
 
-type ErrorEnvelope struct {
-	Error ErrorBody `json:"error"`
-}
+// Re-exported constructors/helpers (defined in internal/apierror).
+var (
+	NewError                 = apierror.NewError
+	RequestBodyTooLargeError = apierror.RequestBodyTooLargeError
+	IsRequestBodyTooLarge    = apierror.IsRequestBodyTooLarge
+	ProviderAPIError         = apierror.ProviderAPIError
+	ProviderAuthError        = apierror.ProviderAuthError
+	ProviderTransportError   = apierror.ProviderTransportError
+)
 
-type ErrorBody struct {
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Code    string `json:"code,omitempty"`
-	Param   string `json:"param,omitempty"`
-}
-
-func (e *APIError) Error() string {
-	return e.Message
-}
-
-func NewError(status int, typ, code, param, message string) *APIError {
-	return &APIError{
-		Status:  status,
-		Type:    typ,
-		Code:    code,
-		Param:   param,
-		Message: message,
-	}
-}
-
-func RequestBodyTooLargeError(maxBytes int64) *APIError {
-	if maxBytes <= 0 {
-		return NewError(http.StatusRequestEntityTooLarge, "invalid_request_error", "request_body_too_large", "", "Request body exceeds the configured maximum size.")
-	}
-	return NewError(http.StatusRequestEntityTooLarge, "invalid_request_error", "request_body_too_large", "", fmt.Sprintf("Request body exceeds the configured maximum size of %d bytes.", maxBytes))
-}
-
-func IsRequestBodyTooLarge(err error) bool {
-	var maxBytesError *http.MaxBytesError
-	return errors.As(err, &maxBytesError)
-}
-
+// WriteError renders err as the OpenAI-compatible error envelope and aborts the
+// request. Non-APIError values become a generic 500.
 func WriteError(c *gin.Context, err error) {
-	var apiErr *APIError
+	var apiErr *apierror.APIError
 	if !errors.As(err, &apiErr) {
-		apiErr = NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "An internal error occurred.")
+		apiErr = apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "An internal error occurred.")
 	}
-	c.AbortWithStatusJSON(apiErr.Status, ErrorEnvelope{
-		Error: ErrorBody{
+	c.AbortWithStatusJSON(apiErr.Status, apierror.ErrorEnvelope{
+		Error: apierror.ErrorBody{
 			Message: apiErr.Message,
 			Type:    apiErr.Type,
 			Code:    apiErr.Code,

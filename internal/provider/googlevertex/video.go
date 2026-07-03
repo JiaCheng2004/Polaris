@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -109,7 +109,7 @@ func (a *VideoAdapter) Generate(ctx context.Context, req *modality.VideoRequest)
 		return nil, err
 	}
 	if strings.TrimSpace(operation.Name) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex did not return an operation name.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex did not return an operation name.")
 	}
 	return &modality.VideoJob{
 		JobID:  operation.Name,
@@ -175,10 +175,10 @@ func (a *VideoAdapter) Cancel(ctx context.Context, jobID string) error {
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode == http.StatusConflict {
-		return httputil.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
+		return apierror.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return a.client.apiError(resp)
@@ -192,15 +192,15 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 		return nil, err
 	}
 	if operation.Response == nil || len(operation.Response.Videos) == 0 {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned no generated video.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned no generated video.")
 	}
 	video := operation.Response.Videos[0]
 	if strings.TrimSpace(video.BytesBase64Encoded) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex did not return inline video bytes.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex did not return inline video bytes.")
 	}
 	data, err := base64.StdEncoding.DecodeString(video.BytesBase64Encoded)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned invalid video bytes.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned invalid video bytes.")
 	}
 	contentType := strings.TrimSpace(video.MimeType)
 	if contentType == "" && status != nil && status.Result != nil {
@@ -217,12 +217,12 @@ func (a *VideoAdapter) fetchOperation(ctx context.Context, jobID string) (*verte
 	path := "/v1/" + a.client.endpoint(providerModelName(a.model, a.model)) + ":fetchPredictOperation"
 	body := map[string]string{"operationName": jobID}
 	if err := a.client.JSON(ctx, http.MethodPost, path, body, &operation); err != nil {
-		var apiErr *httputil.APIError
+		var apiErr *apierror.APIError
 		if strings.Contains(strings.ToLower(err.Error()), "not found") && strings.Contains(strings.ToLower(err.Error()), "operation") {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 		}
 		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 		}
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func vertexImageFromReference(ctx context.Context, client *Client, value string)
 	if strings.HasPrefix(value, "data:") {
 		mimeType, data, err := decodeDataURI(value)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_first_frame", "first_frame", "Image data URI is invalid.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_first_frame", "first_frame", "Image data URI is invalid.")
 		}
 		return &vertexImageData{
 			MimeType:           mimeType,
@@ -257,17 +257,17 @@ func vertexImageFromReference(ctx context.Context, client *Client, value string)
 		}
 		resp, err := client.httpClient.Do(req)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "Failed to fetch the input image.")
 		}
 		defer func() {
 			_ = resp.Body.Close()
 		}()
 		if resp.StatusCode >= http.StatusBadRequest {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_first_frame", "first_frame", "Input image URL could not be fetched.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_first_frame", "first_frame", "Input image URL could not be fetched.")
 		}
 		payload, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Failed to read the input image.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Failed to read the input image.")
 		}
 		mimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 		if mimeType == "" {

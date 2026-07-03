@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -87,11 +87,11 @@ func (a *MusicAdapter) StreamGenerate(ctx context.Context, req *modality.MusicGe
 }
 
 func (a *MusicAdapter) Edit(ctx context.Context, req *modality.MusicEditRequest) (*modality.MusicOperationResult, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "ElevenLabs editing workflows are not enabled in this Polaris build.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "ElevenLabs editing workflows are not enabled in this Polaris build.")
 }
 
 func (a *MusicAdapter) StreamEdit(ctx context.Context, req *modality.MusicEditRequest) (*modality.MusicStream, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "ElevenLabs editing workflows are not enabled in this Polaris build.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "unsupported_music_operation", "operation", "ElevenLabs editing workflows are not enabled in this Polaris build.")
 }
 
 func (a *MusicAdapter) SeparateStems(ctx context.Context, req *modality.MusicStemRequest) (*modality.MusicOperationResult, error) {
@@ -132,7 +132,7 @@ func (a *MusicAdapter) SeparateStems(ctx context.Context, req *modality.MusicSte
 }
 
 func (a *MusicAdapter) GenerateLyrics(ctx context.Context, req *modality.MusicLyricsRequest) (*modality.MusicLyricsResponse, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "lyrics_generation_not_supported", "model", "ElevenLabs does not expose a standalone lyrics generation endpoint through Polaris.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "lyrics_generation_not_supported", "model", "ElevenLabs does not expose a standalone lyrics generation endpoint through Polaris.")
 }
 
 func (a *MusicAdapter) CreatePlan(ctx context.Context, req *modality.MusicPlanRequest) (*modality.MusicPlanResponse, error) {
@@ -169,7 +169,7 @@ func (a *MusicAdapter) composePayload(req *modality.MusicGenerationRequest) (com
 		payload.CompositionPlan = append(json.RawMessage(nil), req.Plan...)
 	}
 	if strings.TrimSpace(req.Prompt) == "" && len(req.Plan) == 0 {
-		return composeRequest{}, nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_prompt", "prompt", "Field 'prompt' or 'plan' is required.")
+		return composeRequest{}, nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_prompt", "prompt", "Field 'prompt' or 'plan' is required.")
 	}
 	query := url.Values{}
 	if value := elevenOutputFormat(req.OutputFormat, req.SampleRateHz, req.Bitrate); value != "" {
@@ -191,9 +191,9 @@ func resolveSourceFile(req *modality.MusicStemRequest) ([]byte, string, string, 
 		}
 		return req.File, filename, contentType, nil
 	case strings.TrimSpace(req.SourceAudio) != "":
-		return nil, "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_source_audio", "source_audio", "ElevenLabs stems currently require an uploaded file or a previous music job.")
+		return nil, "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_source_audio", "source_audio", "ElevenLabs stems currently require an uploaded file or a previous music job.")
 	default:
-		return nil, "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_audio", "source_audio", "Field 'source_audio', an uploaded file, or 'source_job_id' is required.")
+		return nil, "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_source_audio", "source_audio", "Field 'source_audio', an uploaded file, or 'source_job_id' is required.")
 	}
 }
 

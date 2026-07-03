@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -170,7 +170,7 @@ func (r embedContentResponse) usage() modality.EmbedUsage {
 }
 
 func providerInvalidEmbeddingResponse() error {
-	return httputil.NewError(502, "provider_error", "provider_invalid_response", "", "Google returned an embedding response without embedding data.")
+	return apierror.NewError(502, "provider_error", "provider_invalid_response", "", "Google returned an embedding response without embedding data.")
 }
 
 func providerEmbeddingModelName(requestModel string, fallbackModel string) string {

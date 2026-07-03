@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -48,7 +48,7 @@ func (a *BatchAdapter) Cancel(ctx context.Context, providerJobID string) error {
 }
 
 func (a *BatchAdapter) Output(ctx context.Context, providerJobID string) (io.ReadCloser, error) {
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "batch_output_proxy_unavailable", "id", "Anthropic batch output proxy is not implemented in this runtime build.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "batch_output_proxy_unavailable", "id", "Anthropic batch output proxy is not implemented in this runtime build.")
 }
 
 type anthropicBatch struct {

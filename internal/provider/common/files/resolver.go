@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/blob"
@@ -62,7 +62,7 @@ func (r Resolver) Resolve(ctx context.Context, source modality.FileSource, proje
 	case modality.FileSourcePolarisRef:
 		return r.resolvePolarisRef(ctx, source, projectID, providerName)
 	default:
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file_source", "messages.content.file", "Unsupported file source.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file_source", "messages.content.file", "Unsupported file source.")
 	}
 }
 
@@ -88,14 +88,14 @@ func (r Resolver) resolveInlineSource(source modality.FileSource) *ResolvedFile 
 
 func (r Resolver) resolvePolarisRef(ctx context.Context, source modality.FileSource, projectID string, providerName string) (*ResolvedFile, error) {
 	if r.Store == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "store_unavailable", "file_id", "File store is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "store_unavailable", "file_id", "File store is unavailable.")
 	}
 	file, err := r.Store.GetFileForProject(ctx, source.PolarisID, projectID)
 	if err != nil {
 		return nil, fileStoreError(err)
 	}
 	if file.ExpiresAt != nil && time.Now().After(*file.ExpiresAt) {
-		return nil, httputil.NewError(http.StatusGone, "invalid_request_error", "file_expired", "file_id", "File has expired.")
+		return nil, apierror.NewError(http.StatusGone, "invalid_request_error", "file_expired", "file_id", "File has expired.")
 	}
 
 	if preferVisionTransport(providerName, file.MimeType) {
@@ -125,7 +125,7 @@ func (r Resolver) resolvePolarisRef(ctx context.Context, source modality.FileSou
 				PolarisID: file.PolarisID,
 			}, nil
 		}
-		return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "provider_lacks_files_api", "file_id", "Selected provider requires URL or inline bytes for image file references.")
+		return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "provider_lacks_files_api", "file_id", "Selected provider requires URL or inline bytes for image file references.")
 	}
 
 	if handle, ok, err := r.Store.GetFileProviderHandle(ctx, file.PolarisID, providerName); err != nil {
@@ -168,7 +168,7 @@ func (r Resolver) resolvePolarisRef(ctx context.Context, source modality.FileSou
 		}, nil
 	}
 
-	return nil, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "provider_lacks_files_api", "file_id", "Selected provider cannot accept this file reference.")
+	return nil, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "provider_lacks_files_api", "file_id", "Selected provider cannot accept this file reference.")
 }
 
 func (r Resolver) materialize(ctx context.Context, adapter modality.FilesAdapter, providerName string, file *store.File) (*ResolvedFile, error) {
@@ -199,7 +199,7 @@ func (r Resolver) materialize(ctx context.Context, adapter modality.FilesAdapter
 		Size:      file.Size,
 	})
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "materialization_failed", "file_id", "Provider file materialization failed.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "materialization_failed", "file_id", "Provider file materialization failed.")
 	}
 	record := store.FileProviderHandle{
 		PolarisID:      file.PolarisID,
@@ -230,21 +230,21 @@ func (r Resolver) ReadFileBytes(ctx context.Context, file *store.File) ([]byte, 
 			return nil, err
 		}
 		if blobStore == nil {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File blob backing is not configured.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File blob backing is not configured.")
 		}
 		defer func() {
 			_ = blobStore.Close()
 		}()
 		body, _, err := blobStore.Get(ctx, file.BlobKey)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File content was not found.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File content was not found.")
 		}
 		defer func() {
 			_ = body.Close()
 		}()
 		return io.ReadAll(io.LimitReader(body, config.EffectiveMaxFileUploadBytes(r.Config.Ingestion.MaxUploadBytes)+1))
 	}
-	return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File content was not found.")
+	return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File content was not found.")
 }
 
 func BlobStoreFromConfig(cfg config.FilesConfig) (blob.BlobStore, error) {
@@ -329,7 +329,7 @@ func fileStoreError(err error) error {
 		return nil
 	}
 	if err == store.ErrNotFound {
-		return httputil.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File was not found.")
+		return apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File was not found.")
 	}
 	return err
 }

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/safeconv"
 	"github.com/gorilla/websocket"
@@ -124,10 +124,10 @@ func NewPodcastAdapter(client *Client, model string, endpoint string) modality.P
 
 func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.PodcastRequest) (*modality.PodcastResult, error) {
 	if a == nil || a.client == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Podcast adapter is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Podcast adapter is unavailable.")
 	}
 	if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance podcast generation requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance podcast generation requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 	}
 
 	dialer := websocket.Dialer{HandshakeTimeout: minDuration(a.client.httpClient.Timeout, 15*time.Second)}
@@ -148,7 +148,7 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 
 	startConnectionFrame, err := encodePodcastConnectionFrame(podcastEventStartConnection, map[string]any{})
 	if err != nil {
-		return nil, httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast connection request.")
+		return nil, apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast connection request.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, startConnectionFrame); err != nil {
 		return nil, translateTransportError(err, "ByteDance")
@@ -172,7 +172,7 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 	sessionID := newRealtimeSessionID()
 	startFrame, err := encodePodcastJSONFrame(podcastClientMessageType, podcastEventStartSession, sessionID, a.buildRequest(req))
 	if err != nil {
-		return nil, httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast request.")
+		return nil, apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast request.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, startFrame); err != nil {
 		return nil, translateTransportError(err, "ByteDance")
@@ -183,7 +183,7 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 
 	finishSessionFrame, err := encodePodcastJSONFrame(podcastClientMessageType, podcastEventFinishSession, sessionID, map[string]any{})
 	if err != nil {
-		return nil, httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast finish request.")
+		return nil, apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode ByteDance podcast finish request.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, finishSessionFrame); err != nil {
 		return nil, translateTransportError(err, "ByteDance")
@@ -194,7 +194,7 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 		messageType, payload, err := conn.ReadMessage()
 		if err != nil {
 			if !started {
-				return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", "ByteDance podcast handshake failed.")
+				return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", "ByteDance podcast handshake failed.")
 			}
 			return nil, translateTransportError(err, "ByteDance")
 		}
@@ -203,19 +203,19 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 		}
 		frame, err := decodePodcastFrame(payload)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast returned an invalid frame.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast returned an invalid frame.")
 		}
 		if frame.MessageType == podcastErrorMessageType {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
 		}
 		if frame.Event == nil {
 			continue
 		}
 		switch *frame.Event {
 		case podcastEventConnectionFailed:
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast connection failed."))
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast connection failed."))
 		case podcastEventSessionFailed:
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
 		case podcastEventRoundStart:
 			started = true
 		case podcastEventUsageResponse:
@@ -250,7 +250,7 @@ func (a *podcastAdapter) GeneratePodcast(ctx context.Context, req *modality.Podc
 				}
 			}
 			if len(audio) == 0 {
-				return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast generation returned no audio.")
+				return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast generation returned no audio.")
 			}
 			return &modality.PodcastResult{
 				Audio:       append([]byte(nil), audio...),
@@ -275,10 +275,10 @@ func (a *podcastAdapter) waitForPodcastEvent(conn *websocket.Conn, messageType b
 		}
 		frame, err := decodePodcastFrame(payload)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast returned an invalid frame.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast returned an invalid frame.")
 		}
 		if frame.MessageType == podcastErrorMessageType {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(string(frame.Payload)), "ByteDance podcast generation failed."))
 		}
 		if frame.Event == nil {
 			continue
@@ -334,13 +334,13 @@ func (a *podcastAdapter) fetchPodcastAudio(ctx context.Context, rawURL string) (
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, "", httputil.ProviderAPIError("ByteDance", resp.StatusCode, httputil.ProviderErrorDetails{
+		return nil, "", apierror.ProviderAPIError("ByteDance", resp.StatusCode, apierror.ProviderErrorDetails{
 			Message: "ByteDance podcast audio download failed.",
 		})
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast audio could not be read.")
+		return nil, "", apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance podcast audio could not be read.")
 	}
 	return data, resp.Header.Get("Content-Type"), nil
 }

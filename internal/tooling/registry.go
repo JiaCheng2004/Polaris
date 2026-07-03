@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -40,25 +40,25 @@ func (r *Registry) Register(name string, tool LocalTool) {
 }
 
 func (r *Registry) Execute(ctx context.Context, implementation string, arguments json.RawMessage) (Result, error) {
-	ctx, span := telemetry.StartInternalSpan(ctx, "tool.execute",
+	ctx, span := obs.StartInternalSpan(ctx, "tool.execute",
 		attribute.String("polaris.tool_name", implementation),
 	)
 	defer span.End()
 
 	if r == nil {
 		err := fmt.Errorf("tool registry is nil")
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return Result{}, err
 	}
 	tool, ok := r.tools[implementation]
 	if !ok {
 		err := fmt.Errorf("tool implementation %q is not registered", implementation)
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return Result{}, err
 	}
 	result, err := tool.Execute(ctx, arguments)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return Result{}, err
 	}
 	return result, nil

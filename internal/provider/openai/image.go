@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -123,7 +123,7 @@ func (a *ImageAdapter) Edit(ctx context.Context, req *modality.ImageEditRequest)
 
 	var response openAIImageResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid JSON response.")
 	}
 	return translateOpenAIImageResponse(&response, req.ResponseFormat)
 }
@@ -172,7 +172,7 @@ func shouldSendOpenAIImageResponseFormat(model string) bool {
 
 func translateOpenAIImageResponse(response *openAIImageResponse, requestedFormat string) (*modality.ImageResponse, error) {
 	if response == nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
 	}
 
 	created := response.Created
@@ -186,7 +186,7 @@ func translateOpenAIImageResponse(response *openAIImageResponse, requestedFormat
 		switch requestedFormat {
 		case "b64_json":
 			if strings.TrimSpace(data.B64JSON) == "" {
-				return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without inline image data.")
+				return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without inline image data.")
 			}
 			item.B64JSON = data.B64JSON
 		default:
@@ -195,13 +195,13 @@ func translateOpenAIImageResponse(response *openAIImageResponse, requestedFormat
 			} else if strings.TrimSpace(data.B64JSON) != "" {
 				item.URL = openAIImageDataURI("image/png", data.B64JSON)
 			} else {
-				return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
+				return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
 			}
 		}
 		items = append(items, item)
 	}
 	if len(items) == 0 {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an image response without image data.")
 	}
 	return &modality.ImageResponse{
 		Created: created,

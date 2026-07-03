@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/chattools"
 )
@@ -132,7 +132,7 @@ func DecodeStream(providerName string, r io.Reader, canonicalModel string, fallb
 			if strings.TrimSpace(message) == "" {
 				message = providerName + " streaming request failed."
 			}
-			return false, httputil.NewError(502, "provider_error", "provider_stream_error", "", message)
+			return false, apierror.NewError(502, "provider_error", "provider_stream_error", "", message)
 		}
 
 		var chunk modality.ChatChunk

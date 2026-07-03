@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
@@ -187,7 +187,7 @@ func streamEventsFromChunk(chunk modality.ChatChunk) []modality.StreamEvent {
 }
 
 func shouldRetryWithFallback(apiErr *httputil.APIError) bool {
-	return retrypkg.ShouldRetryAPIError(apiErr)
+	return apierror.Retryable(apiErr)
 }
 
 func writeChatTargetError(c *gin.Context, err error) {

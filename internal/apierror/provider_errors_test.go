@@ -1,4 +1,4 @@
-package httputil
+package apierror
 
 import (
 	"context"
@@ -70,6 +70,27 @@ func TestProviderTransportErrorMapsNetTimeout(t *testing.T) {
 	err := ProviderTransportError(timeoutNetError{}, "Qwen")
 	if err.Status != http.StatusGatewayTimeout || err.Type != "timeout_error" || err.Code != "provider_timeout" {
 		t.Fatalf("unexpected API error %#v", err)
+	}
+}
+
+func TestRetryableClassification(t *testing.T) {
+	cases := []struct {
+		name string
+		err  *APIError
+		want bool
+	}{
+		{"nil", nil, false},
+		{"rate limit status", NewError(http.StatusTooManyRequests, "rate_limit_error", "", "", ""), true},
+		{"timeout", NewError(http.StatusGatewayTimeout, "timeout_error", "provider_timeout", "", ""), true},
+		{"server error code", NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", ""), true},
+		{"bad request", NewError(http.StatusBadRequest, "invalid_request_error", "", "", ""), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Retryable(tc.err); got != tc.want {
+				t.Fatalf("Retryable(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
 	}
 }
 

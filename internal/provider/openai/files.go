@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -26,7 +26,7 @@ func NewFilesAdapter(client *Client, provider string) *FilesAdapter {
 
 func (a *FilesAdapter) Upload(ctx context.Context, req *modality.FileUploadRequest) (*modality.ProviderFileHandle, error) {
 	if req == nil || req.Body == nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File body is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File body is required.")
 	}
 
 	filename := strings.TrimSpace(req.Filename)
@@ -60,7 +60,7 @@ func (a *FilesAdapter) Upload(ctx context.Context, req *modality.FileUploadReque
 func (a *FilesAdapter) Get(ctx context.Context, providerFileID string) (*modality.ProviderFileHandle, error) {
 	providerFileID = strings.TrimSpace(providerFileID)
 	if providerFileID == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
 	}
 	var response openAIFileResponse
 	if err := a.client.filesJSON(ctx, http.MethodGet, "/files/"+providerFileID, nil, &response); err != nil {
@@ -72,7 +72,7 @@ func (a *FilesAdapter) Get(ctx context.Context, providerFileID string) (*modalit
 func (a *FilesAdapter) Delete(ctx context.Context, providerFileID string) error {
 	providerFileID = strings.TrimSpace(providerFileID)
 	if providerFileID == "" {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_id", "file_id", "Provider file id is required.")
 	}
 	var response struct {
 		Deleted bool `json:"deleted"`
@@ -82,10 +82,10 @@ func (a *FilesAdapter) Delete(ctx context.Context, providerFileID string) error 
 
 func (a *FilesAdapter) Materialize(ctx context.Context, req *modality.FileMaterializeRequest) (*modality.ProviderFileHandle, error) {
 	if req == nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File materialization request is required.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file", "file", "File materialization request is required.")
 	}
 	if len(req.InlineSrc) == 0 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_bytes", "file", "OpenAI file materialization requires file bytes.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_file_bytes", "file", "OpenAI file materialization requires file bytes.")
 	}
 	return a.Upload(ctx, &modality.FileUploadRequest{
 		Body:     bytes.NewReader(req.InlineSrc),
@@ -170,7 +170,7 @@ func (c *Client) filesMultipart(ctx context.Context, path string, payload []byte
 		return c.apiError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid file response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid file response.")
 	}
 	return nil
 }
@@ -206,7 +206,7 @@ func (c *Client) filesJSON(ctx context.Context, method string, path string, body
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid file response.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid file response.")
 		}
 	}
 	return nil

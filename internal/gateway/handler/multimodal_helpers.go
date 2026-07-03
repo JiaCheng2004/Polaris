@@ -12,8 +12,8 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,35 +21,35 @@ import (
 
 func resolveEndpointModel(c *gin.Context, registry *provider.Registry, auth middleware.AuthContext, name string, routing *modality.RoutingOptions, requiredModality modality.Modality, requiredCapabilities ...modality.Capability) (provider.Resolution, error) {
 	ctx := c.Request.Context()
-	_, span := telemetry.StartInternalSpan(ctx, "policy.resolve_model",
+	_, span := obs.StartInternalSpan(ctx, "policy.resolve_model",
 		attribute.String("polaris.requested_model", name),
 		attribute.String("polaris.modality", string(requiredModality)),
 	)
 	defer span.End()
 
 	if err := validateRoutingOptions(routing); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
 
 	resolution, err := registry.RequireResolvedModel(name, requiredModality, routing, requiredCapabilities...)
 	if err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
 	model := resolution.Model
 	if !middleware.ScopeAllowed(auth.AllowedModels, auth.PolicyModels, model.ID) {
 		err := httputil.NewError(http.StatusForbidden, "permission_error", "model_not_allowed", "model", "API key is not permitted to use this model.")
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
 	if !middleware.ModalityScopeAllowed(auth.AllowedModalities, auth.PolicyModalities, requiredModality) {
 		err := httputil.NewError(http.StatusForbidden, "permission_error", "modality_not_allowed", "model", "API key is not permitted to use this modality.")
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
 	if err := enforcePricingPolicy(c, model.ID); err != nil {
-		telemetry.RecordSpanError(span, err)
+		obs.RecordSpanError(span, err)
 		return provider.Resolution{}, err
 	}
 	span.SetAttributes(

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -207,7 +207,7 @@ func translateContent(content modality.MessageContent) (string, []string, error)
 			textParts = append(textParts, part.Text)
 		case "image_url":
 			if part.ImageURL == nil || strings.TrimSpace(part.ImageURL.URL) == "" {
-				return "", nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
+				return "", nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.url.")
 			}
 			encoded, err := imageValue(part.ImageURL.URL)
 			if err != nil {
@@ -215,9 +215,9 @@ func translateContent(content modality.MessageContent) (string, []string, error)
 			}
 			images = append(images, encoded)
 		case "input_audio":
-			return "", nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_input", "messages.content.input_audio", "Ollama chat does not support audio input in this build.")
+			return "", nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_input", "messages.content.input_audio", "Ollama chat does not support audio input in this build.")
 		default:
-			return "", nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
+			return "", nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 
@@ -228,7 +228,7 @@ func imageValue(raw string) (string, error) {
 	if strings.HasPrefix(raw, "data:") {
 		_, data, ok := strings.Cut(strings.TrimPrefix(raw, "data:"), ",")
 		if !ok {
-			return "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
+			return "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
 		}
 		header := raw[:strings.Index(raw, ",")]
 		if !strings.Contains(header, ";base64") {
@@ -264,15 +264,15 @@ func translateFormat(format *modality.ResponseFormat) (any, error) {
 		return "json", nil
 	case "json_schema":
 		if format.JSONSchema == nil || len(format.JSONSchema.Schema) == 0 {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_json_schema", "response_format", "json_schema response formats must include json_schema.schema.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_json_schema", "response_format", "json_schema response formats must include json_schema.schema.")
 		}
 		var schema any
 		if err := json.Unmarshal(format.JSONSchema.Schema, &schema); err != nil {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json_schema", "response_format", "json_schema.schema must be valid JSON.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json_schema", "response_format", "json_schema.schema must be valid JSON.")
 		}
 		return schema, nil
 	default:
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_response_format", "response_format", "Unsupported response_format type.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_response_format", "response_format", "Unsupported response_format type.")
 	}
 }
 

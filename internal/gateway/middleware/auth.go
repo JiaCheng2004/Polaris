@@ -14,8 +14,8 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -45,7 +45,7 @@ func Auth(holder *gwruntime.Holder, appStore store.Store, keyCache *APIKeyCache,
 			return
 		}
 		cfg := snapshot.Config
-		ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "auth.lookup", attribute.String("polaris.auth_mode", string(cfg.Auth.Mode)))
+		ctx, span := obs.StartInternalSpan(c.Request.Context(), "auth.lookup", attribute.String("polaris.auth_mode", string(cfg.Auth.Mode)))
 		defer span.End()
 		c.Request = c.Request.WithContext(ctx)
 

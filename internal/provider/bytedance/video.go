@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -74,7 +74,7 @@ func (a *VideoAdapter) Generate(ctx context.Context, req *modality.VideoRequest)
 
 	jobID := firstPopulatedString(raw, "id", "task_id", "taskId", "data.id", "data.task_id")
 	if jobID == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance did not return a video task id.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance did not return a video task id.")
 	}
 	status := normalizeVideoTaskState(firstPopulatedString(raw, "status", "state", "data.status", "data.state"))
 	if status == "" {
@@ -105,7 +105,7 @@ func (a *VideoAdapter) GetStatus(ctx context.Context, jobID string) (*modality.V
 	videoErr := normalizeVideoError(raw)
 
 	if status == "completed" && result == nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned a completed video job without a result.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned a completed video job without a result.")
 	}
 	if status == "failed" && videoErr == nil {
 		videoErr = &modality.VideoError{
@@ -141,9 +141,9 @@ func (a *VideoAdapter) Cancel(ctx context.Context, jobID string) error {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil
 	case http.StatusNotFound:
-		return httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	case http.StatusConflict:
-		return httputil.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
+		return apierror.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
 	default:
 		return a.client.apiError(resp)
 	}
@@ -151,7 +151,7 @@ func (a *VideoAdapter) Cancel(ctx context.Context, jobID string) error {
 
 func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modality.VideoStatus) (*modality.VideoAsset, error) {
 	if status == nil || status.Result == nil || strings.TrimSpace(status.Result.VideoURL) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance did not return a downloadable video URL.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance did not return a downloadable video URL.")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, status.Result.VideoURL, nil)
@@ -167,15 +167,15 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 	}()
 
 	if resp.StatusCode == http.StatusGone {
-		return nil, httputil.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
+		return nil, apierror.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_download_failed", "", "ByteDance video download failed.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_download_failed", "", "ByteDance video download failed.")
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid video asset.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid video asset.")
 	}
 
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
@@ -198,7 +198,7 @@ func (a *VideoAdapter) requestJSON(ctx context.Context, method string, path stri
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, a.client.apiError(resp)
@@ -206,12 +206,12 @@ func (a *VideoAdapter) requestJSON(ctx context.Context, method string, path stri
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid video response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid video response.")
 	}
 
 	var raw map[string]any
 	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid JSON response.")
 	}
 	return raw, nil
 }

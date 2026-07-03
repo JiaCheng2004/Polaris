@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	awsauth "github.com/JiaCheng2004/Polaris/internal/provider/common/auth"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
 )
@@ -58,7 +58,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		sessionToken:    strings.TrimSpace(cfg.SessionToken),
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("bedrock", nil),
+			Transport: obs.NewProviderTransport("bedrock", nil),
 		},
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
@@ -82,7 +82,7 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 		return nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Amazon Bedrock returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Amazon Bedrock returned an invalid JSON response.")
 	}
 	return nil
 }
@@ -134,7 +134,7 @@ func (c *Client) do(ctx context.Context, path string, body any, accept string) (
 					continue
 				}
 			}
-			return nil, httputil.ProviderTransportError(err, "Amazon Bedrock")
+			return nil, apierror.ProviderTransportError(err, "Amazon Bedrock")
 		}
 
 		if openaicompat.RetryableStatus(resp.StatusCode) && attempt < attempts {
@@ -148,7 +148,7 @@ func (c *Client) do(ctx context.Context, path string, body any, accept string) (
 		return resp, nil
 	}
 
-	return nil, httputil.ProviderTransportError(lastErr, "Amazon Bedrock")
+	return nil, apierror.ProviderTransportError(lastErr, "Amazon Bedrock")
 }
 
 func (c *Client) apiError(resp *http.Response) error {
@@ -176,7 +176,7 @@ func (c *Client) apiError(resp *http.Response) error {
 		code = strings.TrimSpace(parsed.Type)
 	}
 
-	return httputil.ProviderAPIError("Amazon Bedrock", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("Amazon Bedrock", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Code:    code,

@@ -13,7 +13,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +25,7 @@ func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logge
 	}
 
 	return func(c *gin.Context) {
-		ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "rate_limit.evaluate")
+		ctx, span := obs.StartInternalSpan(c.Request.Context(), "rate_limit.evaluate")
 		defer span.End()
 		c.Request = c.Request.WithContext(ctx)
 

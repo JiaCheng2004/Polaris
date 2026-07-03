@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/gorilla/websocket"
 )
@@ -94,10 +94,10 @@ func NewStreamingTranscriptionAdapter(client *Client, model string, endpoint str
 
 func (a *streamingTranscriptionAdapter) ConnectStreamingTranscription(ctx context.Context, cfg *modality.StreamingTranscriptionSessionConfig) (modality.StreamingTranscriptionSession, error) {
 	if a == nil || a.client == nil {
-		return nil, httputil.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Streaming transcription adapter is unavailable.")
+		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Streaming transcription adapter is unavailable.")
 	}
 	if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance streaming transcription requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance streaming transcription requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {
@@ -130,10 +130,10 @@ func (a *streamingTranscriptionAdapter) normalizeConfig(cfg *modality.StreamingT
 		normalized.SampleRateHz = 16000
 	}
 	if normalized.SampleRateHz != 16000 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz streaming transcription sessions are supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz streaming transcription sessions are supported.")
 	}
 	if normalized.InputAudioFormat != modality.AudioFormatPCM16 {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if normalized.InterimResults == nil {
 		value := true
@@ -145,7 +145,7 @@ func (a *streamingTranscriptionAdapter) normalizeConfig(cfg *modality.StreamingT
 	}
 	streamURL := a.streamURL()
 	if strings.TrimSpace(normalized.Language) != "" && !strings.Contains(streamURL, "bigmodel_nostream") {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_language", "language", "ByteDance streaming transcription only accepts 'language' on the bigmodel_nostream endpoint.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_language", "language", "ByteDance streaming transcription only accepts 'language' on the bigmodel_nostream endpoint.")
 	}
 	return &normalized, nil
 }
@@ -161,7 +161,7 @@ func (s *streamingTranscriptionSession) Send(event modality.StreamingTranscripti
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return httputil.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Streaming transcription session is closed.")
+		return apierror.NewError(http.StatusGone, "invalid_request_error", "session_closed", "", "Streaming transcription session is closed.")
 	}
 	s.mu.Unlock()
 
@@ -175,7 +175,7 @@ func (s *streamingTranscriptionSession) Send(event modality.StreamingTranscripti
 	case modality.StreamingTranscriptionClientEventSessionClose:
 		return s.Close()
 	default:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown streaming transcription client event type.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_event_type", "type", "Unknown streaming transcription client event type.")
 	}
 }
 
@@ -206,16 +206,16 @@ func (s *streamingTranscriptionSession) updateSession(update *modality.Streaming
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if strings.TrimSpace(update.Model) != "" && strings.TrimSpace(update.Model) != strings.TrimSpace(s.cfg.Model) {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Streaming transcription session model cannot be changed after creation.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "model_immutable", "model", "Streaming transcription session model cannot be changed after creation.")
 	}
 	if update.InputAudioFormat != "" && update.InputAudioFormat != modality.AudioFormatPCM16 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_input_audio_format", "input_audio_format", "Only pcm16 input audio is supported.")
 	}
 	if update.SampleRateHz != 0 && update.SampleRateHz != 16000 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz streaming transcription sessions are supported.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_sample_rate", "sample_rate_hz", "Only 16000 Hz streaming transcription sessions are supported.")
 	}
 	if s.started && strings.TrimSpace(update.Language) != "" && update.Language != s.cfg.Language {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "language_immutable", "language", "Streaming transcription language cannot be changed after the provider session starts.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "language_immutable", "language", "Streaming transcription language cannot be changed after the provider session starts.")
 	}
 	if strings.TrimSpace(update.Language) != "" {
 		s.cfg.Language = strings.TrimSpace(update.Language)
@@ -238,17 +238,17 @@ func (s *streamingTranscriptionSession) updateSession(update *modality.Streaming
 func (s *streamingTranscriptionSession) appendAudio(encoded string) error {
 	payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
 	if err != nil {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_audio", "audio", "Audio payload must be valid base64.")
 	}
 	if len(payload) == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "Audio payload must not be empty.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
 	}
 	frame, err := encodeStreamingASRAudio(payload, false)
 	if err != nil {
-		return httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode streaming audio payload.")
+		return apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode streaming audio payload.")
 	}
 	if err := s.writeBinary(frame); err != nil {
 		return err
@@ -264,14 +264,14 @@ func (s *streamingTranscriptionSession) commitAudio() error {
 	pending := s.audioBytes
 	s.mu.Unlock()
 	if pending == 0 {
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_audio", "audio", "No buffered audio is available to commit.")
 	}
 	if err := s.ensureStarted(); err != nil {
 		return err
 	}
 	frame, err := encodeStreamingASRAudio(nil, true)
 	if err != nil {
-		return httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode final streaming audio payload.")
+		return apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode final streaming audio payload.")
 	}
 	if err := s.writeBinary(frame); err != nil {
 		return err
@@ -307,7 +307,7 @@ func (s *streamingTranscriptionSession) ensureStarted() error {
 	case <-s.ctx.Done():
 		return s.ctx.Err()
 	case <-time.After(streamingTranscriptionReadyTimeout):
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance streaming transcription session did not start in time.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_timeout", "", "ByteDance streaming transcription session did not start in time.")
 	case err := <-s.startReady:
 		return err
 	}
@@ -316,7 +316,7 @@ func (s *streamingTranscriptionSession) ensureStarted() error {
 func (s *streamingTranscriptionSession) start() error {
 	wsURL := strings.TrimSpace(s.adapter.streamURL())
 	if _, err := url.Parse(wsURL); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance streaming transcription URL is invalid.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance streaming transcription URL is invalid.")
 	}
 
 	headers := http.Header{}
@@ -329,7 +329,7 @@ func (s *streamingTranscriptionSession) start() error {
 	conn, resp, err := dialer.DialContext(s.ctx, wsURL, headers)
 	if err != nil {
 		if resp != nil && resp.StatusCode > 0 {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", fmt.Sprintf("ByteDance streaming transcription handshake failed with status %d.", resp.StatusCode))
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", fmt.Sprintf("ByteDance streaming transcription handshake failed with status %d.", resp.StatusCode))
 		}
 		return translateTransportError(err, "ByteDance")
 	}
@@ -338,7 +338,7 @@ func (s *streamingTranscriptionSession) start() error {
 	frame, err := encodeStreamingASRRequest(request)
 	if err != nil {
 		_ = conn.Close()
-		return httputil.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode streaming transcription request.")
+		return apierror.NewError(http.StatusInternalServerError, "internal_error", "internal_error", "", "Failed to encode streaming transcription request.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
 		_ = conn.Close()
@@ -397,7 +397,7 @@ func (s *streamingTranscriptionSession) readLoop(conn *websocket.Conn) {
 				return
 			default:
 			}
-			err := httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance streaming transcription connection closed unexpectedly.")
+			err := apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance streaming transcription connection closed unexpectedly.")
 			s.emitError(err)
 			s.signalStart(err)
 			return
@@ -407,7 +407,7 @@ func (s *streamingTranscriptionSession) readLoop(conn *websocket.Conn) {
 		}
 		frame, err := decodeStreamingASRFrame(payload)
 		if err != nil {
-			apiErr := httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid streaming transcription frame.")
+			apiErr := apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid streaming transcription frame.")
 			s.emitError(apiErr)
 			s.signalStart(apiErr)
 			return
@@ -425,7 +425,7 @@ func (s *streamingTranscriptionSession) handleFrame(frame streamingASRFrame) err
 	case streamingASRMessageTypeFullServer:
 		var payload sttResponse
 		if err := json.Unmarshal(frame.Payload, &payload); err != nil {
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid streaming transcription payload.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid streaming transcription payload.")
 		}
 		return s.handleResponse(frame, payload)
 	case streamingASRMessageTypeError:
@@ -433,7 +433,7 @@ func (s *streamingTranscriptionSession) handleFrame(frame streamingASRFrame) err
 		if message == "" {
 			message = "ByteDance streaming transcription returned an error."
 		}
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
 	default:
 		return nil
 	}
@@ -561,7 +561,7 @@ func (s *streamingTranscriptionSession) writeBinary(payload []byte) error {
 	conn := s.conn
 	s.mu.Unlock()
 	if conn == nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance streaming transcription connection is not available.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_transport_error", "", "ByteDance streaming transcription connection is not available.")
 	}
 	if err := conn.WriteMessage(websocket.BinaryMessage, payload); err != nil {
 		return translateTransportError(err, "ByteDance")
@@ -578,9 +578,9 @@ func (s *streamingTranscriptionSession) emit(event modality.StreamingTranscripti
 }
 
 func (s *streamingTranscriptionSession) emitError(err error) {
-	var apiErr *httputil.APIError
+	var apiErr *apierror.APIError
 	if !errors.As(err, &apiErr) {
-		apiErr = httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", err.Error())
+		apiErr = apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", err.Error())
 	}
 	s.emit(modality.StreamingTranscriptionServerEvent{
 		Type:    modality.StreamingTranscriptionServerEventError,

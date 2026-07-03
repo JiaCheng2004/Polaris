@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
@@ -58,7 +58,7 @@ func NewClient(providerSlug string, providerName string, cfg config.ProviderConf
 		apiKey:       cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport(providerSlug, nil),
+			Transport: obs.NewProviderTransport(providerSlug, nil),
 		},
 		maxAttempts:   maxAttempts,
 		initialDelay:  initialDelay,
@@ -104,7 +104,7 @@ func (c *Client) JSON(ctx context.Context, path string, body any, out any) error
 		return c.APIError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", fmt.Sprintf("%s returned an invalid JSON response.", c.providerName))
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", fmt.Sprintf("%s returned an invalid JSON response.", c.providerName))
 	}
 	return nil
 }
@@ -155,7 +155,7 @@ func (c *Client) APIError(resp *http.Response) error {
 		code = strings.TrimSpace(parsed.Code)
 	}
 
-	return httputil.ProviderAPIError(c.providerName, resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError(c.providerName, resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Code:    code,

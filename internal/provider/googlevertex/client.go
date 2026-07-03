@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -45,7 +45,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		baseURL:        baseURL,
 		projectID:      strings.TrimSpace(cfg.ProjectID),
 		location:       strings.TrimSpace(cfg.Location),
-		httpClient:     &http.Client{Timeout: timeout, Transport: telemetry.NewProviderTransport("google-vertex", nil)},
+		httpClient:     &http.Client{Timeout: timeout, Transport: obs.NewProviderTransport("google-vertex", nil)},
 		tokenSource:    tokenSource,
 		tokenSourceErr: err,
 	}
@@ -72,18 +72,18 @@ func (c *Client) JSON(ctx context.Context, method string, path string, body any,
 		return nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google Vertex returned an invalid JSON response.")
 	}
 	return nil
 }
 
 func (c *Client) do(ctx context.Context, method string, path string, body any, accept string) (*http.Response, error) {
 	if c.tokenSourceErr != nil {
-		return nil, httputil.ProviderAuthError("Google Vertex", "Google Vertex ADC credentials are not available.")
+		return nil, apierror.ProviderAuthError("Google Vertex", "Google Vertex ADC credentials are not available.")
 	}
 	token, err := c.tokenSource.Token()
 	if err != nil {
-		return nil, httputil.ProviderAuthError("Google Vertex", "Google Vertex access token request failed.")
+		return nil, apierror.ProviderAuthError("Google Vertex", "Google Vertex access token request failed.")
 	}
 
 	var reader io.Reader
@@ -109,7 +109,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body any, a
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, httputil.ProviderTransportError(err, "Google Vertex")
+		return nil, apierror.ProviderTransportError(err, "Google Vertex")
 	}
 	return resp, nil
 }
@@ -136,7 +136,7 @@ func (c *Client) apiError(resp *http.Response) error {
 		message = "Google Vertex returned an error."
 	}
 
-	return httputil.ProviderAPIError("Google Vertex", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("Google Vertex", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: message,
 		Body:    string(body),
 		Status:  parsed.Error.Status,

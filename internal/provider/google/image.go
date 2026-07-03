@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -120,7 +120,7 @@ func translateReferenceImage(raw string) (googlePart, error) {
 		return translateImagePart(raw)
 	}
 	if strings.TrimSpace(raw) == "" {
-		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_reference_image", "reference_images", "Reference images must be URLs, data URIs, or base64 strings.")
+		return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_reference_image", "reference_images", "Reference images must be URLs, data URIs, or base64 strings.")
 	}
 	return googlePart{
 		InlineData: &googleBlob{
@@ -132,14 +132,14 @@ func translateReferenceImage(raw string) (googlePart, error) {
 
 func inlineImagePart(contentType string, data []byte) (googlePart, error) {
 	if len(data) == 0 {
-		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "missing_image", "image", "Image payload is required.")
+		return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "missing_image", "image", "Image payload is required.")
 	}
 	mimeType := strings.TrimSpace(contentType)
 	if mimeType == "" || mimeType == "application/octet-stream" {
 		mimeType = http.DetectContentType(data)
 	}
 	if !strings.HasPrefix(mimeType, "image/") {
-		return googlePart{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "image", "Google image models require image input.")
+		return googlePart{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "image", "Google image models require image input.")
 	}
 	return googlePart{
 		InlineData: &googleBlob{
@@ -174,7 +174,7 @@ func translateImageResponse(response generateContentResponse, requestedFormat st
 	}
 
 	if len(items) == 0 {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an image response without image data.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Google returned an image response without image data.")
 	}
 	return &modality.ImageResponse{
 		Created: time.Now().Unix(),

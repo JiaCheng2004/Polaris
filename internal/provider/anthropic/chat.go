@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -343,7 +343,7 @@ func translateAnthropicToolDefinition(tool modality.ToolDefinition) (anthropicTo
 		case "mcp":
 			return anthropicTool{Type: "mcp_toolset", Config: config}, true, nil
 		default:
-			return anthropicTool{}, false, httputil.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Anthropic does not support the requested hosted tool.")
+			return anthropicTool{}, false, apierror.NewError(http.StatusBadRequest, "capability_not_supported", "hosted_tool_not_supported", "tools", "Anthropic does not support the requested hosted tool.")
 		}
 	default:
 		return anthropicTool{}, false, nil
@@ -394,7 +394,7 @@ func translateMessage(message modality.ChatMessage) (anthropicMessage, error) {
 			},
 		}, nil
 	default:
-		return anthropicMessage{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_role", "messages.role", "Unsupported message role.")
+		return anthropicMessage{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_role", "messages.role", "Unsupported message role.")
 	}
 }
 
@@ -413,7 +413,7 @@ func translateContent(content modality.MessageContent) ([]anthropicContentBlock,
 			blocks = append(blocks, anthropicContentBlock{Type: "text", Text: part.Text})
 		case "image_url":
 			if part.ImageURL == nil {
-				return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.")
+				return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image", "messages.content.image_url", "Image content must include image_url.")
 			}
 			source, err := translateImageSource(part.ImageURL.URL)
 			if err != nil {
@@ -424,7 +424,7 @@ func translateContent(content modality.MessageContent) ([]anthropicContentBlock,
 				Source: source,
 			})
 		case "input_audio":
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_input", "messages.content.input_audio", "Anthropic chat does not support audio input in this build.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_input", "messages.content.input_audio", "Anthropic chat does not support audio input in this build.")
 		case "file", "document":
 			block, err := translateFileBlock(part)
 			if err != nil {
@@ -432,7 +432,7 @@ func translateContent(content modality.MessageContent) ([]anthropicContentBlock,
 			}
 			blocks = append(blocks, block)
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_content_part", "messages.content.type", "Unsupported content part type.")
 		}
 	}
 	return blocks, nil
@@ -444,7 +444,7 @@ func translateFileBlock(part modality.ContentPart) (anthropicContentBlock, error
 		filePart = part.Document
 	}
 	if filePart == nil {
-		return anthropicContentBlock{}, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
+		return anthropicContentBlock{}, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file details.")
 	}
 	blockType := "document"
 	if strings.HasPrefix(filePart.MimeType, "image/") {
@@ -472,7 +472,7 @@ func translateFileSource(part *modality.FilePart) (*anthropicImageSource, error)
 	case strings.TrimSpace(part.URL) != "":
 		return &anthropicImageSource{Type: "url", URL: strings.TrimSpace(part.URL)}, nil
 	default:
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_file", "messages.content.file", "File content must include file_id, url, or data.")
 	}
 }
 
@@ -480,7 +480,7 @@ func translateImageSource(raw string) (*anthropicImageSource, error) {
 	if strings.HasPrefix(raw, "data:") {
 		header, data, ok := strings.Cut(strings.TrimPrefix(raw, "data:"), ",")
 		if !ok {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_image_data_uri", "messages.content.image_url.url", "Invalid image data URI.")
 		}
 		mediaType := "image/png"
 		if value, _, _ := strings.Cut(header, ";"); value != "" {
@@ -509,7 +509,7 @@ func contentToText(content modality.MessageContent) (string, error) {
 	var parts []string
 	for _, part := range content.Parts {
 		if part.Type != "text" {
-			return "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
+			return "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_system_content", "messages.content", "System and tool messages must use text content.")
 		}
 		parts = append(parts, part.Text)
 	}
@@ -527,7 +527,7 @@ func translateToolChoice(raw json.RawMessage) (map[string]any, error) {
 		case "none":
 			return nil, nil
 		default:
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
+			return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice value.")
 		}
 	}
 
@@ -538,10 +538,10 @@ func translateToolChoice(raw json.RawMessage) (map[string]any, error) {
 		} `json:"function"`
 	}
 	if err := json.Unmarshal(raw, &objectChoice); err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Invalid tool_choice payload.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Invalid tool_choice payload.")
 	}
 	if objectChoice.Type != "function" || objectChoice.Function.Name == "" {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice payload.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_choice", "tool_choice", "Unsupported tool_choice payload.")
 	}
 	return map[string]any{
 		"type": "tool",
@@ -701,7 +701,7 @@ func (a *ChatAdapter) decodeStream(r io.Reader, canonicalModel string, dst chan<
 			if message == "" {
 				message = "Anthropic streaming request failed."
 			}
-			return false, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
+			return false, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
 		}
 
 		chunks, done, err := state.consume(currentEvent, payload, canonicalModel)

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -92,7 +92,7 @@ func decodeAnthropicNativeStream(r io.Reader, canonicalModel string, dst chan<- 
 			if message == "" {
 				message = "Anthropic messages streaming request failed."
 			}
-			return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
 		}
 
 		rewritten, usage, err := rewriteAnthropicMessagePayload([]byte(payload), canonicalModel)
@@ -138,7 +138,7 @@ func decodeAnthropicNativeStream(r io.Reader, canonicalModel string, dst chan<- 
 func rewriteAnthropicRequestModel(raw json.RawMessage, model string) (map[string]any, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON.")
 	}
 	payload["model"] = model
 	return payload, nil

@@ -11,7 +11,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,7 +54,7 @@ func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.R
 	}
 
 	return func(c *gin.Context) {
-		ctx, span := telemetry.StartInternalSpan(c.Request.Context(), "budget.evaluate")
+		ctx, span := obs.StartInternalSpan(c.Request.Context(), "budget.evaluate")
 		defer span.End()
 		c.Request = c.Request.WithContext(ctx)
 

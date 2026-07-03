@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 )
 
 const defaultBaseURL = "https://api.elevenlabs.io"
@@ -40,7 +40,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("elevenlabs", nil),
+			Transport: obs.NewProviderTransport("elevenlabs", nil),
 		},
 	}
 }
@@ -57,7 +57,7 @@ func (c *Client) JSON(ctx context.Context, method string, path string, query url
 		_ = resp.Body.Close()
 	}()
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ElevenLabs returned an invalid JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ElevenLabs returned an invalid JSON response.")
 	}
 	return resp, nil
 }
@@ -107,7 +107,7 @@ func (c *Client) UploadFile(ctx context.Context, path string, fieldName string, 
 		_ = resp.Body.Close()
 	}()
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ElevenLabs returned an invalid JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ElevenLabs returned an invalid JSON response.")
 	}
 	return resp, nil
 }
@@ -134,7 +134,7 @@ func (c *Client) do(ctx context.Context, method string, path string, query url.V
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, httputil.ProviderTransportError(err, "ElevenLabs")
+		return nil, apierror.ProviderTransportError(err, "ElevenLabs")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		defer func() {
@@ -158,7 +158,7 @@ func (c *Client) apiError(resp *http.Response) error {
 	var parsed elevenErrorEnvelope
 	_ = json.Unmarshal(body, &parsed)
 
-	return httputil.ProviderAPIError("ElevenLabs", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("ElevenLabs", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: parsed.Detail.Message,
 		Body:    string(body),
 		Status:  parsed.Detail.Status,

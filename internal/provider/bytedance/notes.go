@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -103,7 +103,7 @@ func NewAudioNotesAdapter(client *Client, model string, endpoint string) modalit
 
 func (a *audioNotesAdapter) SubmitNotes(ctx context.Context, req *modality.AudioNoteRequest) (*modality.AudioNoteJob, error) {
 	if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance audio notes require providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance audio notes require providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 	}
 
 	body := bytedanceNotesSubmitRequest{
@@ -153,7 +153,7 @@ func (a *audioNotesAdapter) SubmitNotes(ctx context.Context, req *modality.Audio
 
 func (a *audioNotesAdapter) GetAudioNote(ctx context.Context, req *modality.AudioNoteStatusRequest) (*modality.AudioNoteJob, error) {
 	if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance audio notes require providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance audio notes require providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 	}
 
 	var envelope bytedanceNotesEnvelope
@@ -209,10 +209,10 @@ func (a *audioNotesAdapter) postNotesJSON(ctx context.Context, endpoint string, 
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance audio notes returned an unreadable response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance audio notes returned an unreadable response.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return httputil.ProviderAPIError("ByteDance", resp.StatusCode, httputil.ProviderErrorDetails{
+		return apierror.ProviderAPIError("ByteDance", resp.StatusCode, apierror.ProviderErrorDetails{
 			Message: strings.TrimSpace(string(raw)),
 			Body:    string(raw),
 		})
@@ -221,10 +221,10 @@ func (a *audioNotesAdapter) postNotesJSON(ctx context.Context, endpoint string, 
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance audio notes returned an invalid JSON response.")
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance audio notes returned an invalid JSON response.")
 	}
 	if envelope, ok := out.(*bytedanceNotesEnvelope); ok && envelope.Code != bytedanceNotesSuccessCode {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(envelope.Message), "ByteDance audio notes request failed."))
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", firstNonEmpty(strings.TrimSpace(envelope.Message), "ByteDance audio notes request failed."))
 	}
 	return nil
 }
@@ -290,7 +290,7 @@ func (a *audioNotesAdapter) fetchJSONURL(ctx context.Context, rawURL string, out
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return httputil.ProviderAPIError("ByteDance", resp.StatusCode, httputil.ProviderErrorDetails{
+		return apierror.ProviderAPIError("ByteDance", resp.StatusCode, apierror.ProviderErrorDetails{
 			Message: "ByteDance audio notes asset download failed.",
 		})
 	}

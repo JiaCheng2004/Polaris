@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -58,7 +58,7 @@ func (a *VideoAdapter) Generate(ctx context.Context, req *modality.VideoRequest)
 		return nil, err
 	}
 	if strings.TrimSpace(response.ID) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate did not return a prediction id.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate did not return a prediction id.")
 	}
 	return &modality.VideoJob{
 		JobID:  response.ID,
@@ -107,9 +107,9 @@ func (a *VideoAdapter) Cancel(ctx context.Context, jobID string) error {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil
 	case http.StatusNotFound:
-		return httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	case http.StatusConflict, http.StatusUnprocessableEntity:
-		return httputil.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
+		return apierror.NewError(http.StatusConflict, "invalid_request_error", "job_immutable", "id", "Completed or failed video jobs cannot be cancelled.")
 	default:
 		return a.client.apiError(resp)
 	}
@@ -127,12 +127,12 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 		}
 		result := predictionToResult(prediction.Output)
 		if result == nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned no downloadable video URL.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned no downloadable video URL.")
 		}
 		videoURL = strings.TrimSpace(result.VideoURL)
 	}
 	if videoURL == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned no downloadable video URL.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned no downloadable video URL.")
 	}
 
 	resp, err := a.client.Download(ctx, videoURL)
@@ -145,17 +145,17 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 
 	switch resp.StatusCode {
 	case http.StatusGone:
-		return nil, httputil.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
+		return nil, apierror.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
 	case http.StatusNotFound:
-		return nil, httputil.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset is no longer available.")
+		return nil, apierror.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset is no longer available.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_download_failed", "", "Replicate video download failed.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_download_failed", "", "Replicate video download failed.")
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned an invalid video asset.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "Replicate returned an invalid video asset.")
 	}
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if contentType == "" {
@@ -167,12 +167,12 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 func (a *VideoAdapter) getPrediction(ctx context.Context, jobID string) (*predictionResponse, error) {
 	var prediction predictionResponse
 	if err := a.client.JSON(ctx, http.MethodGet, "/predictions/"+url.PathEscape(jobID), nil, &prediction); err != nil {
-		var apiErr *httputil.APIError
+		var apiErr *apierror.APIError
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 		}
 		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
-			return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 		}
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func parseProviderModel(value string) (string, string, error) {
 	trimmed := strings.Trim(strings.TrimSpace(value), "/")
 	parts := strings.Split(trimmed, "/")
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_model", "model", "Replicate models must use owner/model identifiers.")
+		return "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_model", "model", "Replicate models must use owner/model identifiers.")
 	}
 	return parts[0], parts[1], nil
 }

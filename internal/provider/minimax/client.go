@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/telemetry"
+	"github.com/JiaCheng2004/Polaris/internal/obs"
 )
 
 const defaultBaseURL = "https://api.minimax.io"
@@ -37,7 +37,7 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout:   timeout,
-			Transport: telemetry.NewProviderTransport("minimax", nil),
+			Transport: obs.NewProviderTransport("minimax", nil),
 		},
 	}
 }
@@ -58,7 +58,7 @@ func (c *Client) JSON(ctx context.Context, method string, path string, body any,
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		_ = resp.Body.Close()
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned an invalid JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "MiniMax returned an invalid JSON response.")
 	}
 	_ = resp.Body.Close()
 	return resp, nil
@@ -100,7 +100,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body any, c
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, httputil.ProviderTransportError(err, "MiniMax")
+		return nil, apierror.ProviderTransportError(err, "MiniMax")
 	}
 	return resp, nil
 }
@@ -118,7 +118,7 @@ func (c *Client) apiError(resp *http.Response) error {
 	var parsed minimaxErrorEnvelope
 	_ = json.Unmarshal(body, &parsed)
 
-	return httputil.ProviderAPIError("MiniMax", resp.StatusCode, httputil.ProviderErrorDetails{
+	return apierror.ProviderAPIError("MiniMax", resp.StatusCode, apierror.ProviderErrorDetails{
 		Message: parsed.BaseResp.StatusMsg,
 		Body:    string(body),
 		Code:    fmt.Sprintf("%d", parsed.BaseResp.StatusCode),

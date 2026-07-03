@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 )
 
 func TestClientInjectsStaticHeaders(t *testing.T) {
@@ -89,7 +89,7 @@ func TestClientMapsProviderErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			var apiErr *httputil.APIError
+			var apiErr *apierror.APIError
 			if !errors.As(err, &apiErr) {
 				t.Fatalf("expected APIError, got %T", err)
 			}

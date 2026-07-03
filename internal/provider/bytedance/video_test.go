@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -264,7 +264,7 @@ func TestVideoAdapterCancelMapsErrors(t *testing.T) {
 	}
 
 	err := adapter.Cancel(context.Background(), "task_done")
-	var apiErr *httputil.APIError
+	var apiErr *apierror.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected APIError, got %T", err)
 	}

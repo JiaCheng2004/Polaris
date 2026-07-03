@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -90,7 +90,7 @@ func decodeOpenAINativeStream(r io.Reader, canonicalModel string, dst chan<- mod
 			if strings.TrimSpace(message) == "" {
 				message = "OpenAI responses streaming request failed."
 			}
-			return false, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
+			return false, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_stream_error", "", message)
 		}
 
 		rewritten, usage, err := rewriteOpenAIResponsePayload([]byte(payload), canonicalModel)
@@ -144,7 +144,7 @@ func decodeOpenAINativeStream(r io.Reader, canonicalModel string, dst chan<- mod
 func rewriteOpenAIRequestModel(raw json.RawMessage, model string) (map[string]any, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON.")
+		return nil, apierror.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON.")
 	}
 	payload["model"] = model
 	return payload, nil

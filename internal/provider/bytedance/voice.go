@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -110,7 +110,7 @@ func NewVoiceAdapter(client *Client, model string, endpoint string) *VoiceAdapte
 
 func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSRequest) (*modality.AudioResponse, error) {
 	if strings.TrimSpace(a.client.speechAPIKey) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance TTS requires providers.bytedance.speech_api_key.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance TTS requires providers.bytedance.speech_api_key.")
 	}
 
 	encoding, contentType, err := bytedanceEncoding(req.ResponseFormat)
@@ -162,7 +162,7 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid voice response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid voice response.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		var parsed ttsResponse
@@ -177,7 +177,7 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 		return nil, err
 	}
 	if len(audioData) == 0 {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an empty audio payload.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an empty audio payload.")
 	}
 
 	return &modality.AudioResponse{
@@ -188,7 +188,7 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 
 func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTRequest) (*modality.TranscriptResponse, error) {
 	if strings.TrimSpace(a.client.speechAPIKey) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance STT requires providers.bytedance.speech_api_key.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance STT requires providers.bytedance.speech_api_key.")
 	}
 
 	requestID := newRequestID()
@@ -230,7 +230,7 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid transcription response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid transcription response.")
 	}
 
 	apiStatus := strings.TrimSpace(resp.Header.Get("X-Api-Status-Code"))
@@ -241,7 +241,7 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 
 	var parsed sttResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid STT JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid STT JSON response.")
 	}
 
 	response := normalizeBytedanceTranscript(parsed, req)
@@ -271,7 +271,7 @@ func bytedanceEncoding(format string) (string, string, error) {
 	case "pcm":
 		return "pcm", "audio/pcm", nil
 	default:
-		return "", "", httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_response_format", "response_format", "Requested response format is not supported by ByteDance TTS 2.0.")
+		return "", "", apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_response_format", "response_format", "Requested response format is not supported by ByteDance TTS 2.0.")
 	}
 }
 
@@ -282,15 +282,15 @@ func bytedanceVoiceError(status int, code int, message string) error {
 
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
 	case status == http.StatusTooManyRequests:
-		return httputil.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
+		return apierror.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
 	case status >= http.StatusInternalServerError:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
 	case code >= 3001 && code < 4000:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "", message)
 	default:
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
 	}
 }
 
@@ -304,27 +304,27 @@ func bytedanceSTTError(status int, apiStatus string, message string, body []byte
 
 	switch apiStatus {
 	case "20000003":
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "silent_audio", "file", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "silent_audio", "file", message)
 	case "45000001":
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "file", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "provider_bad_request", "file", message)
 	case "45000002":
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "empty_audio", "file", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "empty_audio", "file", message)
 	case "45000151":
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_format", "file", message)
+		return apierror.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_audio_format", "file", message)
 	case "55000031":
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_busy", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_busy", "", message)
 	}
 
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_auth_failed", "", message)
 	}
 	if status == http.StatusTooManyRequests {
-		return httputil.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
+		return apierror.NewError(http.StatusTooManyRequests, "rate_limit_error", "provider_rate_limit", "", message)
 	}
 	if strings.HasPrefix(apiStatus, "55") || status >= http.StatusInternalServerError {
-		return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
+		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_server_error", "", message)
 	}
-	return httputil.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
+	return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_error", "", message)
 }
 
 func normalizeBytedanceTranscript(parsed sttResponse, req *modality.STTRequest) *modality.TranscriptResponse {
@@ -459,7 +459,7 @@ func bytedanceDecodeTTSStream(body []byte) ([]byte, error) {
 
 		var parsed ttsResponse
 		if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTS stream event.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an invalid TTS stream event.")
 		}
 		if parsed.Code != 0 && parsed.Code != bytedanceTTSSuccessCode {
 			return nil, bytedanceVoiceError(http.StatusOK, parsed.Code, parsed.Message)
@@ -470,13 +470,13 @@ func bytedanceDecodeTTSStream(body []byte) ([]byte, error) {
 
 		chunk, err := base64.StdEncoding.DecodeString(parsed.Data)
 		if err != nil {
-			return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned invalid base64 audio data.")
+			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned invalid base64 audio data.")
 		}
 		audio = append(audio, chunk...)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an unreadable TTS stream.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "ByteDance returned an unreadable TTS stream.")
 	}
 	return audio, nil
 }

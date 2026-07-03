@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -77,7 +77,7 @@ func (a *VideoAdapter) Generate(ctx context.Context, req *modality.VideoRequest)
 		return nil, err
 	}
 	if strings.TrimSpace(response.ID) == "" {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI did not return a video id.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI did not return a video id.")
 	}
 
 	return &modality.VideoJob{
@@ -97,7 +97,7 @@ func (a *VideoAdapter) GetStatus(ctx context.Context, jobID string) (*modality.V
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, a.client.apiError(resp)
@@ -105,7 +105,7 @@ func (a *VideoAdapter) GetStatus(ctx context.Context, jobID string) (*modality.V
 
 	var raw openAIVideoObject
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid video response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid video response.")
 	}
 
 	status := &modality.VideoStatus{
@@ -144,7 +144,7 @@ func (a *VideoAdapter) GetStatus(ctx context.Context, jobID string) (*modality.V
 }
 
 func (a *VideoAdapter) Cancel(context.Context, string) error {
-	return httputil.NewError(http.StatusConflict, "invalid_request_error", "job_not_cancelable", "id", "This video job cannot be cancelled.")
+	return apierror.NewError(http.StatusConflict, "invalid_request_error", "job_not_cancelable", "id", "This video job cannot be cancelled.")
 }
 
 func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modality.VideoStatus) (*modality.VideoAsset, error) {
@@ -157,10 +157,10 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 	}()
 
 	if resp.StatusCode == http.StatusGone {
-		return nil, httputil.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
+		return nil, apierror.NewError(http.StatusGone, "invalid_request_error", "asset_expired", "id", "Video asset has expired.")
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
+		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, a.client.apiError(resp)
@@ -168,7 +168,7 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid video asset.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid video asset.")
 	}
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if contentType == "" && status != nil && status.Result != nil {

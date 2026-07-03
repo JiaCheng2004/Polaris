@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 )
 
@@ -85,7 +85,7 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid audio response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid audio response.")
 	}
 
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
@@ -161,7 +161,7 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid transcription response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid transcription response.")
 	}
 
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
@@ -180,7 +180,7 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 
 	var verbose verboseTranscriptionResponse
 	if err := json.Unmarshal(payload, &verbose); err != nil {
-		return nil, httputil.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid transcription JSON response.")
+		return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid transcription JSON response.")
 	}
 
 	segments := make([]modality.TranscriptSegment, 0, len(verbose.Segments))
