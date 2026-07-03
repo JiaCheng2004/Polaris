@@ -65,12 +65,12 @@ func (a *BatchAdapter) Output(ctx context.Context, providerJobID string) (io.Rea
 	if strings.TrimSpace(status.OutputFileID) == "" {
 		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "batch_output_not_ready", "id", "Batch output is not ready.")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.client.baseURL+"/files/"+status.OutputFileID+"/content", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.client.BaseURL()+"/files/"+status.OutputFileID+"/content", nil)
 	if err != nil {
 		return nil, fmt.Errorf("build openai batch output request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+a.client.apiKey)
-	resp, err := a.client.httpClient.Do(req)
+	req.Header.Set("Authorization", "Bearer "+a.client.APIKey())
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return nil, translateTransportError(err, "OpenAI")
 	}
@@ -78,7 +78,7 @@ func (a *BatchAdapter) Output(ctx context.Context, providerJobID string) (io.Rea
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 	return resp.Body, nil
 }
@@ -129,16 +129,16 @@ func (a *BatchAdapter) jsonRequest(ctx context.Context, method string, path stri
 		}
 		reader = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, a.client.baseURL+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, a.client.BaseURL()+path, reader)
 	if err != nil {
 		return fmt.Errorf("build openai batch request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+a.client.apiKey)
+	req.Header.Set("Authorization", "Bearer "+a.client.APIKey())
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return translateTransportError(err, "OpenAI")
 	}
@@ -146,7 +146,7 @@ func (a *BatchAdapter) jsonRequest(ctx context.Context, method string, path stri
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return a.client.apiError(resp)
+		return a.client.APIError(resp)
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

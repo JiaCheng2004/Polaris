@@ -151,15 +151,15 @@ func openAIFilePurpose(purpose modality.FilePurpose) string {
 }
 
 func (c *Client) filesMultipart(ctx context.Context, path string, payload []byte, contentType string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL()+path, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("build openai files request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.APIKey())
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient().Do(req)
 	if err != nil {
 		return translateTransportError(err, "OpenAI")
 	}
@@ -167,7 +167,7 @@ func (c *Client) filesMultipart(ctx context.Context, path string, payload []byte
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return c.apiError(resp)
+		return c.APIError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_invalid_response", "", "OpenAI returned an invalid file response.")
@@ -184,17 +184,17 @@ func (c *Client) filesJSON(ctx context.Context, method string, path string, body
 		}
 		reader = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL()+path, reader)
 	if err != nil {
 		return fmt.Errorf("build openai files request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.APIKey())
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HTTPClient().Do(req)
 	if err != nil {
 		return translateTransportError(err, "OpenAI")
 	}
@@ -202,7 +202,7 @@ func (c *Client) filesJSON(ctx context.Context, method string, path string, body
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return c.apiError(resp)
+		return c.APIError(resp)
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

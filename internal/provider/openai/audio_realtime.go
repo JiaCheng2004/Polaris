@@ -61,7 +61,7 @@ func newRealtimeAudioAdapter(client *Client, model string, modelCfg config.Model
 	}
 	realtimeURL := strings.TrimSpace(modelCfg.RealtimeSession.URL)
 	if realtimeURL == "" {
-		realtimeURL = openAIRealtimeURL(client.baseURL)
+		realtimeURL = openAIRealtimeURL(client.BaseURL())
 	}
 	defaultSession := modelCfg.SessionTTL
 	if defaultSession <= 0 {
@@ -375,7 +375,7 @@ func (s *realtimeAudioSession) ensureStarted() error {
 
 func (s *realtimeAudioSession) start() error {
 	headers := http.Header{}
-	headers.Set("Authorization", "Bearer "+s.adapter.client.apiKey)
+	headers.Set("Authorization", "Bearer "+s.adapter.client.APIKey())
 	headers.Set("OpenAI-Beta", realtimeBetaHeader)
 
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}

@@ -1,7 +1,6 @@
 package bytedance
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,14 +11,14 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 const defaultBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
 const defaultControlBaseURL = "https://open.volcengineapi.com"
 
 type Client struct {
+	core            *transport.Client
 	baseURL         string
 	controlBaseURL  string
 	apiKey          string
@@ -57,7 +56,21 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		timeout = 2 * time.Minute
 	}
 
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "ByteDance",
+		ProviderSlug: "bytedance",
+		Auth:         transport.BearerAuth(cfg.APIKey),
+		Timeout:      timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
+		},
+	})
+
 	return &Client{
+		core:            core,
 		baseURL:         baseURL,
 		controlBaseURL:  controlBaseURL,
 		apiKey:          cfg.APIKey,
@@ -67,12 +80,9 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		speechAPIKey:    cfg.SpeechAPIKey,
 		speechToken:     cfg.SpeechAccessToken,
 		projectName:     firstNonEmpty(strings.TrimSpace(cfg.ProjectName), "default"),
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("bytedance", nil),
-		},
-		maxAttempts:  maxAttempts,
-		initialDelay: initialDelay,
+		httpClient:      core.HTTPClient(),
+		maxAttempts:     maxAttempts,
+		initialDelay:    initialDelay,
 	}
 }
 
@@ -147,51 +157,22 @@ func (c *Client) Stream(ctx context.Context, endpoint string, path string, body 
 	return resp, nil
 }
 
+// doRequest routes through the shared transport core (Bearer data-plane auth,
+// jittered retry, B2 fix). The full URL is resolved per call because ByteDance
+// data-plane and per-endpoint overrides use different base URLs; it is passed
+// as an absolute path so the core issues it verbatim.
 func (c *Client) doRequest(ctx context.Context, method string, endpoint string, path string, payload []byte) (*http.Response, error) {
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
+	contentType := ""
+	if payload != nil {
+		contentType = "application/json"
 	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		var body io.Reader
-		if payload != nil {
-			body = bytes.NewReader(payload)
-		}
-		req, err := http.NewRequestWithContext(ctx, method, joinURL(c.resolveBaseURL(endpoint), path), body)
-		if err != nil {
-			return nil, fmt.Errorf("build bytedance request: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		req.Header.Set("Accept", "application/json")
-		if payload != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && retrypkg.RetryableTransportError(err) {
-				if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, retrypkg.TranslateTransportError(err, "ByteDance")
-		}
-
-		if retrypkg.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-
-		return resp, nil
-	}
-
-	return nil, retrypkg.TranslateTransportError(lastErr, "ByteDance")
+	return c.core.Do(ctx, transport.Request{
+		Method:      method,
+		Path:        joinURL(c.resolveBaseURL(endpoint), path),
+		Body:        payload,
+		ContentType: contentType,
+		Accept:      "application/json",
+	})
 }
 
 func (c *Client) resolveBaseURL(endpoint string) string {
@@ -230,7 +211,7 @@ func (c *Client) apiError(resp *http.Response) error {
 }
 
 func translateTransportError(err error, providerName string) error {
-	return retrypkg.TranslateTransportError(err, providerName)
+	return apierror.ProviderTransportError(err, providerName)
 }
 
 func firstNonEmpty(values ...string) string {

@@ -100,7 +100,7 @@ func (a *VideoAdapter) GetStatus(ctx context.Context, jobID string) (*modality.V
 		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 
 	var raw openAIVideoObject
@@ -163,7 +163,7 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 		return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "job_not_found", "id", "Video job was not found.")
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -181,16 +181,16 @@ func (a *VideoAdapter) Download(ctx context.Context, jobID string, status *modal
 }
 
 func (a *VideoAdapter) request(ctx context.Context, method string, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, a.client.baseURL+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, a.client.BaseURL()+path, body)
 	if err != nil {
 		return nil, fmt.Errorf("build openai video request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+a.client.apiKey)
+	req.Header.Set("Authorization", "Bearer "+a.client.APIKey())
 	req.Header.Set("Accept", "*/*")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return nil, translateTransportError(err, "OpenAI")
 	}

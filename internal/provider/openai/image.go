@@ -129,15 +129,15 @@ func (a *ImageAdapter) Edit(ctx context.Context, req *modality.ImageEditRequest)
 }
 
 func (a *ImageAdapter) multipart(ctx context.Context, path string, payload []byte, contentType string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.baseURL+path, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.BaseURL()+path, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("build openai multipart request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+a.client.apiKey)
+	req.Header.Set("Authorization", "Bearer "+a.client.APIKey())
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
 		return nil, translateTransportError(err, "OpenAI")
 	}
@@ -145,7 +145,7 @@ func (a *ImageAdapter) multipart(ctx context.Context, path string, payload []byt
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 	return resp, nil
 }

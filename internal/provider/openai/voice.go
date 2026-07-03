@@ -63,15 +63,15 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 		return nil, fmt.Errorf("marshal openai tts request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.baseURL+"/audio/speech", bytes.NewReader(raw))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.BaseURL()+"/audio/speech", bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("build openai tts request: %w", err)
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+a.client.apiKey)
+	httpReq.Header.Set("Authorization", "Bearer "+a.client.APIKey())
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "*/*")
 
-	resp, err := a.client.httpClient.Do(httpReq)
+	resp, err := a.client.HTTPClient().Do(httpReq)
 	if err != nil {
 		return nil, translateTransportError(err, "OpenAI")
 	}
@@ -80,7 +80,7 @@ func (a *VoiceAdapter) TextToSpeech(ctx context.Context, req *modality.TTSReques
 	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -139,15 +139,15 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 		return nil, fmt.Errorf("close transcription multipart writer: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.baseURL+"/audio/transcriptions", bytes.NewReader(body.Bytes()))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.client.BaseURL()+"/audio/transcriptions", bytes.NewReader(body.Bytes()))
 	if err != nil {
 		return nil, fmt.Errorf("build openai transcription request: %w", err)
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+a.client.apiKey)
+	httpReq.Header.Set("Authorization", "Bearer "+a.client.APIKey())
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	httpReq.Header.Set("Accept", "*/*")
 
-	resp, err := a.client.httpClient.Do(httpReq)
+	resp, err := a.client.HTTPClient().Do(httpReq)
 	if err != nil {
 		return nil, translateTransportError(err, "OpenAI")
 	}
@@ -156,7 +156,7 @@ func (a *VoiceAdapter) SpeechToText(ctx context.Context, req *modality.STTReques
 	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, a.client.apiError(resp)
+		return nil, a.client.APIError(resp)
 	}
 
 	payload, err := io.ReadAll(resp.Body)
