@@ -1,7 +1,6 @@
 package bedrock
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,22 +11,19 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
 	awsauth "github.com/JiaCheng2004/Polaris/internal/provider/common/auth"
-	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 const bedrockService = "bedrock"
 
 type Client struct {
-	baseURL         string
-	region          string
-	accessKeyID     string
-	accessKeySecret string
-	sessionToken    string
-	httpClient      *http.Client
-	maxAttempts     int
-	initialDelay    time.Duration
+	core         *transport.Client
+	baseURL      string
+	region       string
+	httpClient   *http.Client
+	maxAttempts  int
+	initialDelay time.Duration
 }
 
 func NewClient(cfg config.ProviderConfig) *Client {
@@ -50,16 +46,36 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		initialDelay = 200 * time.Millisecond
 	}
 
-	return &Client{
-		baseURL:         baseURL,
-		region:          region,
-		accessKeyID:     strings.TrimSpace(cfg.AccessKeyID),
-		accessKeySecret: strings.TrimSpace(cfg.AccessKeySecret),
-		sessionToken:    strings.TrimSpace(cfg.SessionToken),
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("bedrock", nil),
+	accessKeyID := strings.TrimSpace(cfg.AccessKeyID)
+	accessKeySecret := strings.TrimSpace(cfg.AccessKeySecret)
+	sessionToken := strings.TrimSpace(cfg.SessionToken)
+
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "Amazon Bedrock",
+		ProviderSlug: "bedrock",
+		// SigV4 is re-signed per attempt with a fresh timestamp; the AuthFunc
+		// receives the exact request body to hash. It runs after Content-Type
+		// and Accept are set so those signed headers are covered.
+		Auth: func(req *http.Request, body []byte) error {
+			if err := awsauth.SignAWSRequest(req, body, bedrockService, region, accessKeyID, accessKeySecret, sessionToken, time.Now()); err != nil {
+				return fmt.Errorf("sign amazon bedrock request: %w", err)
+			}
+			return nil
 		},
+		Timeout: timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
+		},
+	})
+
+	return &Client{
+		core:         core,
+		baseURL:      baseURL,
+		region:       region,
+		httpClient:   core.HTTPClient(),
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
 	}
@@ -106,49 +122,13 @@ func (c *Client) do(ctx context.Context, path string, body any, accept string) (
 	if err != nil {
 		return nil, fmt.Errorf("marshal amazon bedrock request: %w", err)
 	}
-
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-		if err != nil {
-			return nil, fmt.Errorf("build amazon bedrock request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		if accept != "" {
-			req.Header.Set("Accept", accept)
-		}
-		if err := awsauth.SignAWSRequest(req, payload, bedrockService, c.region, c.accessKeyID, c.accessKeySecret, c.sessionToken, time.Now()); err != nil {
-			return nil, fmt.Errorf("sign amazon bedrock request: %w", err)
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && openaicompat.RetryableTransportError(err) {
-				if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, apierror.ProviderTransportError(err, "Amazon Bedrock")
-		}
-
-		if openaicompat.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-
-		return resp, nil
-	}
-
-	return nil, apierror.ProviderTransportError(lastErr, "Amazon Bedrock")
+	return c.core.Do(ctx, transport.Request{
+		Method:      http.MethodPost,
+		Path:        path,
+		Body:        payload,
+		ContentType: "application/json",
+		Accept:      accept,
+	})
 }
 
 func (c *Client) apiError(resp *http.Response) error {

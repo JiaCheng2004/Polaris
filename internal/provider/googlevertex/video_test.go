@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"golang.org/x/oauth2"
@@ -54,13 +55,7 @@ func TestVideoAdapterGenerateStatusDownloadAndCancel(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
-		baseURL:     server.URL,
-		projectID:   "test-project",
-		location:    "us-central1",
-		httpClient:  server.Client(),
-		tokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-token"}),
-	}
+	client := newClient(server.URL, time.Minute, "test-project", "us-central1", oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-token"}), nil)
 	adapter := NewVideoAdapter(client, "google-vertex/veo-3.1-generate-001")
 
 	job, err := adapter.Generate(context.Background(), &modality.VideoRequest{

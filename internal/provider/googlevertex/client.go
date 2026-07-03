@@ -1,7 +1,6 @@
 package googlevertex
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -20,6 +19,7 @@ import (
 const cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 
 type Client struct {
+	core           *transport.Client
 	baseURL        string
 	projectID      string
 	location       string
@@ -39,16 +39,45 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		timeout = time.Minute
 	}
 
-	tokenSource, err := google.DefaultTokenSource(context.Background(), cloudPlatformScope)
+	tokenSource, tokenSourceErr := google.DefaultTokenSource(context.Background(), cloudPlatformScope)
 
-	return &Client{
+	return newClient(baseURL, timeout, strings.TrimSpace(cfg.ProjectID), strings.TrimSpace(cfg.Location), tokenSource, tokenSourceErr)
+}
+
+// newClient wires a Client and its transport core; shared by NewClient and tests
+// (which inject a static token source and mock base URL).
+func newClient(baseURL string, timeout time.Duration, projectID, location string, tokenSource oauth2.TokenSource, tokenSourceErr error) *Client {
+	c := &Client{
 		baseURL:        baseURL,
-		projectID:      strings.TrimSpace(cfg.ProjectID),
-		location:       strings.TrimSpace(cfg.Location),
-		httpClient:     &http.Client{Timeout: timeout, Transport: obs.NewProviderTransport("google-vertex", nil)},
+		projectID:      projectID,
+		location:       location,
 		tokenSource:    tokenSource,
-		tokenSourceErr: err,
+		tokenSourceErr: tokenSourceErr,
 	}
+	c.core = transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "Google Vertex",
+		ProviderSlug: "google-vertex",
+		Auth:         c.authorize,
+		Timeout:      timeout,
+		// Vertex generation submits are not idempotent: keep single-attempt.
+		Retry: transport.RetryPolicy{MaxAttempts: 1},
+	})
+	c.httpClient = c.core.HTTPClient()
+	return c
+}
+
+// authorize fetches (and refreshes) the Vertex ADC token per attempt.
+func (c *Client) authorize(req *http.Request, _ []byte) error {
+	if c.tokenSourceErr != nil {
+		return apierror.ProviderAuthError("Google Vertex", "Google Vertex ADC credentials are not available.")
+	}
+	token, err := c.tokenSource.Token()
+	if err != nil {
+		return apierror.ProviderAuthError("Google Vertex", "Google Vertex access token request failed.")
+	}
+	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	return nil
 }
 
 func (c *Client) endpoint(model string) string {
@@ -78,40 +107,25 @@ func (c *Client) JSON(ctx context.Context, method string, path string, body any,
 }
 
 func (c *Client) do(ctx context.Context, method string, path string, body any, accept string) (*http.Response, error) {
-	if c.tokenSourceErr != nil {
-		return nil, apierror.ProviderAuthError("Google Vertex", "Google Vertex ADC credentials are not available.")
-	}
-	token, err := c.tokenSource.Token()
-	if err != nil {
-		return nil, apierror.ProviderAuthError("Google Vertex", "Google Vertex access token request failed.")
-	}
-
-	var reader io.Reader
+	var payload []byte
 	if body != nil {
-		payload, err := json.Marshal(body)
+		marshaled, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshal google vertex request: %w", err)
 		}
-		reader = bytes.NewReader(payload)
+		payload = marshaled
 	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
-	if err != nil {
-		return nil, fmt.Errorf("build google vertex request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	ct := ""
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		ct = "application/json"
 	}
-	if accept != "" {
-		req.Header.Set("Accept", accept)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, apierror.ProviderTransportError(err, "Google Vertex")
-	}
-	return resp, nil
+	return c.core.Do(ctx, transport.Request{
+		Method:      method,
+		Path:        path,
+		Body:        payload,
+		ContentType: ct,
+		Accept:      accept,
+	})
 }
 
 func (c *Client) apiError(resp *http.Response) error {

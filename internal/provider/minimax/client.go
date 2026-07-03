@@ -1,7 +1,6 @@
 package minimax
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,12 +11,13 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 const defaultBaseURL = "https://api.minimax.io"
 
 type Client struct {
+	core       *transport.Client
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -32,13 +32,20 @@ func NewClient(cfg config.ProviderConfig) *Client {
 	if timeout <= 0 {
 		timeout = 2 * time.Minute
 	}
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "MiniMax",
+		ProviderSlug: "minimax",
+		Auth:         transport.BearerAuth(cfg.APIKey),
+		Timeout:      timeout,
+		// MiniMax generation submits are not idempotent: keep single-attempt.
+		Retry: transport.RetryPolicy{MaxAttempts: 1},
+	})
 	return &Client{
-		baseURL: baseURL,
-		apiKey:  cfg.APIKey,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("minimax", nil),
-		},
+		core:       core,
+		baseURL:    baseURL,
+		apiKey:     cfg.APIKey,
+		httpClient: core.HTTPClient(),
 	}
 }
 
@@ -79,30 +86,25 @@ func (c *Client) Raw(ctx context.Context, method string, path string, body any, 
 }
 
 func (c *Client) do(ctx context.Context, method string, path string, body any, contentType string, accept string) (*http.Response, error) {
-	var reader io.Reader
+	var payload []byte
 	if body != nil {
-		payload, err := json.Marshal(body)
+		marshaled, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshal minimax request: %w", err)
 		}
-		reader = bytes.NewReader(payload)
+		payload = marshaled
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
-	if err != nil {
-		return nil, fmt.Errorf("build minimax request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	ct := ""
 	if contentType != "" && body != nil {
-		req.Header.Set("Content-Type", contentType)
+		ct = contentType
 	}
-	if accept != "" {
-		req.Header.Set("Accept", accept)
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, apierror.ProviderTransportError(err, "MiniMax")
-	}
-	return resp, nil
+	return c.core.Do(ctx, transport.Request{
+		Method:      method,
+		Path:        path,
+		Body:        payload,
+		ContentType: ct,
+		Accept:      accept,
+	})
 }
 
 func (c *Client) apiError(resp *http.Response) error {

@@ -15,12 +15,13 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 const defaultBaseURL = "https://api.elevenlabs.io"
 
 type Client struct {
+	core       *transport.Client
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -35,13 +36,20 @@ func NewClient(cfg config.ProviderConfig) *Client {
 	if timeout <= 0 {
 		timeout = 2 * time.Minute
 	}
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "ElevenLabs",
+		ProviderSlug: "elevenlabs",
+		Auth:         transport.APIKeyHeaderAuth("xi-api-key", cfg.APIKey),
+		Timeout:      timeout,
+		// ElevenLabs generation is not idempotent: keep single-attempt.
+		Retry: transport.RetryPolicy{MaxAttempts: 1},
+	})
 	return &Client{
-		baseURL: baseURL,
-		apiKey:  cfg.APIKey,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("elevenlabs", nil),
-		},
+		core:       core,
+		baseURL:    baseURL,
+		apiKey:     cfg.APIKey,
+		httpClient: core.HTTPClient(),
 	}
 }
 
@@ -117,24 +125,19 @@ func (c *Client) doJSON(ctx context.Context, method string, path string, query u
 }
 
 func (c *Client) do(ctx context.Context, method string, path string, query url.Values, body io.Reader, contentType string, accept string) (*http.Response, error) {
-	target := c.baseURL + path
-	if len(query) > 0 {
-		target += "?" + query.Encode()
+	req := transport.Request{
+		Method:     method,
+		Path:       path,
+		Query:      query,
+		BodyReader: body,
+		Accept:     accept,
 	}
-	req, err := http.NewRequestWithContext(ctx, method, target, body)
-	if err != nil {
-		return nil, fmt.Errorf("build elevenlabs request: %w", err)
-	}
-	req.Header.Set("xi-api-key", c.apiKey)
 	if contentType != "" && body != nil {
-		req.Header.Set("Content-Type", contentType)
+		req.ContentType = contentType
 	}
-	if accept != "" {
-		req.Header.Set("Accept", accept)
-	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.core.Do(ctx, req)
 	if err != nil {
-		return nil, apierror.ProviderTransportError(err, "ElevenLabs")
+		return nil, err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		defer func() {

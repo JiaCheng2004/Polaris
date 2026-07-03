@@ -1,7 +1,6 @@
 package replicate
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
-	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 type Client struct {
+	core         *transport.Client
 	baseURL      string
 	apiKey       string
 	httpClient   *http.Client
@@ -43,13 +42,25 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		initialDelay = 200 * time.Millisecond
 	}
 
-	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		apiKey:  strings.TrimSpace(cfg.APIKey),
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("replicate", nil),
+	apiKey := strings.TrimSpace(cfg.APIKey)
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "Replicate",
+		ProviderSlug: "replicate",
+		Auth:         transport.BearerAuth(apiKey),
+		Timeout:      timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
 		},
+	})
+
+	return &Client{
+		core:         core,
+		baseURL:      baseURL,
+		apiKey:       apiKey,
+		httpClient:   core.HTTPClient(),
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
 	}
@@ -77,6 +88,8 @@ func (c *Client) JSON(ctx context.Context, method string, path string, body any,
 	return nil
 }
 
+// Download fetches a generated asset URL. It is a single-attempt GET (no retry)
+// on the shared transport client, preserving the previous behavior.
 func (c *Client) Download(ctx context.Context, rawURL string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -101,54 +114,26 @@ func (c *Client) do(ctx context.Context, method string, path string, body any, e
 		}
 	}
 
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
+	headers := make(map[string]string, len(extraHeaders))
+	for key, value := range extraHeaders {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		headers[key] = value
 	}
 
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		var reader io.Reader
-		if payload != nil {
-			reader = bytes.NewReader(payload)
-		}
-		req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
-		if err != nil {
-			return nil, fmt.Errorf("build replicate request: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		req.Header.Set("Accept", "application/json")
-		if payload != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-		for key, value := range extraHeaders {
-			if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-				continue
-			}
-			req.Header.Set(key, value)
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && openaicompat.RetryableTransportError(err) {
-				if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, apierror.ProviderTransportError(err, "Replicate")
-		}
-		if openaicompat.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-		return resp, nil
+	contentType := ""
+	if payload != nil {
+		contentType = "application/json"
 	}
-
-	return nil, apierror.ProviderTransportError(lastErr, "Replicate")
+	return c.core.Do(ctx, transport.Request{
+		Method:      method,
+		Path:        path,
+		Body:        payload,
+		ContentType: contentType,
+		Accept:      "application/json",
+		Headers:     headers,
+	})
 }
 
 func (c *Client) apiError(resp *http.Response) error {

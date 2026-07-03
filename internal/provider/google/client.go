@@ -1,7 +1,6 @@
 package google
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 type Client struct {
+	core         *transport.Client
 	baseURL      string
 	apiKey       string
 	httpClient   *http.Client
@@ -43,13 +42,24 @@ func NewClient(cfg config.ProviderConfig) *Client {
 		timeout = time.Minute
 	}
 
-	return &Client{
-		baseURL: baseURL,
-		apiKey:  cfg.APIKey,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: obs.NewProviderTransport("google", nil),
+	core := transport.New(transport.Options{
+		BaseURL:      baseURL,
+		ProviderName: "Google",
+		ProviderSlug: "google",
+		Auth:         transport.APIKeyHeaderAuth("x-goog-api-key", cfg.APIKey),
+		Timeout:      timeout,
+		Retry: transport.RetryPolicy{
+			MaxAttempts:       maxAttempts,
+			InitialDelay:      initialDelay,
+			RespectRetryAfter: true,
 		},
+	})
+
+	return &Client{
+		core:         core,
+		baseURL:      baseURL,
+		apiKey:       cfg.APIKey,
+		httpClient:   core.HTTPClient(),
 		maxAttempts:  maxAttempts,
 		initialDelay: initialDelay,
 	}
@@ -97,45 +107,16 @@ func (c *Client) Stream(ctx context.Context, path string, body any) (*http.Respo
 	return resp, nil
 }
 
+// do issues the request through the shared transport core, preserving Google's
+// x-goog-api-key auth and per-request Accept (JSON vs SSE).
 func (c *Client) do(ctx context.Context, path string, payload []byte, accept string) (*http.Response, error) {
-	attempts := c.maxAttempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-		if err != nil {
-			return nil, fmt.Errorf("build google request: %w", err)
-		}
-		req.Header.Set("x-goog-api-key", c.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", accept)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && retrypkg.RetryableTransportError(err) {
-				if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, retrypkg.TranslateTransportError(err, "Google")
-		}
-
-		if retrypkg.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := retrypkg.SleepWithContext(ctx, retrypkg.BackoffDelay(c.initialDelay, attempt)); sleepErr == nil {
-				continue
-			}
-		}
-
-		return resp, nil
-	}
-
-	return nil, retrypkg.TranslateTransportError(lastErr, "Google")
+	return c.core.Do(ctx, transport.Request{
+		Method:      http.MethodPost,
+		Path:        path,
+		Body:        payload,
+		ContentType: "application/json",
+		Accept:      accept,
+	})
 }
 
 func (c *Client) apiError(resp *http.Response) error {
