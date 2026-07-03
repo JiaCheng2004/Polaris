@@ -1,4 +1,4 @@
-package middleware
+package transport
 
 import (
 	"context"
@@ -12,12 +12,18 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 )
 
+// SSRFClient is an outbound HTTP client hardened against server-side request
+// forgery: it enforces an allowed-scheme list, a denied-host list, and blocks
+// private/reserved IPs at both URL-validation and dial time (so DNS rebinding
+// cannot slip a public hostname onto an internal address). It is used to fetch
+// caller-supplied file URLs.
 type SSRFClient struct {
 	client        *http.Client
 	allowedScheme map[string]struct{}
 	denyHosts     map[string]struct{}
 }
 
+// NewSSRFClient builds an SSRFClient from the files SSRF configuration.
 func NewSSRFClient(cfg config.FileSSRFConfig, timeout time.Duration) *SSRFClient {
 	allowedSchemes := cfg.AllowedSchemes
 	if len(allowedSchemes) == 0 {
@@ -45,7 +51,7 @@ func NewSSRFClient(cfg config.FileSSRFConfig, timeout time.Duration) *SSRFClient
 		timeout = 30 * time.Second
 	}
 	dialer := &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}
-	transport := &http.Transport{
+	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(address)
@@ -64,7 +70,7 @@ func NewSSRFClient(cfg config.FileSSRFConfig, timeout time.Duration) *SSRFClient
 	}
 	client.client = &http.Client{
 		Timeout:   timeout,
-		Transport: transport,
+		Transport: tr,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return http.ErrUseLastResponse
@@ -75,6 +81,7 @@ func NewSSRFClient(cfg config.FileSSRFConfig, timeout time.Duration) *SSRFClient
 	return client
 }
 
+// Do validates req.URL then executes it.
 func (c *SSRFClient) Do(req *http.Request) (*http.Response, error) {
 	if req == nil || req.URL == nil {
 		return nil, fmt.Errorf("ssrf: request URL is required")
@@ -85,6 +92,7 @@ func (c *SSRFClient) Do(req *http.Request) (*http.Response, error) {
 	return c.client.Do(req)
 }
 
+// Get validates rawURL then issues a GET.
 func (c *SSRFClient) Get(ctx context.Context, rawURL string) (*http.Response, error) {
 	if err := c.ValidateURL(rawURL); err != nil {
 		return nil, err
@@ -96,6 +104,8 @@ func (c *SSRFClient) Get(ctx context.Context, rawURL string) (*http.Response, er
 	return c.client.Do(req)
 }
 
+// ValidateURL enforces the scheme allow-list, host deny-list, and literal-IP
+// block.
 func (c *SSRFClient) ValidateURL(rawURL string) error {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed == nil || parsed.Host == "" {

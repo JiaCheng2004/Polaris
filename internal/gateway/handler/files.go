@@ -27,6 +27,7 @@ import (
 	providerpkg "github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/blob"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/ulid/v2"
 )
@@ -339,7 +340,7 @@ func (h *FilesHandler) Content(c *gin.Context) {
 		}
 	}
 	if file.OriginURL != "" {
-		resp, err := middleware.NewSSRFClient(cfg.SSRF, cfgTimeout(c)).Get(c.Request.Context(), file.OriginURL)
+		resp, err := transport.NewSSRFClient(cfg.SSRF, cfgTimeout(c)).Get(c.Request.Context(), file.OriginURL)
 		if err != nil {
 			httputil.WriteError(c, ssrfError(err))
 			return
@@ -504,7 +505,7 @@ func (h *FilesHandler) readUploadInput(c *gin.Context, cfg config.FilesConfig) (
 	if req.URL == "" {
 		return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_url", "url", "Field 'url' is required.")
 	}
-	client := middleware.NewSSRFClient(cfg.SSRF, cfgTimeout(c))
+	client := transport.NewSSRFClient(cfg.SSRF, cfgTimeout(c))
 	resp, err := client.Get(c.Request.Context(), req.URL)
 	if err != nil {
 		return nil, ssrfError(err)
@@ -752,7 +753,7 @@ func (h *FilesHandler) readFileBytes(c *gin.Context, cfg config.FilesConfig, fil
 		return readBounded(body, config.EffectiveMaxFileUploadBytes(cfg.Ingestion.MaxUploadBytes))
 	}
 	if file.OriginURL != "" {
-		resp, err := middleware.NewSSRFClient(cfg.SSRF, cfgTimeout(c)).Get(c.Request.Context(), file.OriginURL)
+		resp, err := transport.NewSSRFClient(cfg.SSRF, cfgTimeout(c)).Get(c.Request.Context(), file.OriginURL)
 		if err != nil {
 			return nil, ssrfError(err)
 		}

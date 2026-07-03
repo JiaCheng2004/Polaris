@@ -21,6 +21,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	commonfiles "github.com/JiaCheng2004/Polaris/internal/provider/common/files"
 	"github.com/JiaCheng2004/Polaris/internal/store"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 	"github.com/JiaCheng2004/Polaris/internal/understanding"
 	"github.com/gin-gonic/gin"
 )
@@ -464,7 +465,7 @@ func (h *ChatHandler) loadFileUnderstandingInput(c *gin.Context, filesCfg config
 		}
 		return info, nil
 	case "url":
-		client := middleware.NewSSRFClient(filesCfg.SSRF, cfgTimeout(c))
+		client := transport.NewSSRFClient(filesCfg.SSRF, cfgTimeout(c))
 		resp, err := client.Get(c.Request.Context(), info.URL)
 		if err != nil {
 			return info, ssrfError(err)
