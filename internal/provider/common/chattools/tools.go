@@ -59,10 +59,6 @@ func OpenAIHostedTool(spec *modality.HostedToolSpec) map[string]any {
 	return config
 }
 
-func CopyConfig(config map[string]any) map[string]any {
-	return copyConfig(config)
-}
-
 func copyConfig(config map[string]any) map[string]any {
 	out := map[string]any{}
 	for key, value := range config {
