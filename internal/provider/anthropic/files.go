@@ -14,7 +14,6 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
 const anthropicFilesBeta = "files-api-2025-04-14"
@@ -140,7 +139,7 @@ func (a *FilesAdapter) multipart(ctx context.Context, path string, payload []byt
 
 	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
-		return retrypkg.TranslateTransportError(err, "Anthropic")
+		return apierror.ProviderTransportError(err, "Anthropic")
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -177,7 +176,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 
 	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
-		return retrypkg.TranslateTransportError(err, "Anthropic")
+		return apierror.ProviderTransportError(err, "Anthropic")
 	}
 	defer func() {
 		_ = resp.Body.Close()

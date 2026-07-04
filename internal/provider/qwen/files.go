@@ -13,7 +13,6 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
-	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
 )
 
 type FilesAdapter struct {
@@ -128,7 +127,7 @@ func (a *FilesAdapter) multipart(ctx context.Context, path string, payload []byt
 	req.Header.Set("Accept", "application/json")
 	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
-		return openaicompat.TranslateTransportError(err, "Qwen")
+		return apierror.ProviderTransportError(err, "Qwen")
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -162,7 +161,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 	}
 	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
-		return openaicompat.TranslateTransportError(err, "Qwen")
+		return apierror.ProviderTransportError(err, "Qwen")
 	}
 	defer func() {
 		_ = resp.Body.Close()

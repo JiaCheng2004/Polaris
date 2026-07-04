@@ -10,7 +10,6 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
@@ -139,29 +138,4 @@ func translateOpenAIError(providerName string, status int, body []byte) *apierro
 		Param:   parsed.Error.Param,
 		Type:    parsed.Error.Type,
 	})
-}
-
-// Retry-classification re-exports retained for the few providers (bedrock,
-// replicate, qwen image/files) that issue bespoke requests and reuse this
-// package's retry helpers. They will move onto the transport core in a later
-// step, at which point common/retry is removed.
-
-func RetryableStatus(status int) bool {
-	return retrypkg.RetryableStatus(status)
-}
-
-func RetryableTransportError(err error) bool {
-	return retrypkg.RetryableTransportError(err)
-}
-
-func TranslateTransportError(err error, providerName string) error {
-	return retrypkg.TranslateTransportError(err, providerName)
-}
-
-func BackoffDelay(initial time.Duration, attempt int) time.Duration {
-	return retrypkg.BackoffDelay(initial, attempt)
-}
-
-func SleepWithContext(ctx context.Context, delay time.Duration) error {
-	return retrypkg.SleepWithContext(ctx, delay)
 }

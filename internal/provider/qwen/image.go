@@ -13,6 +13,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 type ImageAdapter struct {
@@ -144,43 +145,18 @@ func (a *ImageAdapter) json(ctx context.Context, path string, body any, out any)
 	return nil
 }
 
+// do routes the image request (which targets a different base URL than the chat
+// endpoint) through the shared transport core: Bearer auth, the provider's
+// configured retry count, jittered backoff, and the B2 fix. The absolute URL is
+// passed verbatim.
 func (a *ImageAdapter) do(ctx context.Context, path string, payload []byte) (*http.Response, error) {
-	attempts := a.client.MaxAttempts()
-	if attempts <= 0 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, imageAPIBaseURL(a.client.BaseURL())+path, strings.NewReader(string(payload)))
-		if err != nil {
-			return nil, fmt.Errorf("build qwen image request: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+a.client.APIKey())
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-
-		resp, err := a.client.HTTPClient().Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < attempts && openaicompat.RetryableTransportError(err) {
-				if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(a.client.InitialDelay(), attempt)); sleepErr == nil {
-					continue
-				}
-			}
-			return nil, openaicompat.TranslateTransportError(err, "Qwen")
-		}
-		if openaicompat.RetryableStatus(resp.StatusCode) && attempt < attempts {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if sleepErr := openaicompat.SleepWithContext(ctx, openaicompat.BackoffDelay(a.client.InitialDelay(), attempt)); sleepErr == nil {
-				continue
-			}
-		}
-		return resp, nil
-	}
-
-	return nil, openaicompat.TranslateTransportError(lastErr, "Qwen")
+	return a.client.Core().Do(ctx, transport.Request{
+		Method:      http.MethodPost,
+		Path:        imageAPIBaseURL(a.client.BaseURL()) + path,
+		Body:        payload,
+		ContentType: "application/json",
+		Accept:      "application/json",
+	})
 }
 
 func (a *ImageAdapter) translateImageResponse(ctx context.Context, response imageResponse, requestedFormat string) (*modality.ImageResponse, error) {
@@ -224,7 +200,7 @@ func (a *ImageAdapter) fetchImageAsBase64(ctx context.Context, imageURL string) 
 	}
 	resp, err := a.client.HTTPClient().Do(req)
 	if err != nil {
-		return "", openaicompat.TranslateTransportError(err, "Qwen")
+		return "", apierror.ProviderTransportError(err, "Qwen")
 	}
 	defer func() {
 		_ = resp.Body.Close()

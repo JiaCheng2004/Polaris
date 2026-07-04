@@ -13,7 +13,6 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
-	retrypkg "github.com/JiaCheng2004/Polaris/internal/provider/common/retry"
 )
 
 type FilesAdapter struct {
@@ -142,7 +141,7 @@ func (a *FilesAdapter) startResumableUpload(ctx context.Context, filename string
 
 	resp, err := a.client.httpClient.Do(req)
 	if err != nil {
-		return "", retrypkg.TranslateTransportError(err, "Google")
+		return "", apierror.ProviderTransportError(err, "Google")
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -168,7 +167,7 @@ func (a *FilesAdapter) finalizeResumableUpload(ctx context.Context, uploadURL st
 
 	resp, err := a.client.httpClient.Do(req)
 	if err != nil {
-		return googleFileEnvelope{}, retrypkg.TranslateTransportError(err, "Google")
+		return googleFileEnvelope{}, apierror.ProviderTransportError(err, "Google")
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -203,7 +202,7 @@ func (a *FilesAdapter) jsonRequest(ctx context.Context, method string, path stri
 	}
 	resp, err := a.client.httpClient.Do(req)
 	if err != nil {
-		return retrypkg.TranslateTransportError(err, "Google")
+		return apierror.ProviderTransportError(err, "Google")
 	}
 	defer func() {
 		_ = resp.Body.Close()

@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/openaicompat"
 )
@@ -31,5 +32,5 @@ func firstNonEmpty(values ...string) string {
 }
 
 func translateTransportError(err error, providerName string) error {
-	return openaicompat.TranslateTransportError(err, providerName)
+	return apierror.ProviderTransportError(err, providerName)
 }
