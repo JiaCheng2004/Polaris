@@ -22,9 +22,11 @@ linters:
       rules:
         # Architecture layering (plan §4.1). Provider adapters and the tool
         # registry must not depend on the HTTP gateway layer; they use the
-        # neutral internal/apierror and internal/obs packages instead. Rule is
-        # baselined via issues.new-from-merge-base until the Phase 1 extraction
-        # drives existing violations to zero, after which it becomes absolute.
+        # neutral internal/apierror and internal/obs packages instead. Existing
+        # violations are now zero, so this rule catches any regression on changed
+        # lines. `make check-layering` additionally hard-enforces it over the
+        # whole tree (independent of the merge-base baseline) and runs in
+        # release-check.
         provider-and-tooling:
           list-mode: lax
           files:

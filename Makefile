@@ -14,7 +14,7 @@ GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test lint security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test lint check-layering security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -64,6 +64,16 @@ test:
 
 lint:
 	$(GOLANGCI_LINT) run ./...
+
+check-layering:
+	@echo "Verifying provider/tooling packages never import the gateway layer..."
+	@matches="$$(grep -rl 'JiaCheng2004/Polaris/internal/gateway' internal/provider internal/tooling 2>/dev/null || true)"; \
+	if [ -n "$$matches" ]; then \
+		echo "LAYERING VIOLATION: the following provider/tooling files import internal/gateway:" >&2; \
+		echo "$$matches" >&2; \
+		exit 1; \
+	fi; \
+	echo "OK: no provider/tooling -> gateway imports."
 
 security-check:
 	@mkdir -p ./tmp; \
@@ -124,6 +134,7 @@ panic-scan:
 release-check:
 	$(MAKE) fmt-check
 	$(MAKE) lint
+	$(MAKE) check-layering
 	$(MAKE) security-check
 	$(MAKE) panic-scan
 	$(MAKE) config-check
