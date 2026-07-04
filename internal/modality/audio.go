@@ -33,6 +33,11 @@ const (
 // handlers can expose one realtime surface across different providers and
 // transport implementations.
 type AudioAdapter interface {
+	// ValidateConfig statically validates a session config (model, credentials,
+	// formats, and provider-specific constraints such as supported turn-detection
+	// modes) without opening a provider connection. Session bootstrap calls this
+	// instead of dialing the provider just to validate.
+	ValidateConfig(cfg *AudioSessionConfig) error
 	Connect(ctx context.Context, cfg *AudioSessionConfig) (AudioSession, error)
 }
 

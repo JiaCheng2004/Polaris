@@ -97,9 +97,18 @@ func openAIRealtimeURL(baseURL string) string {
 	return parsed.String()
 }
 
-func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+// ValidateConfig statically checks the session config without dialing OpenAI.
+func (a *realtimeAudioAdapter) ValidateConfig(cfg *modality.AudioSessionConfig) error {
 	if a == nil || a.client == nil {
-		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+	}
+	_, err := a.normalizeConfig(cfg)
+	return err
+}
+
+func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+	if err := a.ValidateConfig(cfg); err != nil {
+		return nil, err
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {

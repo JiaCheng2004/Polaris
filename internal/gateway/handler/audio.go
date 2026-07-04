@@ -67,12 +67,13 @@ func (h *AudioHandler) Create(c *gin.Context) {
 		writeModalityTargetError(c, err, "audio sessions")
 		return
 	}
-	testSession, err := adapter.Connect(c.Request.Context(), &req)
-	if err != nil {
+	// Validate the session config statically (credentials, formats, and
+	// provider-specific turn-detection support) without dialing the provider
+	// (B7). Connectivity/auth errors surface when the client opens the WebSocket.
+	if err := adapter.ValidateConfig(&req); err != nil {
 		httputil.WriteError(c, err)
 		return
 	}
-	_ = testSession.Close()
 
 	req.Model = model.ID
 	ttl := 10 * time.Minute

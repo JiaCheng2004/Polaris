@@ -52,9 +52,19 @@ func NewCascadeAdapter(model string, chatModel string, sttModel string, ttsModel
 	}
 }
 
-func (a *CascadeAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+// ValidateConfig statically checks the cascade pipeline and session config
+// without starting a session.
+func (a *CascadeAdapter) ValidateConfig(cfg *modality.AudioSessionConfig) error {
 	if a == nil || a.chat == nil || a.transcribe == nil || a.synthesize == nil {
-		return nil, apierror.NewError(503, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return apierror.NewError(503, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+	}
+	_, err := a.normalizeConfig(cfg)
+	return err
+}
+
+func (a *CascadeAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+	if err := a.ValidateConfig(cfg); err != nil {
+		return nil, err
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {

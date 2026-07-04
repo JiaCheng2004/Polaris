@@ -228,19 +228,29 @@ func newRealtimeAudioAdapter(client *Client, model string, modelCfg config.Model
 	}
 }
 
-func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+// ValidateConfig statically checks credentials and the session config without
+// constructing a session.
+func (a *realtimeAudioAdapter) ValidateConfig(cfg *modality.AudioSessionConfig) error {
 	if a == nil || a.client == nil {
-		return nil, apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
+		return apierror.NewError(http.StatusServiceUnavailable, "provider_error", "adapter_unavailable", "", "Audio adapter is unavailable.")
 	}
 	switch a.authMode {
 	case realtimeAuthAPIKey:
 		if strings.TrimSpace(a.client.speechAPIKey) == "" {
-			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio with realtime_session.auth=api_key requires providers.bytedance.speech_api_key.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio with realtime_session.auth=api_key requires providers.bytedance.speech_api_key.")
 		}
 	default:
 		if strings.TrimSpace(a.client.appID) == "" || strings.TrimSpace(a.client.speechToken) == "" {
-			return nil, apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
+			return apierror.NewError(http.StatusBadGateway, "provider_error", "provider_misconfigured", "", "ByteDance native realtime audio requires providers.bytedance.app_id and providers.bytedance.speech_access_token.")
 		}
+	}
+	_, err := a.normalizeConfig(cfg)
+	return err
+}
+
+func (a *realtimeAudioAdapter) Connect(ctx context.Context, cfg *modality.AudioSessionConfig) (modality.AudioSession, error) {
+	if err := a.ValidateConfig(cfg); err != nil {
+		return nil, err
 	}
 	normalized, err := a.normalizeConfig(cfg)
 	if err != nil {
