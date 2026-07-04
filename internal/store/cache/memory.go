@@ -7,8 +7,12 @@ import (
 	"time"
 )
 
+const defaultSweepInterval = time.Minute
+
 type Memory struct {
 	items sync.Map
+	stop  chan struct{}
+	stopO sync.Once
 }
 
 type memoryItem struct {
@@ -18,7 +22,15 @@ type memoryItem struct {
 }
 
 func NewMemory() *Memory {
-	return &Memory{}
+	return newMemory(defaultSweepInterval)
+}
+
+func newMemory(sweepInterval time.Duration) *Memory {
+	m := &Memory{stop: make(chan struct{})}
+	if sweepInterval > 0 {
+		go m.sweepLoop(sweepInterval)
+	}
+	return m
 }
 
 func (m *Memory) Get(_ context.Context, key string) (string, bool, error) {
@@ -73,7 +85,39 @@ func (m *Memory) Ping(context.Context) error {
 }
 
 func (m *Memory) Close() error {
+	m.stopO.Do(func() { close(m.stop) })
 	return nil
+}
+
+// sweepLoop periodically evicts expired entries. Without it, keys that embed a
+// rotating component (rate-limit window starts) accumulate forever, since Get
+// only evicts the specific key it reads (B5a).
+func (m *Memory) sweepLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-m.stop:
+			return
+		case now := <-ticker.C:
+			m.sweep(now)
+		}
+	}
+}
+
+func (m *Memory) sweep(now time.Time) {
+	m.items.Range(func(key, raw any) bool {
+		item := raw.(*memoryItem)
+		item.mu.Lock()
+		expired := item.expired(now)
+		item.mu.Unlock()
+		if expired {
+			// CompareAndDelete only removes the exact entry we examined, so a
+			// concurrent Set that replaced it is preserved.
+			m.items.CompareAndDelete(key, raw)
+		}
+		return true
+	})
 }
 
 func (i *memoryItem) expired(now time.Time) bool {
