@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -38,32 +34,17 @@ func signBatchJobID(snapshot *gwruntime.Snapshot, model provider.Model, provider
 		KeyID:         strings.TrimSpace(keyID),
 		ExpiresAt:     expiresAt,
 	}
-	raw, err := json.Marshal(payload)
+	token, err := signHMACToken(secret, batchJobIDPrefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "batch_id_encoding_failed", "", "Unable to issue batch job id.")
 	}
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return batchJobIDPrefix + encodedPayload + "." + signature, nil
+	return token, nil
 }
 
 func parseBatchJobID(snapshot *gwruntime.Snapshot, token string) (batchJobToken, error) {
-	if !strings.HasPrefix(token, batchJobIDPrefix) {
-		return batchJobToken{}, invalidBatchJobIDError()
-	}
-	trimmed := strings.TrimPrefix(token, batchJobIDPrefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 {
-		return batchJobToken{}, invalidBatchJobIDError()
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return batchJobToken{}, invalidBatchJobIDError()
-	}
 	var payload batchJobToken
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	encodedPayload, signature, err := decodeSignedToken(batchJobIDPrefix, token, &payload)
+	if err != nil {
 		return batchJobToken{}, invalidBatchJobIDError()
 	}
 	if payload.Version != 1 || payload.Provider == "" || payload.Model == "" || payload.ProviderJobID == "" || payload.KeyID == "" || payload.ExpiresAt <= 0 {
@@ -73,10 +54,7 @@ func parseBatchJobID(snapshot *gwruntime.Snapshot, token string) (batchJobToken,
 	if err != nil {
 		return batchJobToken{}, invalidBatchJobIDError()
 	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(mac.Sum(nil), actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return batchJobToken{}, invalidBatchJobIDError()
 	}
 	if time.Now().Unix() >= payload.ExpiresAt {

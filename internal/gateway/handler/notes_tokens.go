@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -41,32 +37,17 @@ func signAudioNoteID(snapshot *gwruntime.Snapshot, model provider.Model, provide
 		KeyID:          strings.TrimSpace(keyID),
 		ExpiresAt:      expiresAt,
 	}
-	raw, err := json.Marshal(payload)
+	signed, err := signHMACToken(secret, audioNoteIDPrefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "job_id_encoding_failed", "", "Unable to issue audio note id.")
 	}
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return audioNoteIDPrefix + encodedPayload + "." + signature, nil
+	return signed, nil
 }
 
 func parseAudioNoteID(snapshot *gwruntime.Snapshot, token string) (audioNoteToken, error) {
-	if !strings.HasPrefix(token, audioNoteIDPrefix) {
-		return audioNoteToken{}, invalidAudioNoteIDError()
-	}
-	trimmed := strings.TrimPrefix(token, audioNoteIDPrefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return audioNoteToken{}, invalidAudioNoteIDError()
-	}
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return audioNoteToken{}, invalidAudioNoteIDError()
-	}
 	var payload audioNoteToken
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+	encodedPayload, signature, err := decodeSignedToken(audioNoteIDPrefix, token, &payload)
+	if err != nil {
 		return audioNoteToken{}, invalidAudioNoteIDError()
 	}
 	if payload.Version != 1 || strings.TrimSpace(payload.Provider) == "" || strings.TrimSpace(payload.Model) == "" || strings.TrimSpace(payload.ProviderTaskID) == "" || strings.TrimSpace(payload.KeyID) == "" || payload.ExpiresAt <= 0 {
@@ -76,11 +57,7 @@ func parseAudioNoteID(snapshot *gwruntime.Snapshot, token string) (audioNoteToke
 	if err != nil {
 		return audioNoteToken{}, invalidAudioNoteIDError()
 	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	expected := mac.Sum(nil)
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(expected, actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return audioNoteToken{}, invalidAudioNoteIDError()
 	}
 	if time.Now().Unix() >= payload.ExpiresAt {

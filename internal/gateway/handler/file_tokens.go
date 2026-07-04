@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -35,15 +31,11 @@ func signFileDownloadToken(polarisID, projectID, keyID string, expiresAt int64) 
 		KeyID:     strings.TrimSpace(keyID),
 		ExpiresAt: expiresAt,
 	}
-	raw, err := json.Marshal(payload)
+	signed, err := signHMACToken(secret, fileDownloadTokenPrefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "file_token_encoding_failed", "", "Unable to issue file download token.")
 	}
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return fileDownloadTokenPrefix + encodedPayload + "." + signature, nil
+	return signed, nil
 }
 
 func parseFileDownloadToken(token string) (fileDownloadToken, error) {
@@ -51,20 +43,9 @@ func parseFileDownloadToken(token string) (fileDownloadToken, error) {
 	if len(secret) == 0 {
 		return fileDownloadToken{}, invalidFileDownloadTokenError()
 	}
-	if !strings.HasPrefix(token, fileDownloadTokenPrefix) {
-		return fileDownloadToken{}, invalidFileDownloadTokenError()
-	}
-	trimmed := strings.TrimPrefix(token, fileDownloadTokenPrefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return fileDownloadToken{}, invalidFileDownloadTokenError()
-	}
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return fileDownloadToken{}, invalidFileDownloadTokenError()
-	}
 	var payload fileDownloadToken
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+	encodedPayload, signature, err := decodeSignedToken(fileDownloadTokenPrefix, token, &payload)
+	if err != nil {
 		return fileDownloadToken{}, invalidFileDownloadTokenError()
 	}
 	if payload.Version != 1 ||
@@ -74,11 +55,7 @@ func parseFileDownloadToken(token string) (fileDownloadToken, error) {
 		payload.ExpiresAt <= 0 {
 		return fileDownloadToken{}, invalidFileDownloadTokenError()
 	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	expected := mac.Sum(nil)
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(expected, actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return fileDownloadToken{}, invalidFileDownloadTokenError()
 	}
 	if time.Now().Unix() >= payload.ExpiresAt {

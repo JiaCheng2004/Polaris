@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -36,36 +32,17 @@ func signVideoJobID(snapshot *gwruntime.Snapshot, model provider.Model, provider
 		ProviderJobID: strings.TrimSpace(providerJobID),
 		KeyID:         strings.TrimSpace(keyID),
 	}
-	raw, err := json.Marshal(payload)
+	token, err := signHMACToken(secret, videoJobIDPrefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "job_id_encoding_failed", "", "Unable to issue video job id.")
 	}
-
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return videoJobIDPrefix + encodedPayload + "." + signature, nil
+	return token, nil
 }
 
 func parseVideoJobID(snapshot *gwruntime.Snapshot, token string) (videoJobToken, error) {
-	if !strings.HasPrefix(token, videoJobIDPrefix) {
-		return videoJobToken{}, invalidVideoJobIDError()
-	}
-
-	trimmed := strings.TrimPrefix(token, videoJobIDPrefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return videoJobToken{}, invalidVideoJobIDError()
-	}
-
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return videoJobToken{}, invalidVideoJobIDError()
-	}
-
 	var payload videoJobToken
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+	encodedPayload, signature, err := decodeSignedToken(videoJobIDPrefix, token, &payload)
+	if err != nil {
 		return videoJobToken{}, invalidVideoJobIDError()
 	}
 	if payload.Version != 1 || strings.TrimSpace(payload.Provider) == "" || strings.TrimSpace(payload.Model) == "" || strings.TrimSpace(payload.ProviderJobID) == "" || strings.TrimSpace(payload.KeyID) == "" {
@@ -76,12 +53,7 @@ func parseVideoJobID(snapshot *gwruntime.Snapshot, token string) (videoJobToken,
 	if err != nil {
 		return videoJobToken{}, invalidVideoJobIDError()
 	}
-
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	expected := mac.Sum(nil)
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(expected, actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return videoJobToken{}, invalidVideoJobIDError()
 	}
 

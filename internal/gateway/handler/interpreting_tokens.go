@@ -1,12 +1,9 @@
 package handler
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -110,32 +107,20 @@ func signInterpretingPayload(snapshot *gwruntime.Snapshot, providerName string, 
 	if err != nil {
 		return "", invalidInterpretingSessionError("session", "Interpreting session signing secret is unavailable.")
 	}
-	raw, err := json.Marshal(payload)
+	token, err := signHMACToken(secret, prefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "session_id_encoding_failed", "", "Unable to issue interpreting session token.")
 	}
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return prefix + encodedPayload + "." + signature, nil
+	return token, nil
 }
 
 func parseSignedInterpretingPayload[T any](snapshot *gwruntime.Snapshot, prefix string, token string) (T, error) {
 	var payload T
-	if !strings.HasPrefix(token, prefix) {
-		return payload, invalidInterpretingSessionError("session", "Interpreting session token was not found.")
-	}
-	trimmed := strings.TrimPrefix(token, prefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
-	}
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	encodedPayload, signature, err := decodeSignedToken(prefix, token, &payload)
 	if err != nil {
-		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
-	}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		if errors.Is(err, errSignedTokenNotFound) {
+			return payload, invalidInterpretingSessionError("session", "Interpreting session token was not found.")
+		}
 		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
 	}
 
@@ -152,11 +137,7 @@ func parseSignedInterpretingPayload[T any](snapshot *gwruntime.Snapshot, prefix 
 	if err != nil {
 		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
 	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	expected := mac.Sum(nil)
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(expected, actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return payload, invalidInterpretingSessionError("session", "Interpreting session token is invalid.")
 	}
 	return payload, nil

@@ -1,12 +1,8 @@
 package handler
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -40,32 +36,17 @@ func signPodcastJobID(snapshot *gwruntime.Snapshot, model provider.Model, cacheK
 		KeyID:     strings.TrimSpace(keyID),
 		ExpiresAt: expiresAt,
 	}
-	raw, err := json.Marshal(payload)
+	signed, err := signHMACToken(secret, podcastJobIDPrefix, payload)
 	if err != nil {
 		return "", httputil.NewError(http.StatusInternalServerError, "internal_error", "job_id_encoding_failed", "", "Unable to issue podcast job id.")
 	}
-	encodedPayload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(encodedPayload))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return podcastJobIDPrefix + encodedPayload + "." + signature, nil
+	return signed, nil
 }
 
 func parsePodcastJobID(snapshot *gwruntime.Snapshot, token string) (podcastJobToken, error) {
-	if !strings.HasPrefix(token, podcastJobIDPrefix) {
-		return podcastJobToken{}, invalidPodcastJobIDError()
-	}
-	trimmed := strings.TrimPrefix(token, podcastJobIDPrefix)
-	parts := strings.SplitN(trimmed, ".", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return podcastJobToken{}, invalidPodcastJobIDError()
-	}
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return podcastJobToken{}, invalidPodcastJobIDError()
-	}
 	var payload podcastJobToken
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+	encodedPayload, signature, err := decodeSignedToken(podcastJobIDPrefix, token, &payload)
+	if err != nil {
 		return podcastJobToken{}, invalidPodcastJobIDError()
 	}
 	if payload.Version != 1 || strings.TrimSpace(payload.Provider) == "" || strings.TrimSpace(payload.Model) == "" || strings.TrimSpace(payload.CacheKey) == "" || strings.TrimSpace(payload.KeyID) == "" || payload.ExpiresAt <= 0 {
@@ -75,11 +56,7 @@ func parsePodcastJobID(snapshot *gwruntime.Snapshot, token string) (podcastJobTo
 	if err != nil {
 		return podcastJobToken{}, invalidPodcastJobIDError()
 	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(parts[0]))
-	expected := mac.Sum(nil)
-	actual, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || !hmac.Equal(expected, actual) {
+	if err := verifyHMACSignature(secret, encodedPayload, signature); err != nil {
 		return podcastJobToken{}, invalidPodcastJobIDError()
 	}
 	if time.Now().Unix() >= payload.ExpiresAt {
