@@ -3,15 +3,12 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
-	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 func (h *ChatHandler) prepareConversation(c *gin.Context, req *modality.ChatRequest) (chatTarget, []chatTarget, error) {
@@ -62,206 +59,16 @@ func (h *ChatHandler) openConversationStream(c *gin.Context, req *modality.ChatR
 	}
 
 	targets := append([]chatTarget{primary}, fallbacks...)
-	var lastOutcome middleware.RequestOutcome
-	for index, target := range targets {
-		attemptReq := *req
-		attemptReq.Model = target.model.ID
-		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
-		if err != nil {
-			return nil, chatTarget{}, lastOutcome, "", err
-		}
-
-		start := time.Now()
-		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
-			attribute.Int("polaris.fallback_attempt", index+1),
-			attribute.String("polaris.provider", target.model.Provider),
-			attribute.String("polaris.model", target.model.ID),
-			attribute.String("polaris.fallback_from", primary.model.ID),
-		)
-		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
-		if err != nil {
-			obs.RecordSpanError(attemptSpan, err)
-		}
-		attemptSpan.End()
-		providerLatencyMs := int(time.Since(start).Milliseconds())
-		if err != nil {
-			apiErr := apiErrorFrom(err)
-			h.metrics.IncProviderError(target.model.Provider, apiErr.Type)
-			lastOutcome = middleware.RequestOutcome{
-				Model:             target.model.ID,
-				Provider:          target.model.Provider,
-				Modality:          modality.ModalityChat,
-				InterfaceFamily:   interfaceFamily,
-				StatusCode:        apiErr.Status,
-				ErrorType:         apiErr.Type,
-				ProviderLatencyMs: providerLatencyMs,
-			}
-			if index < len(targets)-1 && shouldRetryWithFallback(apiErr) {
-				continue
-			}
-			return nil, chatTarget{}, lastOutcome, "", apiErr
-		}
-
-		outcome := middleware.RequestOutcome{
-			Model:             target.model.ID,
-			Provider:          target.model.Provider,
-			Modality:          modality.ModalityChat,
-			InterfaceFamily:   interfaceFamily,
-			StatusCode:        http.StatusOK,
-			ProviderLatencyMs: providerLatencyMs,
-		}
-		fallbackModel := ""
-		if index > 0 {
-			fallbackModel = target.model.ID
-			outcome.FallbackModel = fallbackModel
-			obs.AnnotateCurrentSpan(c.Request.Context(),
-				attribute.String("polaris.fallback_from", primary.model.ID),
-				attribute.String("polaris.fallback_to", fallbackModel),
-			)
-		}
-		return stream, target, outcome, fallbackModel, nil
-	}
-
-	return nil, chatTarget{}, lastOutcome, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No available provider could serve this request.")
+	return runFailover(h, c, targets, primary, req, interfaceFamily, 1, true, noAvailableProviderError(), invokeStream, nil)
 }
 
 func (h *ChatHandler) completeFallbackConversation(c *gin.Context, primary chatTarget, fallbacks []chatTarget, req *modality.ChatRequest, interfaceFamily string) (*modality.ChatResponse, middleware.RequestOutcome, string, error) {
-	if len(fallbacks) == 0 {
-		return nil, middleware.RequestOutcome{}, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No configured fallback provider could serve this request.")
-	}
-
-	var lastOutcome middleware.RequestOutcome
-	for index, target := range fallbacks {
-		attemptReq := *req
-		attemptReq.Model = target.model.ID
-		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
-		if err != nil {
-			return nil, lastOutcome, "", err
-		}
-
-		start := time.Now()
-		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
-			attribute.Int("polaris.fallback_attempt", index+2),
-			attribute.String("polaris.provider", target.model.Provider),
-			attribute.String("polaris.model", target.model.ID),
-			attribute.String("polaris.fallback_from", primary.model.ID),
-		)
-		response, err := target.adapter.Complete(attemptCtx, resolvedReq)
-		if err != nil {
-			obs.RecordSpanError(attemptSpan, err)
-		}
-		attemptSpan.End()
-
-		providerLatencyMs := int(time.Since(start).Milliseconds())
-		if err != nil {
-			apiErr := apiErrorFrom(err)
-			h.metrics.IncProviderError(target.model.Provider, apiErr.Type)
-			lastOutcome = middleware.RequestOutcome{
-				Model:             target.model.ID,
-				Provider:          target.model.Provider,
-				Modality:          modality.ModalityChat,
-				InterfaceFamily:   interfaceFamily,
-				StatusCode:        apiErr.Status,
-				ErrorType:         apiErr.Type,
-				ProviderLatencyMs: providerLatencyMs,
-			}
-			if index < len(fallbacks)-1 && shouldRetryWithFallback(apiErr) {
-				continue
-			}
-			return nil, lastOutcome, "", apiErr
-		}
-
-		response.Model = target.model.ID
-		response.Usage = normalizeUsage(response.Usage)
-		attachFileUnderstandingMetadata(response, resolvedReq)
-		fallbackModel := target.model.ID
-		outcome := middleware.RequestOutcome{
-			Model:             target.model.ID,
-			Provider:          target.model.Provider,
-			Modality:          modality.ModalityChat,
-			InterfaceFamily:   interfaceFamily,
-			StatusCode:        http.StatusOK,
-			ProviderLatencyMs: providerLatencyMs,
-			PromptTokens:      response.Usage.PromptTokens,
-			CompletionTokens:  response.Usage.CompletionTokens,
-			TotalTokens:       response.Usage.TotalTokens,
-			TokenSource:       providerUsageSource(response.Usage),
-			FallbackModel:     fallbackModel,
-		}
-		obs.AnnotateCurrentSpan(c.Request.Context(),
-			attribute.String("polaris.fallback_from", primary.model.ID),
-			attribute.String("polaris.fallback_to", fallbackModel),
-		)
-		return response, outcome, fallbackModel, nil
-	}
-
-	return nil, lastOutcome, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No configured fallback provider could serve this request.")
+	response, _, outcome, fallbackModel, err := runFailover(h, c, fallbacks, primary, req, interfaceFamily, 2, false, noConfiguredFallbackError(), invokeComplete, onCompleteSuccess)
+	return response, outcome, fallbackModel, err
 }
 
 func (h *ChatHandler) openFallbackConversationStream(c *gin.Context, primary chatTarget, fallbacks []chatTarget, req *modality.ChatRequest, interfaceFamily string) (<-chan modality.ChatChunk, chatTarget, middleware.RequestOutcome, string, error) {
-	if len(fallbacks) == 0 {
-		return nil, chatTarget{}, middleware.RequestOutcome{}, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No configured fallback provider could serve this request.")
-	}
-
-	var lastOutcome middleware.RequestOutcome
-	for index, target := range fallbacks {
-		attemptReq := *req
-		attemptReq.Model = target.model.ID
-		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
-		if err != nil {
-			return nil, chatTarget{}, lastOutcome, "", err
-		}
-
-		start := time.Now()
-		attemptCtx, attemptSpan := obs.StartInternalSpan(c.Request.Context(), "fallback.attempt",
-			attribute.Int("polaris.fallback_attempt", index+2),
-			attribute.String("polaris.provider", target.model.Provider),
-			attribute.String("polaris.model", target.model.ID),
-			attribute.String("polaris.fallback_from", primary.model.ID),
-		)
-		stream, err := target.adapter.Stream(attemptCtx, resolvedReq)
-		if err != nil {
-			obs.RecordSpanError(attemptSpan, err)
-		}
-		attemptSpan.End()
-
-		providerLatencyMs := int(time.Since(start).Milliseconds())
-		if err != nil {
-			apiErr := apiErrorFrom(err)
-			h.metrics.IncProviderError(target.model.Provider, apiErr.Type)
-			lastOutcome = middleware.RequestOutcome{
-				Model:             target.model.ID,
-				Provider:          target.model.Provider,
-				Modality:          modality.ModalityChat,
-				InterfaceFamily:   interfaceFamily,
-				StatusCode:        apiErr.Status,
-				ErrorType:         apiErr.Type,
-				ProviderLatencyMs: providerLatencyMs,
-			}
-			if index < len(fallbacks)-1 && shouldRetryWithFallback(apiErr) {
-				continue
-			}
-			return nil, chatTarget{}, lastOutcome, "", apiErr
-		}
-
-		fallbackModel := target.model.ID
-		outcome := middleware.RequestOutcome{
-			Model:             target.model.ID,
-			Provider:          target.model.Provider,
-			Modality:          modality.ModalityChat,
-			InterfaceFamily:   interfaceFamily,
-			StatusCode:        http.StatusOK,
-			ProviderLatencyMs: providerLatencyMs,
-			FallbackModel:     fallbackModel,
-		}
-		obs.AnnotateCurrentSpan(c.Request.Context(),
-			attribute.String("polaris.fallback_from", primary.model.ID),
-			attribute.String("polaris.fallback_to", fallbackModel),
-		)
-		return stream, target, outcome, fallbackModel, nil
-	}
-
-	return nil, chatTarget{}, lastOutcome, "", httputil.NewError(http.StatusBadGateway, "provider_error", "provider_unavailable", "model", "No configured fallback provider could serve this request.")
+	return runFailover(h, c, fallbacks, primary, req, interfaceFamily, 2, false, noConfiguredFallbackError(), invokeStream, nil)
 }
 
 func writeConversationFallbackHeaders(c *gin.Context, h *ChatHandler, originalModel string, outcome middleware.RequestOutcome, fallbackModel string) {
