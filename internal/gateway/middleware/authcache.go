@@ -1,84 +1,47 @@
 package middleware
 
 import (
-	"sync"
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/store"
 )
 
+// APIKeyCache caches resolved API keys by hash. It is a thin pointer-returning
+// wrapper over the generic store.TTLCache.
 type APIKeyCache struct {
-	ttl   time.Duration
-	mu    sync.RWMutex
-	items map[string]cachedAPIKey
-}
-
-type cachedAPIKey struct {
-	key       store.APIKey
-	expiresAt time.Time
+	inner *store.TTLCache[store.APIKey]
 }
 
 func NewAPIKeyCache(ttl time.Duration) *APIKeyCache {
-	if ttl <= 0 {
-		ttl = 60 * time.Second
-	}
-	return &APIKeyCache{
-		ttl:   ttl,
-		items: make(map[string]cachedAPIKey),
-	}
+	return &APIKeyCache{inner: store.NewTTLCache[store.APIKey](ttl)}
 }
 
 func (c *APIKeyCache) Get(hash string) (*store.APIKey, bool) {
-	if c == nil || hash == "" {
+	if c == nil {
 		return nil, false
 	}
-
-	c.mu.RLock()
-	entry, ok := c.items[hash]
-	c.mu.RUnlock()
+	value, ok := c.inner.Get(hash)
 	if !ok {
 		return nil, false
 	}
-	if time.Now().After(entry.expiresAt) {
-		c.Delete(hash)
-		return nil, false
-	}
-
-	key := entry.key
-	return &key, true
+	return &value, true
 }
 
 func (c *APIKeyCache) Set(hash string, key *store.APIKey) {
-	if c == nil || hash == "" || key == nil {
+	if c == nil || key == nil {
 		return
 	}
-
-	copyKey := *key
-
-	c.mu.Lock()
-	c.items[hash] = cachedAPIKey{
-		key:       copyKey,
-		expiresAt: time.Now().Add(c.ttl),
-	}
-	c.mu.Unlock()
+	c.inner.Set(hash, *key)
 }
 
 func (c *APIKeyCache) Delete(hash string) {
-	if c == nil || hash == "" {
-		return
+	if c != nil {
+		c.inner.Delete(hash)
 	}
-
-	c.mu.Lock()
-	delete(c.items, hash)
-	c.mu.Unlock()
 }
 
 func (c *APIKeyCache) Clear() {
-	if c == nil {
-		return
+	if c != nil {
+		c.inner.Clear()
 	}
-
-	c.mu.Lock()
-	clear(c.items)
-	c.mu.Unlock()
 }

@@ -195,18 +195,10 @@ func Validate(cfg *Config) error {
 	if cfg.Files.Materialize.InlineFallbackMax < 0 {
 		problems = append(problems, errors.New("files.materialization.inline_fallback_max must not be negative"))
 	}
-	if cfg.Files.Understanding.Enabled {
-		switch strings.TrimSpace(cfg.Files.Understanding.Mode) {
-		case "", "disabled", "explicit", "auto_fallback":
-		default:
-			problems = append(problems, fmt.Errorf("files.understanding.mode %q is invalid", cfg.Files.Understanding.Mode))
-		}
-	} else {
-		switch strings.TrimSpace(cfg.Files.Understanding.Mode) {
-		case "", "disabled", "explicit", "auto_fallback":
-		default:
-			problems = append(problems, fmt.Errorf("files.understanding.mode %q is invalid", cfg.Files.Understanding.Mode))
-		}
+	switch strings.TrimSpace(cfg.Files.Understanding.Mode) {
+	case "", "disabled", "explicit", "auto_fallback":
+	default:
+		problems = append(problems, fmt.Errorf("files.understanding.mode %q is invalid", cfg.Files.Understanding.Mode))
 	}
 	if cfg.Files.Understanding.MaxBytes < 0 {
 		problems = append(problems, errors.New("files.understanding.max_bytes must not be negative"))
