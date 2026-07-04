@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -273,13 +272,42 @@ func ModelAllowed(patterns []string, candidate string) bool {
 		if pattern == "*" {
 			return true
 		}
-		regex := "^" + regexp.QuoteMeta(pattern) + "$"
-		regex = strings.ReplaceAll(regex, `\*`, ".*")
-		if matched, _ := regexp.MatchString(regex, candidate); matched {
+		if wildcardMatch(pattern, candidate) {
 			return true
 		}
 	}
 	return false
+}
+
+// wildcardMatch reports whether candidate matches a glob pattern in which '*'
+// matches any (possibly empty) run of characters and every other character is a
+// literal. It replaces per-request regex compilation on the auth hot path (B3)
+// with an allocation-free linear scan; the matching semantics are identical to
+// the previous anchored "^" + QuoteMeta(pattern with \*->.* ) + "$" regex.
+func wildcardMatch(pattern, candidate string) bool {
+	p, c := 0, 0
+	star, mark := -1, 0
+	for c < len(candidate) {
+		switch {
+		case p < len(pattern) && pattern[p] == candidate[c]:
+			p++
+			c++
+		case p < len(pattern) && pattern[p] == '*':
+			star = p
+			mark = c
+			p++
+		case star != -1:
+			p = star + 1
+			mark++
+			c = mark
+		default:
+			return false
+		}
+	}
+	for p < len(pattern) && pattern[p] == '*' {
+		p++
+	}
+	return p == len(pattern)
 }
 
 func ScopeAllowed(primary []string, policy []string, candidate string) bool {
