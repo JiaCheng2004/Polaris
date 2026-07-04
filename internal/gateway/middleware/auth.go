@@ -36,6 +36,7 @@ func Auth(holder *gwruntime.Holder, appStore store.Store, keyCache *APIKeyCache,
 		virtualKeyCache = NewVirtualKeyCache(authCacheTTL)
 	}
 	externalAuthCache := newExternalAuthCache()
+	policyCache := store.NewTTLCache[ProjectPolicies](controlPlaneCacheTTL)
 
 	return func(c *gin.Context) {
 		snapshot := RuntimeSnapshot(c, holder)
@@ -161,7 +162,7 @@ func Auth(holder *gwruntime.Holder, appStore store.Store, keyCache *APIKeyCache,
 			if len(allowedModalities) == 0 {
 				allowedModalities = allModalities()
 			}
-			policyModels, policyModalities, policyToolsets, policyBindings, err := aggregateProjectPolicies(c.Request.Context(), appStore, virtualKey.ProjectID)
+			policyModels, policyModalities, policyToolsets, policyBindings, err := aggregateProjectPolicies(c.Request.Context(), appStore, virtualKey.ProjectID, policyCache)
 			if err != nil {
 				logger.Warn("project policy lookup failed", "project_id", virtualKey.ProjectID, "error", err)
 			}
@@ -469,15 +470,23 @@ func allModalities() []modality.Modality {
 	}
 }
 
-func aggregateProjectPolicies(ctx context.Context, appStore store.Store, projectID string) ([]string, []modality.Modality, []string, []string, error) {
+func aggregateProjectPolicies(ctx context.Context, appStore store.Store, projectID string, cache *store.TTLCache[ProjectPolicies]) ([]string, []modality.Modality, []string, []string, error) {
 	if appStore == nil || projectID == "" {
 		return nil, nil, nil, nil, nil
+	}
+	if cache != nil {
+		if cached, ok := cache.Get(projectID); ok {
+			return cached.Models, cached.Modalities, cached.Toolsets, cached.Bindings, nil
+		}
 	}
 	policies, err := appStore.ListPolicies(ctx, projectID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	if len(policies) == 0 {
+		if cache != nil {
+			cache.Set(projectID, ProjectPolicies{})
+		}
 		return nil, nil, nil, nil, nil
 	}
 	models := make(map[string]struct{})
@@ -507,7 +516,16 @@ func aggregateProjectPolicies(ctx context.Context, appStore store.Store, project
 		}
 	}
 
-	return mapKeys(models), mapModalityKeys(modalitiesSet), mapKeys(toolsets), mapKeys(bindings), nil
+	result := ProjectPolicies{
+		Models:     mapKeys(models),
+		Modalities: mapModalityKeys(modalitiesSet),
+		Toolsets:   mapKeys(toolsets),
+		Bindings:   mapKeys(bindings),
+	}
+	if cache != nil {
+		cache.Set(projectID, result)
+	}
+	return result.Models, result.Modalities, result.Toolsets, result.Bindings, nil
 }
 
 func mapKeys(values map[string]struct{}) []string {

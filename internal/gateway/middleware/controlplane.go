@@ -11,6 +11,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
+	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/gin-gonic/gin"
@@ -48,10 +49,26 @@ func ControlPlaneEnabled(runtime *gwruntime.Holder) gin.HandlerFunc {
 	}
 }
 
+// controlPlaneCacheTTL bounds how stale cached control-plane config reads
+// (budget limits, aggregated project policies) may be. These are admin-set
+// config that changes rarely, so a short TTL removes a per-request DB query with
+// eventual consistency; a config change takes effect within this window. Actual
+// spend (GetUsage) is never cached, so hard-budget enforcement stays accurate.
+const controlPlaneCacheTTL = 60 * time.Second
+
+// ProjectPolicies is the aggregated, cacheable result of a project's policies.
+type ProjectPolicies struct {
+	Models     []string
+	Modalities []modality.Modality
+	Toolsets   []string
+	Bindings   []string
+}
+
 func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.Recorder, auditLogger *store.AsyncAuditLogger, logger *slog.Logger) gin.HandlerFunc {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	budgetCache := store.NewTTLCache[[]store.Budget](controlPlaneCacheTTL)
 
 	return func(c *gin.Context) {
 		ctx, span := obs.StartInternalSpan(c.Request.Context(), "budget.evaluate")
@@ -81,11 +98,16 @@ func Budget(runtime *gwruntime.Holder, appStore store.Store, recorder *metrics.R
 			c.Next()
 			return
 		}
-		budgets, err := appStore.ListBudgets(c.Request.Context(), auth.ProjectID)
-		if err != nil {
-			logger.Warn("budget lookup failed", "project_id", auth.ProjectID, "error", err)
-			c.Next()
-			return
+		budgets, cached := budgetCache.Get(auth.ProjectID)
+		if !cached {
+			fresh, err := appStore.ListBudgets(c.Request.Context(), auth.ProjectID)
+			if err != nil {
+				logger.Warn("budget lookup failed", "project_id", auth.ProjectID, "error", err)
+				c.Next()
+				return
+			}
+			budgets = fresh
+			budgetCache.Set(auth.ProjectID, budgets)
 		}
 		for _, budget := range budgets {
 			if budget.Mode != store.BudgetModeHard {
