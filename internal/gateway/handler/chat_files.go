@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
+	commonfiles "github.com/JiaCheng2004/Polaris/internal/files"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
-	commonfiles "github.com/JiaCheng2004/Polaris/internal/provider/common/files"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/transport"
 	"github.com/JiaCheng2004/Polaris/internal/understanding"

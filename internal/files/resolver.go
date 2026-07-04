@@ -1,3 +1,8 @@
+// Package files resolves Polaris file references into a form a provider can
+// consume (provider handle, URL, or inline bytes), materializing files into
+// provider Files APIs on demand. It is gateway-level orchestration -- it owns
+// the store lookups, the blob-store client lifecycle (one per snapshot), and the
+// per-file materialization locks -- so it lives above the provider layer.
 package files
 
 import (
@@ -8,7 +13,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
@@ -48,8 +52,6 @@ type Resolver struct {
 	Registry AdapterRegistry
 	Config   config.FilesConfig
 }
-
-var materializeLocks sync.Map
 
 func (r Resolver) Resolve(ctx context.Context, source modality.FileSource, projectID string, providerName string) (*ResolvedFile, error) {
 	switch source.Kind {
@@ -172,11 +174,8 @@ func (r Resolver) resolvePolarisRef(ctx context.Context, source modality.FileSou
 }
 
 func (r Resolver) materialize(ctx context.Context, adapter modality.FilesAdapter, providerName string, file *store.File) (*ResolvedFile, error) {
-	lockKey := file.PolarisID + "\x00" + providerName
-	rawLock, _ := materializeLocks.LoadOrStore(lockKey, &sync.Mutex{})
-	lock := rawLock.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
+	release := materializeLocks.acquire(file.PolarisID + "\x00" + providerName)
+	defer release()
 
 	if handle, ok, err := r.Store.GetFileProviderHandle(ctx, file.PolarisID, providerName); err != nil {
 		return nil, err
@@ -225,16 +224,15 @@ func (r Resolver) ReadFileBytes(ctx context.Context, file *store.File) ([]byte, 
 		return append([]byte(nil), file.InlineBytes...), nil
 	}
 	if file.BlobKey != "" {
-		blobStore, err := BlobStoreFromConfig(r.Config)
+		// Reuse the process-lifetime blob client for this config (B6): do not
+		// construct or Close it per read.
+		blobStore, err := globalBlobCache.get(r.Config)
 		if err != nil {
 			return nil, err
 		}
 		if blobStore == nil {
 			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File blob backing is not configured.")
 		}
-		defer func() {
-			_ = blobStore.Close()
-		}()
 		body, _, err := blobStore.Get(ctx, file.BlobKey)
 		if err != nil {
 			return nil, apierror.NewError(http.StatusNotFound, "invalid_request_error", "file_not_found", "file_id", "File content was not found.")

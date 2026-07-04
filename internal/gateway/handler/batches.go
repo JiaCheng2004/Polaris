@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
+	commonfiles "github.com/JiaCheng2004/Polaris/internal/files"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
-	commonfiles "github.com/JiaCheng2004/Polaris/internal/provider/common/files"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/gin-gonic/gin"
 )
