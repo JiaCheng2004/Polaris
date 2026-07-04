@@ -41,7 +41,7 @@ func (r *Reloader) Reload() error {
 		return errors.New("runtime holder is nil")
 	}
 
-	nextCfg, configWarnings, err := config.Load(r.path)
+	nextCfg, configWarnings, err := config.LoadWithOptions(r.path, config.LoadOptions{Lenient: r.overrides.Lenient})
 	if err != nil {
 		return err
 	}

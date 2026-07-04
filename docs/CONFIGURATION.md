@@ -18,6 +18,21 @@ Supported CLI flags:
 - `--config <path>`
 - `--port <port>`
 - `--log-level <level>`
+- `--config-lenient`
+
+## Strict Key Validation
+
+By default, configuration loading is **strict**: an unknown or misspelled key at
+any level (a stray top-level key, an unrecognized `runtime.*` section, a typo in a
+provider credential/transport field, or an unknown field inside any section)
+fails startup with an `unknown config key(s): …` error naming the offending path.
+This prevents typos from being silently ignored. Hot reloads are validated the
+same way.
+
+Pass `--config-lenient` to disable strict checking (unknown keys are dropped
+instead of rejected). Use it only as a temporary forward-compatibility escape
+hatch, for example when rolling back to an older binary that does not yet know a
+newly added key.
 
 ## File Roles
 

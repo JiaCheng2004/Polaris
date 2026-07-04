@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -331,6 +332,8 @@ type AuditConfig struct {
 type RuntimeOverrides struct {
 	Port     int
 	LogLevel string
+	// Lenient disables strict unknown-key checking on load and hot-reload.
+	Lenient bool
 }
 
 var envPattern = regexp.MustCompile(`\$\{([A-Z0-9_]+)\}`)
@@ -525,14 +528,30 @@ func EffectiveFileDownloadTTL(value time.Duration) time.Duration {
 	return value
 }
 
+// LoadOptions controls configuration loading.
+type LoadOptions struct {
+	// Lenient disables strict unknown-key checking. The default (strict) rejects
+	// unknown or misspelled configuration keys with a load error so typos cannot
+	// be silently ignored; --config-lenient sets this for forward-compatibility.
+	Lenient bool
+}
+
 func Load(path string) (*Config, []string, error) {
+	return LoadWithOptions(path, LoadOptions{})
+}
+
+// LoadWithOptions loads the config with explicit options.
+func LoadWithOptions(path string, opts LoadOptions) (*Config, []string, error) {
+	strict := !opts.Lenient
 	cfg := Default()
-	data, warnings, err := loadV2(path)
+	data, warnings, err := loadV2(path, strict)
 	if err != nil {
 		return nil, warnings, err
 	}
 
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(strict)
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, warnings, fmt.Errorf("decode config yaml: %w", err)
 	}
 

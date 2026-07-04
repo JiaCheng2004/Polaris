@@ -47,6 +47,7 @@ func run() error {
 	verifyModels := flag.Bool("verify-models", false, "Print configured model verification summary and exit")
 	verifyModelsJSON := flag.Bool("verify-models-json", false, "Print configured model verification summary as JSON and exit")
 	showVersion := flag.Bool("version", false, "Print version information and exit")
+	configLenient := flag.Bool("config-lenient", false, "Do not fail on unknown/misspelled config keys (forward-compat escape hatch)")
 	flag.Parse()
 	if *showVersion {
 		if _, err := fmt.Fprintf(os.Stdout, "polaris %s (%s, built %s)\n", version, commit, buildDate); err != nil {
@@ -61,7 +62,7 @@ func run() error {
 		_ = os.Setenv("MINIMAX_BASE_URL", "https://api.minimax.io")
 	}
 
-	cfg, warnings, err := config.Load(*configPath)
+	cfg, warnings, err := config.LoadWithOptions(*configPath, config.LoadOptions{Lenient: *configLenient})
 	if err != nil {
 		return err
 	}
@@ -153,6 +154,7 @@ func run() error {
 	reloader := gwruntime.NewReloader(*configPath, config.RuntimeOverrides{
 		Port:     *port,
 		LogLevel: *logLevel,
+		Lenient:  *configLenient,
 	}, runtimeHolder, logger, level)
 	configWatcher, err := config.NewWatcher(*configPath, 250*time.Millisecond, func(trigger string) {
 		if err := reloader.Reload(); err != nil {

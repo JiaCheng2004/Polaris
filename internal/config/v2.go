@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -14,7 +15,7 @@ import (
 
 const currentConfigVersion = 2
 
-func loadV2(path string) ([]byte, []string, error) {
+func loadV2(path string, strict bool) ([]byte, []string, error) {
 	absolutePath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve config path: %w", err)
@@ -25,7 +26,7 @@ func loadV2(path string) ([]byte, []string, error) {
 		return nil, warnings, err
 	}
 
-	normalized, err := normalizeV2Config(raw)
+	normalized, err := normalizeV2Config(raw, strict)
 	if err != nil {
 		return nil, warnings, err
 	}
@@ -148,7 +149,31 @@ func requireV2(raw map[string]any, path string) error {
 	return nil
 }
 
-func normalizeV2Config(raw map[string]any) (map[string]any, error) {
+// rejectUnknownKeys returns an error (in strict mode) listing any keys in source
+// that are not in known. It is how the whitelisting normalizer surfaces typos
+// instead of silently dropping them (B8).
+func rejectUnknownKeys(source map[string]any, known []string, prefix string, strict bool) error {
+	if !strict || len(source) == 0 {
+		return nil
+	}
+	knownSet := make(map[string]struct{}, len(known))
+	for _, k := range known {
+		knownSet[k] = struct{}{}
+	}
+	var unknown []string
+	for key := range source {
+		if _, ok := knownSet[key]; !ok {
+			unknown = append(unknown, prefix+key)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	sort.Strings(unknown)
+	return fmt.Errorf("unknown config key(s): %s", strings.Join(unknown, ", "))
+}
+
+func normalizeV2Config(raw map[string]any, strict bool) (map[string]any, error) {
 	version, ok := intValue(raw["version"])
 	if !ok {
 		return nil, fmt.Errorf("config.version is required")
@@ -157,9 +182,17 @@ func normalizeV2Config(raw map[string]any) (map[string]any, error) {
 		return nil, fmt.Errorf("config.version must be %d, got %d", currentConfigVersion, version)
 	}
 
+	if err := rejectUnknownKeys(raw, []string{"version", "runtime", "routing", "providers"}, "", strict); err != nil {
+		return nil, err
+	}
+
 	normalized := map[string]any{}
 	if runtime, ok := stringMap(raw["runtime"]); ok {
-		for _, section := range []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "files", "pricing", "observability"} {
+		runtimeSections := []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "files", "pricing", "observability"}
+		if err := rejectUnknownKeys(runtime, runtimeSections, "runtime.", strict); err != nil {
+			return nil, err
+		}
+		for _, section := range runtimeSections {
 			if value, exists := runtime[section]; exists {
 				normalized[section] = value
 			}
@@ -169,7 +202,7 @@ func normalizeV2Config(raw map[string]any) (map[string]any, error) {
 		normalized["routing"] = routing
 	}
 
-	providers, err := normalizeV2Providers(raw["providers"])
+	providers, err := normalizeV2Providers(raw["providers"], strict)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +210,7 @@ func normalizeV2Config(raw map[string]any) (map[string]any, error) {
 	return normalized, nil
 }
 
-func normalizeV2Providers(value any) (map[string]any, error) {
+func normalizeV2Providers(value any, strict bool) (map[string]any, error) {
 	rawProviders, ok := stringMap(value)
 	if !ok {
 		if value == nil {
@@ -191,11 +224,17 @@ func normalizeV2Providers(value any) (map[string]any, error) {
 		return nil, fmt.Errorf("load provider model catalog: %w", err)
 	}
 
+	credentialFields := []string{"api_key", "access_key_id", "access_key_secret", "session_token", "app_id", "speech_api_key", "speech_access_token", "secret_key", "project_name", "project_id", "location"}
+	transportFields := []string{"base_url", "control_base_url", "timeout", "retry"}
+
 	normalized := make(map[string]any, len(rawProviders))
 	for providerName, rawProvider := range rawProviders {
 		provider, ok := stringMap(rawProvider)
 		if !ok {
 			return nil, fmt.Errorf("providers.%s must be a map", providerName)
+		}
+		if err := rejectUnknownKeys(provider, []string{"enabled", "credentials", "transport", "models"}, "providers."+providerName+".", strict); err != nil {
+			return nil, err
 		}
 		if enabled, exists, err := optionalBool(provider["enabled"], "providers."+providerName+".enabled"); err != nil {
 			return nil, err
@@ -205,21 +244,27 @@ func normalizeV2Providers(value any) (map[string]any, error) {
 
 		normalizedProvider := map[string]any{}
 		if credentials, ok := stringMap(provider["credentials"]); ok {
-			for _, field := range []string{"api_key", "access_key_id", "access_key_secret", "session_token", "app_id", "speech_api_key", "speech_access_token", "secret_key", "project_name", "project_id", "location"} {
+			if err := rejectUnknownKeys(credentials, credentialFields, "providers."+providerName+".credentials.", strict); err != nil {
+				return nil, err
+			}
+			for _, field := range credentialFields {
 				if value, exists := credentials[field]; exists {
 					normalizedProvider[field] = value
 				}
 			}
 		}
 		if transport, ok := stringMap(provider["transport"]); ok {
-			for _, field := range []string{"base_url", "control_base_url", "timeout", "retry"} {
+			if err := rejectUnknownKeys(transport, transportFields, "providers."+providerName+".transport.", strict); err != nil {
+				return nil, err
+			}
+			for _, field := range transportFields {
 				if value, exists := transport[field]; exists {
 					normalizedProvider[field] = value
 				}
 			}
 		}
 
-		models, err := normalizeV2ProviderModels(providerName, provider["models"], modelCatalog)
+		models, err := normalizeV2ProviderModels(providerName, provider["models"], modelCatalog, strict)
 		if err != nil {
 			return nil, err
 		}
@@ -230,10 +275,13 @@ func normalizeV2Providers(value any) (map[string]any, error) {
 	return normalized, nil
 }
 
-func normalizeV2ProviderModels(providerName string, value any, modelCatalog *catalog.Catalog) (map[string]any, error) {
+func normalizeV2ProviderModels(providerName string, value any, modelCatalog *catalog.Catalog, strict bool) (map[string]any, error) {
 	rawModels, ok := stringMap(value)
 	if !ok {
 		return nil, fmt.Errorf("providers.%s.models must be a map with use and optional overrides", providerName)
+	}
+	if err := rejectUnknownKeys(rawModels, []string{"use", "overrides"}, "providers."+providerName+".models.", strict); err != nil {
+		return nil, err
 	}
 
 	usedModels, err := stringSlice(rawModels["use"], "providers."+providerName+".models.use")
