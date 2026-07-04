@@ -7,6 +7,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 func registerConfiguredAliases(registry *Registry, routing config.RoutingConfig, warnings *[]string) {
@@ -124,18 +125,6 @@ func selectModelForSelector(registry *Registry, alias string, selector config.Ro
 	return selectModelCandidates(registry, alias, candidates, mergedRoutingPolicy(selectorOverride(selector, requiredModality, requiredCapabilities), routing))
 }
 
-func mergeCapabilities(a []modality.Capability, b []modality.Capability) []modality.Capability {
-	out := make([]modality.Capability, 0, len(a)+len(b))
-	for _, items := range [][]modality.Capability{a, b} {
-		for _, capability := range items {
-			if !containsCapability(out, capability) {
-				out = append(out, capability)
-			}
-		}
-	}
-	return out
-}
-
 func modelMatchesSelector(
 	model Model,
 	requiredModality modality.Modality,
@@ -165,7 +154,7 @@ func modelMatchesSelector(
 		}
 	}
 	for _, capability := range requiredCapabilities {
-		if !containsCapability(model.Capabilities, capability) {
+		if !core.ContainsCapability(model.Capabilities, capability) {
 			return false
 		}
 	}
@@ -188,7 +177,7 @@ func selectorOverride(selector config.RoutingSelector, requiredModality modality
 	if requiredModality != "" {
 		selector.Modality = requiredModality
 	}
-	selector.Capabilities = mergeCapabilities(selector.Capabilities, requiredCapabilities)
+	selector.Capabilities = core.MergeCapabilities(selector.Capabilities, requiredCapabilities)
 	return selector
 }
 
@@ -232,7 +221,7 @@ func mergedRoutingPolicy(selector config.RoutingSelector, routing *modality.Rout
 
 	capabilities := append([]modality.Capability(nil), selector.Capabilities...)
 	if routing != nil && len(routing.Capabilities) > 0 {
-		capabilities = mergeCapabilities(capabilities, routing.Capabilities)
+		capabilities = core.MergeCapabilities(capabilities, routing.Capabilities)
 	}
 
 	costTier := strings.TrimSpace(selector.CostTier)
@@ -256,8 +245,8 @@ func mergedRoutingPolicy(selector config.RoutingSelector, routing *modality.Rout
 		capabilities:        capabilities,
 		providers:           providers,
 		excludeProviders:    exclude,
-		statuses:            toSet(statuses),
-		verificationClasses: toSet(verificationClasses),
+		statuses:            core.ToSet(statuses),
+		verificationClasses: core.ToSet(verificationClasses),
 		prefer:              prefer,
 		costTier:            costTier,
 		latencyTier:         latencyTier,
@@ -289,10 +278,10 @@ func selectModelCandidates(registry *Registry, alias string, candidates []Model,
 		}
 	}
 
-	providerPriority := toPriorityMap(policy.providers)
+	providerPriority := core.ToPriorityMap(policy.providers)
 	slices.SortFunc(filtered, func(a, b Model) int {
-		aRank := selectorRank(a, providerPriority)
-		bRank := selectorRank(b, providerPriority)
+		aRank := core.SelectorRank(a.Provider, providerPriority)
+		bRank := core.SelectorRank(b.Provider, providerPriority)
 		if aRank != bRank {
 			if aRank < bRank {
 				return -1
@@ -321,32 +310,6 @@ func selectModelCandidates(registry *Registry, alias string, candidates []Model,
 	})
 
 	return filtered[0], nil
-}
-
-func toSet(values []string) map[string]struct{} {
-	if len(values) == 0 {
-		return nil
-	}
-	out := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		out[strings.TrimSpace(value)] = struct{}{}
-	}
-	return out
-}
-
-func toPriorityMap(values []string) map[string]int {
-	out := make(map[string]int, len(values))
-	for index, value := range values {
-		out[strings.TrimSpace(value)] = index
-	}
-	return out
-}
-
-func selectorRank(model Model, priority map[string]int) int {
-	if rank, ok := priority[model.Provider]; ok {
-		return rank
-	}
-	return len(priority)
 }
 
 func tierRank(modelTier string, requestedTier string) int {
@@ -387,7 +350,7 @@ func intersectOrdered(primary []string, secondary []string) []string {
 	if len(primary) == 0 || len(secondary) == 0 {
 		return nil
 	}
-	allowed := toSet(secondary)
+	allowed := core.ToSet(secondary)
 	out := make([]string, 0, len(primary))
 	for _, item := range primary {
 		trimmed := strings.TrimSpace(item)
@@ -402,7 +365,7 @@ func intersectUnordered(primary []string, secondary []string) []string {
 	if len(primary) == 0 || len(secondary) == 0 {
 		return nil
 	}
-	allowed := toSet(secondary)
+	allowed := core.ToSet(secondary)
 	out := make([]string, 0, len(primary))
 	for _, item := range primary {
 		trimmed := strings.TrimSpace(item)

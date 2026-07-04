@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 type ModelCapabilityFlags struct {
@@ -91,22 +92,22 @@ func withModelMetadata(model Model) Model {
 func capabilityFlags(model Model) ModelCapabilityFlags {
 	return ModelCapabilityFlags{
 		Chat:              model.Modality == modality.ModalityChat,
-		Vision:            containsCapability(model.Capabilities, modality.CapabilityVision),
+		Vision:            core.ContainsCapability(model.Capabilities, modality.CapabilityVision),
 		FileUnderstanding: nativeFileUnderstanding(model.Capabilities),
 		ImageGeneration: model.Modality == modality.ModalityImage &&
-			containsCapability(model.Capabilities, modality.CapabilityGeneration),
+			core.ContainsCapability(model.Capabilities, modality.CapabilityGeneration),
 		ImageEdit: model.Modality == modality.ModalityImage &&
-			containsCapability(model.Capabilities, modality.CapabilityEditing),
+			core.ContainsCapability(model.Capabilities, modality.CapabilityEditing),
 		MusicGeneration: model.Modality == modality.ModalityMusic &&
-			containsCapability(model.Capabilities, modality.CapabilityMusicGeneration),
+			core.ContainsCapability(model.Capabilities, modality.CapabilityMusicGeneration),
 		LyricsGeneration: model.Modality == modality.ModalityMusic &&
-			containsCapability(model.Capabilities, modality.CapabilityLyricsGeneration),
+			core.ContainsCapability(model.Capabilities, modality.CapabilityLyricsGeneration),
 		VideoGeneration: model.Modality == modality.ModalityVideo &&
-			(containsCapability(model.Capabilities, modality.CapabilityTextToVideo) ||
-				containsCapability(model.Capabilities, modality.CapabilityImageToVideo) ||
-				containsCapability(model.Capabilities, modality.CapabilityGeneration)),
-		ToolCalling: containsCapability(model.Capabilities, modality.CapabilityFunctionCalling),
-		Streaming:   containsCapability(model.Capabilities, modality.CapabilityStreaming),
+			(core.ContainsCapability(model.Capabilities, modality.CapabilityTextToVideo) ||
+				core.ContainsCapability(model.Capabilities, modality.CapabilityImageToVideo) ||
+				core.ContainsCapability(model.Capabilities, modality.CapabilityGeneration)),
+		ToolCalling: core.ContainsCapability(model.Capabilities, modality.CapabilityFunctionCalling),
+		Streaming:   core.ContainsCapability(model.Capabilities, modality.CapabilityStreaming),
 	}
 }
 
@@ -159,7 +160,7 @@ func hostedTools(capabilities []modality.Capability) []ModelHostedTool {
 		{capability: modality.CapabilityHostedToolMCP, name: "mcp"},
 		{capability: modality.CapabilityHostedToolURLContext, name: "url_context"},
 	} {
-		if containsCapability(capabilities, tool.capability) {
+		if core.ContainsCapability(capabilities, tool.capability) {
 			tools = append(tools, ModelHostedTool{
 				Name:               tool.name,
 				Capability:         string(tool.capability),

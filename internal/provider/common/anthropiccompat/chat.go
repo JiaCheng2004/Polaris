@@ -13,6 +13,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 type RequestTranslator func(req *modality.ChatRequest, stream bool, providerModel string) any
@@ -965,25 +966,11 @@ func mapStopReason(reason string) string {
 }
 
 func providerModelName(requestModel string, fallbackModel string) string {
-	if requestModel != "" {
-		if idx := strings.IndexByte(requestModel, '/'); idx >= 0 {
-			return requestModel[idx+1:]
-		}
-		return requestModel
-	}
-	if idx := strings.IndexByte(fallbackModel, '/'); idx >= 0 {
-		return fallbackModel[idx+1:]
-	}
-	return fallbackModel
+	return core.ProviderModelName(requestModel, fallbackModel)
 }
 
 func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
+	return core.FirstNonEmpty(values...)
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

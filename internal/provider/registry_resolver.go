@@ -7,6 +7,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 func (r *Registry) ResolveAlias(alias string) (string, error) {
@@ -133,7 +134,7 @@ func (r *Registry) resolveFamilyModel(familyID string, requiredModality modality
 		}
 		matches := true
 		for _, capability := range requiredCapabilities {
-			if !containsCapability(model.Capabilities, capability) {
+			if !core.ContainsCapability(model.Capabilities, capability) {
 				matches = false
 				break
 			}
@@ -179,7 +180,7 @@ func (r *Registry) ListModels(includeAliases bool) []Model {
 		if err != nil {
 			continue
 		}
-		items = append(items, aliasModel(alias, "selector", resolved, resolved.ID, mergeCapabilities(selector.Capabilities, resolved.Capabilities)))
+		items = append(items, aliasModel(alias, "selector", resolved, resolved.ID, core.MergeCapabilities(selector.Capabilities, resolved.Capabilities)))
 	}
 
 	slices.SortFunc(items, func(a, b Model) int {
@@ -260,7 +261,7 @@ func validateResolvedModel(model Model, requiredModality modality.Modality, requ
 		return fmt.Errorf("%w: requested %s got %s", ErrModalityMismatch, requiredModality, model.Modality)
 	}
 	for _, capability := range requiredCapabilities {
-		if !containsCapability(model.Capabilities, capability) {
+		if !core.ContainsCapability(model.Capabilities, capability) {
 			return fmt.Errorf("%w: %s", ErrCapabilityMissing, capability)
 		}
 	}

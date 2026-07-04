@@ -11,6 +11,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/provider/catalog"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 type CountSummary struct {
@@ -297,11 +298,11 @@ func resolveConfiguredModel(cfg *config.Config, configured map[string]provider.M
 }
 
 func selectConfiguredModelForSelector(configured map[string]provider.Model, alias string, selector config.RoutingSelector) (provider.Model, error) {
-	required := mergeCapabilities(selector.Capabilities, nil)
-	excludeProviders := toSet(selector.ExcludeProviders)
-	allowedStatuses := toSet(selector.Statuses)
-	allowedVerificationClasses := toSet(selector.VerificationClasses)
-	providerPriority := toPriorityMap(selector.Providers)
+	required := core.MergeCapabilities(selector.Capabilities, nil)
+	excludeProviders := core.ToSet(selector.ExcludeProviders)
+	allowedStatuses := core.ToSet(selector.Statuses)
+	allowedVerificationClasses := core.ToSet(selector.VerificationClasses)
+	providerPriority := core.ToPriorityMap(selector.Providers)
 
 	pickByName := func(name string) (provider.Model, bool) {
 		model, ok := configured[name]
@@ -328,8 +329,8 @@ func selectConfiguredModelForSelector(configured map[string]provider.Model, alia
 	}
 
 	slices.SortFunc(candidates, func(a, b provider.Model) int {
-		aRank := selectorRank(a, providerPriority)
-		bRank := selectorRank(b, providerPriority)
+		aRank := core.SelectorRank(a.Provider, providerPriority)
+		bRank := core.SelectorRank(b.Provider, providerPriority)
 		if aRank != bRank {
 			if aRank < bRank {
 				return -1
@@ -340,27 +341,6 @@ func selectConfiguredModelForSelector(configured map[string]provider.Model, alia
 	})
 
 	return candidates[0], nil
-}
-
-func mergeCapabilities(a []modality.Capability, b []modality.Capability) []modality.Capability {
-	out := make([]modality.Capability, 0, len(a)+len(b))
-	for _, items := range [][]modality.Capability{a, b} {
-		for _, capability := range items {
-			if !containsCapability(out, capability) {
-				out = append(out, capability)
-			}
-		}
-	}
-	return out
-}
-
-func containsCapability(capabilities []modality.Capability, candidate modality.Capability) bool {
-	for _, capability := range capabilities {
-		if capability == candidate {
-			return true
-		}
-	}
-	return false
 }
 
 func modelMatchesSelector(
@@ -392,35 +372,9 @@ func modelMatchesSelector(
 		}
 	}
 	for _, capability := range requiredCapabilities {
-		if !containsCapability(model.Capabilities, capability) {
+		if !core.ContainsCapability(model.Capabilities, capability) {
 			return false
 		}
 	}
 	return true
-}
-
-func toSet(values []string) map[string]struct{} {
-	if len(values) == 0 {
-		return nil
-	}
-	out := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		out[strings.TrimSpace(value)] = struct{}{}
-	}
-	return out
-}
-
-func toPriorityMap(values []string) map[string]int {
-	out := make(map[string]int, len(values))
-	for index, value := range values {
-		out[strings.TrimSpace(value)] = index
-	}
-	return out
-}
-
-func selectorRank(model provider.Model, priority map[string]int) int {
-	if rank, ok := priority[model.Provider]; ok {
-		return rank
-	}
-	return len(priority)
 }

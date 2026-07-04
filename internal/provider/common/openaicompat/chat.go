@@ -12,6 +12,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/apierror"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/chattools"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 type RequestTranslator func(req *modality.ChatRequest, stream bool, providerModel string) any
@@ -204,26 +205,13 @@ func NormalizeChatChunk(chunk *modality.ChatChunk, canonicalModel string, fallba
 	}
 }
 
+// ProviderModelName is re-exported from provider/core (single source) for the
+// providers that build on this compat base.
 func ProviderModelName(requestModel string, fallbackModel string) string {
-	if requestModel == "" {
-		return strings.TrimPrefix(fallbackModel[strings.Index(fallbackModel, "/")+1:], "/")
-	}
-	if idx := strings.IndexByte(requestModel, '/'); idx >= 0 {
-		return requestModel[idx+1:]
-	}
-	if fallbackModel != "" {
-		if idx := strings.IndexByte(fallbackModel, '/'); idx >= 0 {
-			return fallbackModel[idx+1:]
-		}
-	}
-	return requestModel
+	return core.ProviderModelName(requestModel, fallbackModel)
 }
 
+// FirstNonEmpty is re-exported from provider/core.
 func FirstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
+	return core.FirstNonEmpty(values...)
 }

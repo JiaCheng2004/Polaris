@@ -46,15 +46,6 @@ func modelFromConfig(id, providerName, modelName string, modelCfg config.ModelCo
 	return model
 }
 
-func containsCapability(capabilities []modality.Capability, candidate modality.Capability) bool {
-	for _, capability := range capabilities {
-		if capability == candidate {
-			return true
-		}
-	}
-	return false
-}
-
 func runtimeSupportedModality(candidate modality.Modality) bool {
 	switch candidate {
 	case modality.ModalityChat, modality.ModalityImage, modality.ModalityVideo, modality.ModalityVoice, modality.ModalityEmbed, modality.ModalityAudio, modality.ModalityInterpreting, modality.ModalityMusic, modality.ModalityTranslation, modality.ModalityNotes, modality.ModalityPodcast:

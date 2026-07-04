@@ -7,6 +7,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/bytedance"
+	"github.com/JiaCheng2004/Polaris/internal/provider/core"
 )
 
 func init() {
@@ -63,15 +64,15 @@ func registerByteDanceProvider(registry *Registry, warnings *[]string, providerN
 			}
 		}
 		if modelCfg.Modality == modality.ModalityVoice {
-			if containsCapability(modelCfg.Capabilities, modality.CapabilityTTS) && strings.TrimSpace(providerCfg.SpeechAPIKey) == "" {
+			if core.ContainsCapability(modelCfg.Capabilities, modality.CapabilityTTS) && strings.TrimSpace(providerCfg.SpeechAPIKey) == "" {
 				*warnings = append(*warnings, fmt.Sprintf("model %s/%s is disabled because providers.%s.speech_api_key is required for ByteDance TTS", providerName, modelName, providerName))
 				continue
 			}
-			if containsCapability(modelCfg.Capabilities, modality.CapabilitySTT) && strings.TrimSpace(providerCfg.SpeechAPIKey) == "" {
+			if core.ContainsCapability(modelCfg.Capabilities, modality.CapabilitySTT) && strings.TrimSpace(providerCfg.SpeechAPIKey) == "" {
 				*warnings = append(*warnings, fmt.Sprintf("model %s/%s is disabled because providers.%s.speech_api_key is required for ByteDance STT", providerName, modelName, providerName))
 				continue
 			}
-			if containsCapability(modelCfg.Capabilities, modality.CapabilityStreaming) {
+			if core.ContainsCapability(modelCfg.Capabilities, modality.CapabilityStreaming) {
 				if strings.TrimSpace(providerCfg.AppID) == "" {
 					*warnings = append(*warnings, fmt.Sprintf("model %s/%s is disabled because providers.%s.app_id is required for ByteDance streaming transcription", providerName, modelName, providerName))
 					continue
@@ -134,10 +135,10 @@ func registerByteDanceProvider(registry *Registry, warnings *[]string, providerN
 			registry.interpretingAdapters[id] = bytedance.NewInterpretingAdapter(client, id, modelCfg.Endpoint)
 		case modality.ModalityVoice:
 			voiceAdapter := bytedance.NewVoiceAdapter(client, id, modelCfg.Endpoint)
-			if containsCapability(modelCfg.Capabilities, modality.CapabilityTTS) || containsCapability(modelCfg.Capabilities, modality.CapabilitySTT) {
+			if core.ContainsCapability(modelCfg.Capabilities, modality.CapabilityTTS) || core.ContainsCapability(modelCfg.Capabilities, modality.CapabilitySTT) {
 				registry.voiceAdapters[id] = voiceAdapter
 			}
-			if containsCapability(modelCfg.Capabilities, modality.CapabilityStreaming) {
+			if core.ContainsCapability(modelCfg.Capabilities, modality.CapabilityStreaming) {
 				registry.streamingTranscriptionAdapters[id] = bytedance.NewStreamingTranscriptionAdapter(client, id, modelCfg.Endpoint)
 			}
 		case modality.ModalityAudio:
