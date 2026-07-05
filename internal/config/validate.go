@@ -150,6 +150,9 @@ func Validate(cfg *Config) error {
 	if cfg.Cache.Driver == "redis" && cfg.Cache.URL == "" {
 		problems = append(problems, errors.New("cache.url is required when cache.driver=redis"))
 	}
+	if fm := cfg.Cache.RateLimit.FailMode; fm != "" && fm != "open" && fm != "closed" {
+		problems = append(problems, fmt.Errorf("cache.rate_limit.fail_mode %q is invalid (want open|closed)", fm))
+	}
 	if cfg.Cache.RateLimit.Window != "" && cfg.Cache.RateLimit.Window != "sliding" {
 		problems = append(problems, fmt.Errorf("cache.rate_limit.window %q is invalid", cfg.Cache.RateLimit.Window))
 	}

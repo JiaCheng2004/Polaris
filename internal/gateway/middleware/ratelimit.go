@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
@@ -19,10 +20,21 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// rateStore is the subset of cache.Cache the sliding-window limiter needs. Both
+// the primary limiter and the process-local fallback satisfy it.
+type rateStore interface {
+	Increment(ctx context.Context, key string, ttl time.Duration) (int64, error)
+	Get(ctx context.Context, key string) (string, bool, error)
+}
+
 func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logger, recorder *metrics.Recorder) gin.HandlerFunc {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	// A best-effort, process-local fallback used when the primary limiter (Redis)
+	// is unavailable and fail_mode is "open". Goroutine-free (lazy expiry) so it
+	// adds no shutdown/goleak surface.
+	fallback := newLocalRateCounter()
 
 	return func(c *gin.Context) {
 		ctx, span := obs.StartInternalSpan(c.Request.Context(), "rate_limit.evaluate")
@@ -67,15 +79,40 @@ func RateLimit(holder *gwruntime.Holder, limiter cache.Cache, logger *slog.Logge
 		currentKey := fmt.Sprintf("ratelimit:%s:%s:%d", bucket, auth.KeyID, currentStart)
 		previousKey := fmt.Sprintf("ratelimit:%s:%s:%d", bucket, auth.KeyID, previousStart)
 
+		failMode := strings.ToLower(strings.TrimSpace(cfg.Cache.RateLimit.FailMode))
+		if failMode == "" {
+			failMode = "open"
+		}
+
+		var effective rateStore = limiter
 		currentCount, err := limiter.Increment(context.Background(), currentKey, 2*window)
 		if err != nil {
-			logger.Warn("rate limit increment failed, allowing request", "request_id", GetRequestID(c), "error", err)
-			c.Next()
-			return
+			if failMode == "closed" {
+				// Strict: reject rather than risk unbounded traffic (and provider
+				// spend) while the limiter is down.
+				logger.Warn("rate limit primary unavailable, failing closed", "request_id", GetRequestID(c), "error", err)
+				recorder.IncRateLimitDegraded("closed", "rejected")
+				retryAfter := int64(math.Ceil(window.Seconds()))
+				if retryAfter < 1 {
+					retryAfter = 1
+				}
+				c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+				httputil.WriteError(c, httputil.NewError(http.StatusServiceUnavailable, "rate_limit_error", "rate_limiter_unavailable", "", "Rate limiter is temporarily unavailable."))
+				return
+			}
+			// Open (default): degrade to best-effort process-local counting.
+			logger.Warn("rate limit primary unavailable, degrading to local counting", "request_id", GetRequestID(c), "error", err)
+			recorder.IncRateLimitDegraded("open", "fallback")
+			effective = fallback
+			currentCount, err = fallback.Increment(context.Background(), currentKey, 2*window)
+			if err != nil {
+				c.Next()
+				return
+			}
 		}
 
 		previousCount := int64(0)
-		if previousRaw, ok, err := limiter.Get(context.Background(), previousKey); err == nil && ok {
+		if previousRaw, ok, err := effective.Get(context.Background(), previousKey); err == nil && ok {
 			if value, parseErr := strconv.ParseInt(previousRaw, 10, 64); parseErr == nil {
 				previousCount = value
 			}
@@ -117,6 +154,60 @@ func rateLimitBucket(c *gin.Context) string {
 		return "files_read"
 	default:
 		return "requests"
+	}
+}
+
+type localRateEntry struct {
+	count   int64
+	expires time.Time
+}
+
+// localRateCounter is a process-local sliding-window counter with lazy expiry
+// and no background goroutine, used as the rate-limit fallback when the primary
+// limiter is unavailable in fail_mode "open".
+type localRateCounter struct {
+	mu sync.Mutex
+	m  map[string]localRateEntry
+}
+
+func newLocalRateCounter() *localRateCounter {
+	return &localRateCounter{m: make(map[string]localRateEntry)}
+}
+
+func (l *localRateCounter) Increment(_ context.Context, key string, ttl time.Duration) (int64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	l.evictExpiredLocked(now)
+	e, ok := l.m[key]
+	if !ok || now.After(e.expires) {
+		e = localRateEntry{expires: now.Add(ttl)}
+	}
+	e.count++
+	l.m[key] = e
+	return e.count, nil
+}
+
+func (l *localRateCounter) Get(_ context.Context, key string) (string, bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	e, ok := l.m[key]
+	if !ok || time.Now().After(e.expires) {
+		return "", false, nil
+	}
+	return strconv.FormatInt(e.count, 10), true, nil
+}
+
+// evictExpiredLocked drops expired entries once the map grows past a threshold,
+// keeping it bounded without a janitor goroutine.
+func (l *localRateCounter) evictExpiredLocked(now time.Time) {
+	if len(l.m) < 1024 {
+		return
+	}
+	for k, e := range l.m {
+		if now.After(e.expires) {
+			delete(l.m, k)
+		}
 	}
 }
 

@@ -34,6 +34,7 @@ type Recorder struct {
 	retryBudgetExhausted *prometheus.CounterVec
 	usageDropped         *prometheus.CounterVec
 	idempotentReplays    *prometheus.CounterVec
+	rateLimitDegraded    *prometheus.CounterVec
 }
 
 func NewRecorder() *Recorder {
@@ -127,6 +128,10 @@ func NewRecorder() *Recorder {
 			Name: "polaris_idempotent_replays_total",
 			Help: "Total idempotency-key replays served from cache, by endpoint.",
 		}, []string{"endpoint"}),
+		rateLimitDegraded: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_ratelimit_degraded_total",
+			Help: "Total requests where the primary rate limiter was unavailable, by fail mode and action.",
+		}, []string{"mode", "action"}),
 	}
 
 	registry.MustRegister(
@@ -151,6 +156,7 @@ func NewRecorder() *Recorder {
 		recorder.retryBudgetExhausted,
 		recorder.usageDropped,
 		recorder.idempotentReplays,
+		recorder.rateLimitDegraded,
 	)
 
 	return recorder
@@ -296,6 +302,22 @@ func (r *Recorder) IncIdempotentReplay(endpoint string) {
 		endpoint = "unknown"
 	}
 	r.idempotentReplays.WithLabelValues(endpoint).Inc()
+}
+
+// IncRateLimitDegraded records a request where the primary rate limiter was
+// unavailable. action is "fallback" (degraded to local counting), "allowed"
+// (fail-open), or "rejected" (fail-closed 503).
+func (r *Recorder) IncRateLimitDegraded(mode, action string) {
+	if r == nil {
+		return
+	}
+	if mode == "" {
+		mode = "open"
+	}
+	if action == "" {
+		action = "unknown"
+	}
+	r.rateLimitDegraded.WithLabelValues(mode, action).Inc()
 }
 
 func (r *Recorder) IncCacheEvent(status string, model string) {

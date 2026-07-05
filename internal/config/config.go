@@ -130,6 +130,10 @@ type RateLimitConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Default string `yaml:"default"`
 	Window  string `yaml:"window"`
+	// FailMode controls behavior when the primary limiter (e.g. Redis) is
+	// unavailable: "open" (default) degrades to best-effort process-local counting
+	// then allows; "closed" returns 503 to cap runaway provider spend.
+	FailMode string `yaml:"fail_mode"`
 }
 
 type ResponseCache struct {
@@ -402,9 +406,10 @@ func Default() Config {
 		Cache: CacheConfig{
 			Driver: "memory",
 			RateLimit: RateLimitConfig{
-				Enabled: true,
-				Default: "60/min",
-				Window:  "sliding",
+				Enabled:  true,
+				Default:  "60/min",
+				Window:   "sliding",
+				FailMode: "open",
 			},
 			ResponseCache: ResponseCache{
 				TTL:                 24 * time.Hour,
