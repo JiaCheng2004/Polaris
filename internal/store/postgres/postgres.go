@@ -326,6 +326,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if upgradeErr := s.ensureFilesUpgrade(ctx); upgradeErr != nil {
 			return fmt.Errorf("apply postgres migrations: %w (files upgrade fallback failed: %v)", err, upgradeErr)
 		}
+		if upgradeErr := s.ensureIdempotencyUpgrade(ctx); upgradeErr != nil {
+			return fmt.Errorf("apply postgres migrations: %w (idempotency upgrade fallback failed: %v)", err, upgradeErr)
+		}
 		return nil
 	}
 	if err := s.ensureControlPlaneUpgrade(ctx); err != nil {
@@ -333,6 +336,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	if err := s.ensureFilesUpgrade(ctx); err != nil {
 		return fmt.Errorf("apply postgres files upgrades: %w", err)
+	}
+	if err := s.ensureIdempotencyUpgrade(ctx); err != nil {
+		return fmt.Errorf("apply postgres idempotency upgrades: %w", err)
 	}
 	return nil
 }

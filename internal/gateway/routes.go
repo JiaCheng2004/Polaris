@@ -29,6 +29,10 @@ type routeHandlers struct {
 	video        *handler.VideoHandler
 	voice        *handler.VoiceHandler
 	voices       *handler.VoicesHandler
+	// idempotency builds the per-route idempotency middleware for a job-submit
+	// endpoint. All routes share one coordinator so concurrent duplicates of a
+	// key serialize regardless of endpoint.
+	idempotency func(endpoint string) gin.HandlerFunc
 }
 
 func registerRoutes(engine *gin.Engine, deps Dependencies) {
@@ -53,7 +57,11 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 
 func buildRouteHandlers(deps Dependencies) routeHandlers {
 	chatHandler := handler.NewChatHandler(deps.Runtime, deps.Metrics, deps.Cache, deps.Store, deps.Reliability)
+	idempotencyCoord := middleware.NewIdempotencyCoordinator()
 	return routeHandlers{
+		idempotency: func(endpoint string) gin.HandlerFunc {
+			return middleware.Idempotency(deps.Runtime, deps.Store, idempotencyCoord, deps.Metrics, endpoint)
+		},
 		audio:        handler.NewAudioHandler(deps.Runtime),
 		batches:      handler.NewBatchesHandler(deps.Runtime, deps.Store),
 		chat:         chatHandler,

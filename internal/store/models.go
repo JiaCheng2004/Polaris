@@ -74,6 +74,20 @@ type Budget struct {
 	CreatedAt      time.Time
 }
 
+// IdempotencyKey stores the outcome of a job-submit request keyed by the
+// client-supplied Idempotency-Key, so a retry replays the original response
+// instead of double-executing (R8).
+type IdempotencyKey struct {
+	Key            string
+	ProjectID      string
+	Endpoint       string
+	RequestHash    string
+	ResponseStatus int
+	ResponseBody   []byte
+	CreatedAt      time.Time
+	ExpiresAt      time.Time
+}
+
 type File struct {
 	PolarisID        string
 	ProjectID        string

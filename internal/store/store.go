@@ -113,6 +113,13 @@ type UsageStore interface {
 	GetUsageByModel(ctx context.Context, filter UsageFilter) (UsageReport, error)
 }
 
+// IdempotencyStore persists idempotency-key outcomes for job-submit endpoints.
+type IdempotencyStore interface {
+	CheckIdempotencyKey(ctx context.Context, key, projectID, endpoint string) (*IdempotencyKey, bool, error)
+	PutIdempotencyKey(ctx context.Context, rec IdempotencyKey) error
+	PurgeExpiredIdempotencyKeys(ctx context.Context, now time.Time) (int64, error)
+}
+
 // MaintenanceStore covers lifecycle/maintenance operations.
 type MaintenanceStore interface {
 	PurgeOldLogs(ctx context.Context, olderThan time.Time) (int64, error)
@@ -136,5 +143,6 @@ type Store interface {
 	VoiceStore
 	RequestLogStore
 	UsageStore
+	IdempotencyStore
 	MaintenanceStore
 }

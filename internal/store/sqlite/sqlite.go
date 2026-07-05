@@ -314,6 +314,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if upgradeErr := s.ensureFilesUpgrade(ctx); upgradeErr != nil {
 			return fmt.Errorf("apply sqlite migrations: %w (files upgrade fallback failed: %v)", err, upgradeErr)
 		}
+		if upgradeErr := s.ensureIdempotencyUpgrade(ctx); upgradeErr != nil {
+			return fmt.Errorf("apply sqlite migrations: %w (idempotency upgrade fallback failed: %v)", err, upgradeErr)
+		}
 		return nil
 	}
 	if err := s.ensureControlPlaneUpgrade(ctx); err != nil {
@@ -321,6 +324,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	if err := s.ensureFilesUpgrade(ctx); err != nil {
 		return fmt.Errorf("apply sqlite files upgrades: %w", err)
+	}
+	if err := s.ensureIdempotencyUpgrade(ctx); err != nil {
+		return fmt.Errorf("apply sqlite idempotency upgrades: %w", err)
 	}
 	return nil
 }
