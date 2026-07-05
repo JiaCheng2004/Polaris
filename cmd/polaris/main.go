@@ -140,6 +140,7 @@ func run() error {
 	defer reliabilityManager.Close()
 
 	requestLogger := store.NewAsyncRequestLogger(appStore, logger, store.NewLoggerConfig(cfg.Store.LogBufferSize, cfg.Store.LogFlushInterval))
+	requestLogger.SetMetrics(metricsRecorder)
 	defer func() {
 		if err := requestLogger.Close(context.Background()); err != nil {
 			logger.Warn("request logger close failed", "error", err)
@@ -147,6 +148,7 @@ func run() error {
 	}()
 	auditLogger := store.NewAsyncAuditLogger(appStore, logger, store.NewLoggerConfig(cfg.Store.LogBufferSize, cfg.Store.LogFlushInterval))
 	if auditLogger != nil {
+		auditLogger.SetMetrics(metricsRecorder)
 		defer func() {
 			if err := auditLogger.Close(context.Background()); err != nil {
 				logger.Warn("audit logger close failed", "error", err)
