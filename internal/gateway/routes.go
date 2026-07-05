@@ -41,6 +41,7 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 		middleware.CORS(deps.Runtime),
 		middleware.Logger(deps.Logger),
 		middleware.Metrics(deps.Metrics),
+		middleware.Shed(deps.Reliability),
 	)
 
 	handlers := buildRouteHandlers(deps)
@@ -51,7 +52,7 @@ func registerRoutes(engine *gin.Engine, deps Dependencies) {
 }
 
 func buildRouteHandlers(deps Dependencies) routeHandlers {
-	chatHandler := handler.NewChatHandler(deps.Runtime, deps.Metrics, deps.Cache, deps.Store)
+	chatHandler := handler.NewChatHandler(deps.Runtime, deps.Metrics, deps.Cache, deps.Store, deps.Reliability)
 	return routeHandlers{
 		audio:        handler.NewAudioHandler(deps.Runtime),
 		batches:      handler.NewBatchesHandler(deps.Runtime, deps.Store),

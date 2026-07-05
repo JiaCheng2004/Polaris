@@ -9,6 +9,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/obs"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -47,10 +48,23 @@ func runFailover[T any](
 
 	var lastOutcome middleware.RequestOutcome
 	for index, target := range targets {
+		slug := target.model.Provider
+		// Admission (2B): an open breaker demotes this target and a full
+		// concurrency cap sheds it — advance to the next candidate. The last
+		// target is always attempted, so admission alone never hard-fails a
+		// request. Default config is permissive, so this is wire-neutral until a
+		// provider actually fails repeatedly or shedding is enabled.
+		release, admit := h.admit(slug)
+		if admit != reliability.AdmitOK && index < len(targets)-1 {
+			release()
+			continue
+		}
+
 		attemptReq := *req
 		attemptReq.Model = target.model.ID
 		resolvedReq, err := h.resolveFilesForTarget(c, &attemptReq, target.model)
 		if err != nil {
+			release()
 			return zero, chatTarget{}, lastOutcome, "", err
 		}
 
@@ -66,6 +80,9 @@ func runFailover[T any](
 			obs.RecordSpanError(attemptSpan, err)
 		}
 		attemptSpan.End()
+		// Free the concurrency slot; health/breaker state is updated by the
+		// transport observer, not here.
+		release()
 		providerLatencyMs := int(time.Since(start).Milliseconds())
 
 		if err != nil {
@@ -80,7 +97,10 @@ func runFailover[T any](
 				ErrorType:         apiErr.Type,
 				ProviderLatencyMs: providerLatencyMs,
 			}
-			if index < len(targets)-1 && shouldRetryWithFallback(apiErr) {
+			// Consult the retry budget before failing over (only when we would
+			// otherwise fail over): a sustained failure storm exhausts it and
+			// stops amplifying load.
+			if index < len(targets)-1 && shouldRetryWithFallback(apiErr) && h.allowRetry(slug) {
 				continue
 			}
 			return zero, chatTarget{}, lastOutcome, "", apiErr
@@ -113,6 +133,23 @@ func runFailover[T any](
 	}
 
 	return zero, chatTarget{}, lastOutcome, "", noProviderErr
+}
+
+// admit consults the reliability manager for admission, nil-safe (a handler
+// built without a manager always admits).
+func (h *ChatHandler) admit(slug string) (func(), reliability.AdmitReason) {
+	if h.reliability == nil {
+		return func() {}, reliability.AdmitOK
+	}
+	return h.reliability.Admit(slug)
+}
+
+// allowRetry consults the global retry budget before a failover, nil-safe.
+func (h *ChatHandler) allowRetry(slug string) bool {
+	if h.reliability == nil {
+		return true
+	}
+	return h.reliability.AllowRetry(slug)
 }
 
 func invokeComplete(ctx context.Context, req *modality.ChatRequest, target chatTarget) (*modality.ChatResponse, error) {

@@ -27,6 +27,7 @@ import (
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/JiaCheng2004/Polaris/internal/store/sqlite"
@@ -3130,6 +3131,78 @@ func TestChatFallbackStopsAtFirstSuccess(t *testing.T) {
 	}
 	if deepseekCalls != 1 || xaiCalls != 0 {
 		t.Fatalf("expected first fallback only, got deepseek=%d xai=%d", deepseekCalls, xaiCalls)
+	}
+}
+
+func TestChatBreakerDemotesOpenPrimary(t *testing.T) {
+	primaryCalls := 0
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		primaryCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"primary"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer primary.Close()
+
+	deepseekCalls := 0
+	deepseek := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		deepseekCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"d","object":"chat.completion","created":1744329600,"model":"deepseek-chat","choices":[{"index":0,"message":{"role":"assistant","content":"fallback"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer deepseek.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{
+		"openai":   primary.URL + "/v1",
+		"deepseek": deepseek.URL + "/v1",
+	})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "100/min", AllowedModels: []string{"openai/*", "deepseek/*"}},
+	}
+	cfg.Routing.Fallbacks = []config.FallbackRule{
+		{From: "openai/gpt-4o", To: []string{"deepseek/deepseek-chat"}, On: []string{"rate_limit", "timeout", "server_error"}},
+	}
+
+	// Trip the openai breaker before any request. The primary is otherwise healthy
+	// (returns 200), so a skip proves the breaker demoted it (R1) rather than an error.
+	mgr := reliability.NewManager(reliability.Config{Breaker: reliability.BreakerConfig{ErrorRate: 0.5, MinSamples: 5, OpenFor: time.Minute, HalfOpenProbes: 1}}, nil)
+	for i := 0; i < 10; i++ {
+		mgr.Report("openai", false, time.Millisecond)
+	}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New() error = %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:      cfg,
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:       testSQLiteStore(t),
+		Cache:       cache.NewMemory(),
+		Registry:    registry,
+		Reliability: mgr,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hi"}]}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", res.Code, res.Body.String())
+	}
+	if primaryCalls != 0 {
+		t.Fatalf("primary called %d times despite open breaker, want 0 (R1: no dead-primary timeout)", primaryCalls)
+	}
+	if deepseekCalls != 1 {
+		t.Fatalf("fallback called %d times, want 1", deepseekCalls)
+	}
+	if res.Header().Get("X-Polaris-Fallback") == "" {
+		t.Fatal("expected X-Polaris-Fallback header on demoted-primary request")
 	}
 }
 

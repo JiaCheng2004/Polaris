@@ -53,6 +53,11 @@ func NewEngine(deps Dependencies) (*gin.Engine, error) {
 	if deps.ToolRegistry == nil {
 		deps.ToolRegistry = tooling.NewRegistry()
 	}
+	if deps.Reliability == nil {
+		// A default manager keeps handlers non-nil; it is inert unless a transport
+		// observer feeds it (only main.go registers one), so tests stay wire-neutral.
+		deps.Reliability = reliability.NewManager(gwruntime.ReliabilityConfig(deps.Config), deps.Metrics)
+	}
 
 	engine := gin.New()
 	engine.HandleMethodNotAllowed = true

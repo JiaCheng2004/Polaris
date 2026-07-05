@@ -12,16 +12,18 @@ import (
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
 )
 
 type ChatHandler struct {
-	runtime *gwruntime.Holder
-	metrics *metrics.Recorder
-	cache   cachepkg.Cache
-	store   store.Store
+	runtime     *gwruntime.Holder
+	metrics     *metrics.Recorder
+	cache       cachepkg.Cache
+	store       store.Store
+	reliability *reliability.Manager
 }
 
 type chatTarget struct {
@@ -30,8 +32,8 @@ type chatTarget struct {
 	resolution provider.Resolution
 }
 
-func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store) *ChatHandler {
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore}
+func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store, reliabilityManager *reliability.Manager) *ChatHandler {
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {

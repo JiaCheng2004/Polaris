@@ -186,20 +186,37 @@ func TestManagerAdmitConcurrencyCap(t *testing.T) {
 
 func TestManagerAdmitGlobalCap(t *testing.T) {
 	m, _, _ := newTestManager(Config{Shed: ShedConfig{Enabled: true, GlobalMaxInflight: 1}})
-	r1, reason := m.Admit("a")
-	if reason != AdmitOK {
-		t.Fatalf("first = %v", reason)
+	r1, ok := m.AdmitGlobal()
+	if !ok {
+		t.Fatal("first global admit rejected")
 	}
-	_, reason = m.Admit("b")
-	if reason != AdmitGlobalFull {
-		t.Fatalf("second (other provider) = %v, want global_full", reason)
+	if _, ok := m.AdmitGlobal(); ok {
+		t.Fatal("second global admit allowed beyond cap")
+	}
+	if m.GlobalInflight() != 1 {
+		t.Fatalf("global inflight = %d, want 1", m.GlobalInflight())
 	}
 	r1()
-	r2, reason := m.Admit("b")
-	if reason != AdmitOK {
-		t.Fatalf("after release = %v", reason)
+	r2, ok := m.AdmitGlobal()
+	if !ok {
+		t.Fatal("global admit after release rejected")
 	}
 	r2()
+	if m.GlobalInflight() != 0 {
+		t.Fatalf("global inflight = %d after release, want 0", m.GlobalInflight())
+	}
+}
+
+func TestManagerAdmitGlobalDisabled(t *testing.T) {
+	m, _, _ := newTestManager(Config{}) // shed disabled
+	for i := 0; i < 5; i++ {
+		if _, ok := m.AdmitGlobal(); !ok {
+			t.Fatal("global admit rejected while shedding disabled")
+		}
+	}
+	if m.GlobalInflight() != 5 {
+		t.Fatalf("global inflight = %d, want 5 (tracked even when uncapped)", m.GlobalInflight())
+	}
 }
 
 func TestManagerAdmitReleaseIdempotent(t *testing.T) {
@@ -207,8 +224,8 @@ func TestManagerAdmitReleaseIdempotent(t *testing.T) {
 	r, _ := m.Admit("p")
 	r()
 	r() // double release must not underflow
-	if got := m.globalInflight.Load(); got != 0 {
-		t.Fatalf("global inflight = %d after double release, want 0", got)
+	if got := m.Health("p").Inflight; got != 0 {
+		t.Fatalf("provider inflight = %d after double release, want 0", got)
 	}
 }
 

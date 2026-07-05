@@ -200,20 +200,9 @@ func (m *Manager) Admit(slug string) (release func(), reason AdmitReason) {
 	}
 
 	cfg := m.config()
-	if cfg.Shed.Enabled && cfg.Shed.GlobalMaxInflight > 0 {
-		if m.globalInflight.Add(1) > int64(cfg.Shed.GlobalMaxInflight) {
-			m.globalInflight.Add(-1)
-			m.metrics.IncShed(slug, AdmitGlobalFull.String())
-			return noopRelease, AdmitGlobalFull
-		}
-	} else {
-		m.globalInflight.Add(1)
-	}
-
 	if cfg.Shed.Enabled && cfg.Shed.PerProviderMaxInflight > 0 {
 		if e.inflight.Add(1) > int64(cfg.Shed.PerProviderMaxInflight) {
 			e.inflight.Add(-1)
-			m.globalInflight.Add(-1)
 			m.metrics.IncShed(slug, AdmitProviderFull.String())
 			return noopRelease, AdmitProviderFull
 		}
@@ -223,12 +212,32 @@ func (m *Manager) Admit(slug string) (release func(), reason AdmitReason) {
 
 	var once sync.Once
 	return func() {
-		once.Do(func() {
-			e.inflight.Add(-1)
-			m.globalInflight.Add(-1)
-		})
+		once.Do(func() { e.inflight.Add(-1) })
 	}, AdmitOK
 }
+
+// AdmitGlobal enforces the front-door global in-flight cap (all requests, every
+// modality). The shed middleware calls it once per request. It returns a release
+// that MUST be called when the request finishes, and whether the request was
+// admitted (false = over the global cap → the caller should return 503).
+func (m *Manager) AdmitGlobal() (release func(), admitted bool) {
+	cfg := m.config()
+	if !cfg.Shed.Enabled || cfg.Shed.GlobalMaxInflight <= 0 {
+		m.globalInflight.Add(1)
+		var once sync.Once
+		return func() { once.Do(func() { m.globalInflight.Add(-1) }) }, true
+	}
+	if m.globalInflight.Add(1) > int64(cfg.Shed.GlobalMaxInflight) {
+		m.globalInflight.Add(-1)
+		m.metrics.IncShed("global", AdmitGlobalFull.String())
+		return noopRelease, false
+	}
+	var once sync.Once
+	return func() { once.Do(func() { m.globalInflight.Add(-1) }) }, true
+}
+
+// GlobalInflight reports the current global in-flight request count (for /ready).
+func (m *Manager) GlobalInflight() int64 { return m.globalInflight.Load() }
 
 func noopRelease() {}
 
