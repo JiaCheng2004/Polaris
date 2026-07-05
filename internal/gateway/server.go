@@ -11,6 +11,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/JiaCheng2004/Polaris/internal/tooling"
@@ -30,6 +31,7 @@ type Dependencies struct {
 	VirtualKeyCache *middleware.VirtualKeyCache
 	AuditLogger     *store.AsyncAuditLogger
 	ToolRegistry    *tooling.Registry
+	Reliability     *reliability.Manager
 }
 
 func NewEngine(deps Dependencies) (*gin.Engine, error) {

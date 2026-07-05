@@ -26,6 +26,14 @@ type Recorder struct {
 	toolInvocations *prometheus.CounterVec
 	mcpSessions     *prometheus.CounterVec
 	activeStreams   *prometheus.GaugeVec
+
+	providerHealth       *prometheus.GaugeVec
+	breakerState         *prometheus.GaugeVec
+	breakerTransitions   *prometheus.CounterVec
+	shedTotal            *prometheus.CounterVec
+	retryBudgetExhausted *prometheus.CounterVec
+	usageDropped         *prometheus.CounterVec
+	idempotentReplays    *prometheus.CounterVec
 }
 
 func NewRecorder() *Recorder {
@@ -91,6 +99,34 @@ func NewRecorder() *Recorder {
 			Name: "polaris_active_streams",
 			Help: "Currently active streaming responses.",
 		}, []string{"model", "provider"}),
+		providerHealth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "polaris_provider_health_score",
+			Help: "Provider health score in [0,1] (1 = healthy).",
+		}, []string{"provider"}),
+		breakerState: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "polaris_breaker_state",
+			Help: "Circuit-breaker state per provider (0=closed, 1=open, 2=half_open).",
+		}, []string{"provider"}),
+		breakerTransitions: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_breaker_transitions_total",
+			Help: "Total circuit-breaker state transitions.",
+		}, []string{"provider", "from", "to"}),
+		shedTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_shed_total",
+			Help: "Total attempts shed by the reliability manager, by reason.",
+		}, []string{"provider", "reason"}),
+		retryBudgetExhausted: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_retry_budget_exhausted_total",
+			Help: "Total failover attempts denied because the retry budget was exhausted.",
+		}, []string{"provider"}),
+		usageDropped: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_usage_dropped_total",
+			Help: "Total usage/audit log rows dropped, by kind and reason.",
+		}, []string{"kind", "reason"}),
+		idempotentReplays: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_idempotent_replays_total",
+			Help: "Total idempotency-key replays served from cache, by endpoint.",
+		}, []string{"endpoint"}),
 	}
 
 	registry.MustRegister(
@@ -108,6 +144,13 @@ func NewRecorder() *Recorder {
 		recorder.toolInvocations,
 		recorder.mcpSessions,
 		recorder.activeStreams,
+		recorder.providerHealth,
+		recorder.breakerState,
+		recorder.breakerTransitions,
+		recorder.shedTotal,
+		recorder.retryBudgetExhausted,
+		recorder.usageDropped,
+		recorder.idempotentReplays,
 	)
 
 	return recorder
@@ -185,6 +228,74 @@ func (r *Recorder) IncProviderError(provider string, errorType string) {
 		return
 	}
 	r.providerErrors.WithLabelValues(provider, errorType).Inc()
+}
+
+// SetProviderHealth records a provider's health score in [0,1].
+func (r *Recorder) SetProviderHealth(provider string, score float64) {
+	if r == nil || provider == "" {
+		return
+	}
+	r.providerHealth.WithLabelValues(provider).Set(score)
+}
+
+// SetBreakerState records a provider's breaker state (0=closed, 1=open, 2=half_open).
+func (r *Recorder) SetBreakerState(provider string, state int) {
+	if r == nil || provider == "" {
+		return
+	}
+	r.breakerState.WithLabelValues(provider).Set(float64(state))
+}
+
+// IncBreakerTransition records a breaker state transition.
+func (r *Recorder) IncBreakerTransition(provider, from, to string) {
+	if r == nil || provider == "" {
+		return
+	}
+	r.breakerTransitions.WithLabelValues(provider, from, to).Inc()
+}
+
+// IncShed records an attempt shed by the reliability manager.
+func (r *Recorder) IncShed(provider, reason string) {
+	if r == nil || provider == "" {
+		return
+	}
+	r.shedTotal.WithLabelValues(provider, reason).Inc()
+}
+
+// IncRetryBudgetExhausted records a failover denied by the retry budget.
+func (r *Recorder) IncRetryBudgetExhausted(provider string) {
+	if r == nil {
+		return
+	}
+	if provider == "" {
+		provider = "unknown"
+	}
+	r.retryBudgetExhausted.WithLabelValues(provider).Inc()
+}
+
+// IncUsageDropped records a dropped usage/audit log row.
+func (r *Recorder) IncUsageDropped(kind, reason string) {
+	if r == nil {
+		return
+	}
+	if kind == "" {
+		kind = "request"
+	}
+	if reason == "" {
+		reason = "unknown"
+	}
+	r.usageDropped.WithLabelValues(kind, reason).Inc()
+}
+
+// IncIdempotentReplay records an idempotency-key replay served from cache.
+func (r *Recorder) IncIdempotentReplay(endpoint string) {
+	if r == nil {
+		return
+	}
+	if endpoint == "" {
+		endpoint = "unknown"
+	}
+	r.idempotentReplays.WithLabelValues(endpoint).Inc()
 }
 
 func (r *Recorder) IncCacheEvent(status string, model string) {

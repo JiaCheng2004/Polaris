@@ -41,7 +41,41 @@
         },
         "files": { "$ref": "#/$defs/files" },
         "pricing": { "$ref": "#/$defs/pricing" },
-        "observability": { "$ref": "#/$defs/observability" }
+        "observability": { "$ref": "#/$defs/observability" },
+        "reliability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "retry_budget_ratio": { "type": "number" },
+            "shed": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "global_max_inflight": { "type": "integer" },
+                "per_provider_max_inflight": { "type": "integer" }
+              }
+            },
+            "breaker_defaults": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "error_rate": { "type": "number" },
+                "min_samples": { "type": "integer" },
+                "open_for": { "type": ["string", "integer"] },
+                "half_open_probes": { "type": "integer" }
+              }
+            },
+            "idempotency": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "ttl": { "type": ["string", "integer"] }
+              }
+            }
+          }
+        }
       }
     },
     "providers": {

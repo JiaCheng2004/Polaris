@@ -14,16 +14,19 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/pricing"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/provider/verification"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/JiaCheng2004/Polaris/internal/store/postgres"
 	"github.com/JiaCheng2004/Polaris/internal/store/sqlite"
 	"github.com/JiaCheng2004/Polaris/internal/tooling"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 )
 
 var (
@@ -126,6 +129,16 @@ func run() error {
 	pricingHolder := pricing.NewHolder(pricingCatalog)
 	runtimeHolder := gwruntime.NewHolderWithPricing(cfg, registry, pricingHolder)
 
+	// The metrics recorder and reliability manager are process-lifetime state
+	// shared by the engine and the manager (one prometheus registry). The manager
+	// observes every upstream attempt via the transport observer, so it must be
+	// registered before serving (the observer is consulted at request time, so
+	// registration order relative to provider.New does not matter).
+	metricsRecorder := metrics.NewRecorder()
+	reliabilityManager := reliability.NewManager(gwruntime.ReliabilityConfig(cfg), metricsRecorder)
+	transport.AddObserver(reliabilityManager.Observe)
+	defer reliabilityManager.Close()
+
 	requestLogger := store.NewAsyncRequestLogger(appStore, logger, store.NewLoggerConfig(cfg.Store.LogBufferSize, cfg.Store.LogFlushInterval))
 	defer func() {
 		if err := requestLogger.Close(context.Background()); err != nil {
@@ -156,6 +169,7 @@ func run() error {
 		LogLevel: *logLevel,
 		Lenient:  *configLenient,
 	}, runtimeHolder, logger, level)
+	reloader.SetReliability(reliabilityManager)
 	configWatcher, err := config.NewWatcher(*configPath, 250*time.Millisecond, func(trigger string) {
 		if err := reloader.Reload(); err != nil {
 			logger.Error("config reload failed", "trigger", trigger, "error", err)
@@ -181,9 +195,11 @@ func run() error {
 		Cache:         appCache,
 		Registry:      registry,
 		Runtime:       runtimeHolder,
+		Metrics:       metricsRecorder,
 		RequestLogger: requestLogger,
 		AuditLogger:   auditLogger,
 		ToolRegistry:  toolRegistry,
+		Reliability:   reliabilityManager,
 	})
 	if err != nil {
 		return err

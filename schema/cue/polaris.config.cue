@@ -113,6 +113,7 @@ package polaris
 			fail_on_missing?: bool
 		}
 		observability?: _
+		reliability?: _
 	}
 
 	providers?: [string]: {

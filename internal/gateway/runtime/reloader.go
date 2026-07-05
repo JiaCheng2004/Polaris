@@ -9,14 +9,24 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/pricing"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 )
 
 type Reloader struct {
-	path      string
-	overrides config.RuntimeOverrides
-	holder    *Holder
-	logger    *slog.Logger
-	level     *slog.LevelVar
+	path        string
+	overrides   config.RuntimeOverrides
+	holder      *Holder
+	logger      *slog.Logger
+	level       *slog.LevelVar
+	reliability *reliability.Manager
+}
+
+// SetReliability attaches the process-lifetime reliability manager so its
+// thresholds are re-applied on every hot reload. Safe to leave unset (tests).
+func (r *Reloader) SetReliability(m *reliability.Manager) {
+	if r != nil {
+		r.reliability = m
+	}
 }
 
 func NewReloader(path string, overrides config.RuntimeOverrides, holder *Holder, logger *slog.Logger, level *slog.LevelVar) *Reloader {
@@ -81,6 +91,11 @@ func (r *Reloader) Reload() error {
 	}
 
 	r.holder.Swap(nextCfg, registry)
+	// Reliability state is process-lifetime (survives the swap); only its
+	// thresholds are re-applied here.
+	if r.reliability != nil {
+		r.reliability.Reconfigure(ReliabilityConfig(nextCfg))
+	}
 	return nil
 }
 

@@ -52,6 +52,7 @@ type Options struct {
 type Client struct {
 	baseURL       string
 	providerName  string
+	slug          string
 	auth          AuthFunc
 	staticHeaders map[string]string
 	retry         RetryPolicy
@@ -62,15 +63,15 @@ type Client struct {
 
 // New builds a Client.
 func New(opts Options) *Client {
+	slug := opts.ProviderSlug
+	if slug == "" {
+		slug = strings.ToLower(strings.TrimSpace(opts.ProviderName))
+	}
 	httpClient := opts.HTTPClient
 	if httpClient == nil {
 		timeout := opts.Timeout
 		if timeout <= 0 {
 			timeout = time.Minute
-		}
-		slug := opts.ProviderSlug
-		if slug == "" {
-			slug = strings.ToLower(strings.TrimSpace(opts.ProviderName))
 		}
 		httpClient = &http.Client{
 			Timeout:   timeout,
@@ -84,6 +85,7 @@ func New(opts Options) *Client {
 	return &Client{
 		baseURL:       strings.TrimRight(opts.BaseURL, "/"),
 		providerName:  opts.ProviderName,
+		slug:          slug,
 		auth:          opts.Auth,
 		staticHeaders: headers,
 		retry:         opts.Retry,
@@ -260,11 +262,13 @@ func (c *Client) build(ctx context.Context, r Request) (*http.Request, error) {
 }
 
 func (c *Client) report(r Request, attempt, status int, err error, latency time.Duration) {
-	if len(c.hooks) == 0 {
+	obsHooks := loadObservers()
+	if len(c.hooks) == 0 && len(obsHooks) == 0 {
 		return
 	}
 	info := AttemptInfo{
 		Provider: c.providerName,
+		Slug:     c.slug,
 		Attempt:  attempt,
 		Method:   r.Method,
 		Path:     r.Path,
@@ -273,6 +277,9 @@ func (c *Client) report(r Request, attempt, status int, err error, latency time.
 		Latency:  latency,
 	}
 	for _, hook := range c.hooks {
+		hook(info)
+	}
+	for _, hook := range obsHooks {
 		hook(info)
 	}
 }

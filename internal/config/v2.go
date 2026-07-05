@@ -188,7 +188,7 @@ func normalizeV2Config(raw map[string]any, strict bool) (map[string]any, error) 
 
 	normalized := map[string]any{}
 	if runtime, ok := stringMap(raw["runtime"]); ok {
-		runtimeSections := []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "files", "pricing", "observability"}
+		runtimeSections := []string{"server", "auth", "store", "cache", "control_plane", "tools", "mcp", "files", "pricing", "observability", "reliability"}
 		if err := rejectUnknownKeys(runtime, runtimeSections, "runtime.", strict); err != nil {
 			return nil, err
 		}

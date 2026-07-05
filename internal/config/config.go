@@ -27,6 +27,35 @@ type Config struct {
 	Files         FilesConfig               `yaml:"files"`
 	Pricing       PricingConfig             `yaml:"pricing"`
 	Observability ObservabilityConfig       `yaml:"observability"`
+	Reliability   ReliabilityConfig         `yaml:"reliability"`
+}
+
+// ReliabilityConfig tunes the process-lifetime reliability manager (circuit
+// breaking, load shedding, retry budgets, idempotency). Everything defaults to
+// off/permissive so behavior is unchanged until an operator opts in.
+type ReliabilityConfig struct {
+	Shed             ShedConfig        `yaml:"shed"`
+	Breaker          BreakerConfig     `yaml:"breaker_defaults"`
+	Idempotency      IdempotencyConfig `yaml:"idempotency"`
+	RetryBudgetRatio float64           `yaml:"retry_budget_ratio"`
+}
+
+type ShedConfig struct {
+	Enabled                bool `yaml:"enabled"`
+	GlobalMaxInflight      int  `yaml:"global_max_inflight"`
+	PerProviderMaxInflight int  `yaml:"per_provider_max_inflight"`
+}
+
+type BreakerConfig struct {
+	ErrorRate      float64       `yaml:"error_rate"`
+	MinSamples     int           `yaml:"min_samples"`
+	OpenFor        time.Duration `yaml:"open_for"`
+	HalfOpenProbes int           `yaml:"half_open_probes"`
+}
+
+type IdempotencyConfig struct {
+	Enabled bool          `yaml:"enabled"`
+	TTL     time.Duration `yaml:"ttl"`
 }
 
 type ServerConfig struct {
@@ -459,6 +488,17 @@ func Default() Config {
 			Audit: AuditConfig{
 				Enabled: true,
 			},
+		},
+		Reliability: ReliabilityConfig{
+			Shed: ShedConfig{Enabled: false, GlobalMaxInflight: 0, PerProviderMaxInflight: 0},
+			Breaker: BreakerConfig{
+				ErrorRate:      0.5,
+				MinSamples:     20,
+				OpenFor:        30 * time.Second,
+				HalfOpenProbes: 3,
+			},
+			Idempotency:      IdempotencyConfig{Enabled: true, TTL: 24 * time.Hour},
+			RetryBudgetRatio: 0.2,
 		},
 	}
 }
