@@ -19,12 +19,18 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	c, err := client.New(getenv("POLARIS_BASE_URL", "http://localhost:8080"),
 		client.WithAPIKey(os.Getenv("POLARIS_API_KEY")),
 		client.WithTimeout(60*time.Second),
 	)
 	if err != nil {
-		log.Fatalf("new client: %v", err)
+		return fmt.Errorf("new client: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -38,15 +44,16 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatalf("chat completion: %v", err)
+		return fmt.Errorf("chat completion: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		log.Fatal("no choices returned")
+		return fmt.Errorf("no choices returned")
 	}
 	if text := resp.Choices[0].Message.Content.Text; text != nil {
 		fmt.Println(*text)
 	}
 	fmt.Printf("[tokens in/out: %d/%d]\n", resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	return nil
 }
 
 func getenv(key, fallback string) string {

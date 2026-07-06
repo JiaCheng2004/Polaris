@@ -18,11 +18,17 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	c, err := client.New(getenv("POLARIS_BASE_URL", "http://localhost:8080"),
 		client.WithAPIKey(os.Getenv("POLARIS_API_KEY")),
 	)
 	if err != nil {
-		log.Fatalf("new client: %v", err)
+		return fmt.Errorf("new client: %w", err)
 	}
 
 	stream, err := c.StreamChatCompletion(context.Background(), &client.ChatCompletionRequest{
@@ -31,9 +37,9 @@ func main() {
 		Stream:   true,
 	})
 	if err != nil {
-		log.Fatalf("stream: %v", err)
+		return fmt.Errorf("stream: %w", err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	for stream.Next() {
 		for _, choice := range stream.Chunk().Choices {
@@ -41,9 +47,10 @@ func main() {
 		}
 	}
 	if err := stream.Err(); err != nil {
-		log.Fatalf("stream error: %v", err)
+		return fmt.Errorf("stream error: %w", err)
 	}
 	fmt.Println()
+	return nil
 }
 
 func getenv(key, fallback string) string {
