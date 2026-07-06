@@ -27,6 +27,17 @@ go run ./examples/go/embeddings   # an embedding vector
 Godoc examples for every surface also live in `pkg/client/example_test.go` and
 render on [pkg.go.dev](https://pkg.go.dev/github.com/JiaCheng2004/Polaris/pkg/client).
 
+## TypeScript SDK
+
+The TypeScript SDK is published as `@polaris/sdk` (source in `sdk/typescript/`).
+`typescript/chat.ts` is a runnable consumer example:
+
+```bash
+npm install @polaris/sdk
+export POLARIS_API_KEY=sk-...
+npx tsx examples/typescript/chat.ts
+```
+
 ## Configuration
 
 Ready-to-copy configuration lives in `config/polaris.example.yaml`. The feature

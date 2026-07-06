@@ -52,10 +52,10 @@ COMMIT_GROUPS=(
   "feat(semcache): embedding semantic cache|internal/semcache"
   "feat(mcp): stateless streamable-HTTP MCP gateway with OAuth 2.1|internal/mcp"
   "feat(gateway): HTTP gateway, handlers, middleware, and entrypoint|internal/gateway cmd"
-  "feat(sdk): public Go client SDK|pkg"
+  "feat(sdk): Go and TypeScript client SDKs|pkg sdk"
   "feat(config): deployment configuration and provider definitions|config"
   "docs: API reference, guides, examples, OpenAPI, and docs site|docs examples spec mkdocs.yml requirements-docs.txt"
-  "build: CI, release automation, containers, and test suites|.github deployments scripts tests .golangci.yml .goreleaser.yaml .vacuum.yaml .revive-doc.toml"
+  "build: CI, release automation, containers, and test suites|.github deployments scripts tests .golangci.yml .goreleaser.yaml .vacuum.yaml .revive-doc.toml .lycheeignore"
 )
 
 echo "==> creating orphan branch $TARGET from $SOURCE"
