@@ -119,6 +119,35 @@ func writeGuardrailBlocked(c *gin.Context, modelID string, phase guardrails.Phas
 	httputil.WriteError(c, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "guardrail_blocked", "", "Content was blocked by a guardrail policy ("+string(phase)+" phase)."))
 }
 
+// newResponseRedactor builds a streaming redactor for the response phase, or nil
+// when guardrails are disabled / not matched / internal.
+func (h *ChatHandler) newResponseRedactor(c *gin.Context, modelID string) *guardrails.StreamRedactor {
+	if h.guardrails == nil || isInternalRequest(c) {
+		return nil
+	}
+	snapshot := middleware.RuntimeSnapshot(c, h.runtime)
+	if snapshot == nil {
+		return nil
+	}
+	policies := guardrailPolicies(snapshot.Config, modelID)
+	if len(policies) == 0 {
+		return nil
+	}
+	return guardrails.NewStreamRedactor(h.guardrails, policies, 0)
+}
+
+func writeStreamGuardrailBlocked(c *gin.Context, outcome *middleware.RequestOutcome) {
+	outcome.ErrorType = "guardrail_blocked"
+	middleware.SetRequestOutcome(c, *outcome)
+	if err := writeSSEData(c, httputil.ErrorEnvelope{Error: httputil.ErrorBody{
+		Message: "Content was blocked by a guardrail policy (response phase).",
+		Type:    "invalid_request_error",
+		Code:    "guardrail_blocked",
+	}}); err == nil {
+		_ = writeSSEDone(c)
+	}
+}
+
 // requestTextFields returns pointers to every editable text field in a chat
 // request (message string content and text content-parts), so redaction can be
 // applied in place.

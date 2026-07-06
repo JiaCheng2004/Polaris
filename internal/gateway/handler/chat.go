@@ -135,6 +135,15 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 	defer releaseStream()
 	polarisStream := strings.Contains(c.GetHeader("Accept"), "application/x-polaris-stream+json")
 
+	// Per-choice response-phase redactors (nil when guardrails are disabled).
+	var redactors []*guardrails.StreamRedactor
+	ensureRedactor := func(i int) *guardrails.StreamRedactor {
+		for len(redactors) <= i {
+			redactors = append(redactors, h.newResponseRedactor(c, selected.model.ID))
+		}
+		return redactors[i]
+	}
+
 	for chunk := range stream {
 		if chunk.Err != nil {
 			apiErr := apiErrorFrom(chunk.Err)
@@ -165,6 +174,18 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 			outcome.TotalTokens = chunk.Usage.TotalTokens
 			outcome.TokenSource = providerUsageSource(*chunk.Usage)
 		}
+		for i := range chunk.Choices {
+			r := ensureRedactor(i)
+			if r == nil || !r.Active() {
+				continue
+			}
+			emit, blocked := r.Process(chunk.Choices[i].Delta.Content)
+			if blocked {
+				writeStreamGuardrailBlocked(c, &outcome)
+				return
+			}
+			chunk.Choices[i].Delta.Content = emit
+		}
 		var frame any = chunk
 		if polarisStream {
 			frame = streamEventsFromChunk(chunk)
@@ -173,6 +194,26 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 			outcome.ErrorType = "provider_error"
 			middleware.SetRequestOutcome(c, outcome)
 			return
+		}
+	}
+
+	// Flush any held-back tail from each redactor as a final content frame.
+	for i, r := range redactors {
+		if r == nil || !r.Active() {
+			continue
+		}
+		emit, blocked := r.Flush()
+		if blocked {
+			writeStreamGuardrailBlocked(c, &outcome)
+			return
+		}
+		if emit != "" {
+			tail := modality.ChatChunk{Model: selected.model.ID, Choices: []modality.ChatChunkChoice{{Index: i, Delta: modality.ChatDelta{Content: emit}}}}
+			var frame any = tail
+			if polarisStream {
+				frame = streamEventsFromChunk(tail)
+			}
+			_ = writeSSEData(c, frame)
 		}
 	}
 

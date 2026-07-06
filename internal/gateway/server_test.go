@@ -3300,6 +3300,64 @@ func TestGuardrailsRedactResponse(t *testing.T) {
 	}
 }
 
+func TestGuardrailsStreamRedact(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		// The email is built up across chunk boundaries.
+		for _, part := range []string{"Reach ", "bob@", "example", ".com", " now"} {
+			_, _ = fmt.Fprintf(w, "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"created\":1744329600,\"model\":\"gpt-4o\",\"choices\":[{\"index\":0,\"delta\":{\"content\":%q},\"finish_reason\":null}]}\n\n", part)
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		_, _ = fmt.Fprint(w, "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"created\":1744329600,\"model\":\"gpt-4o\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":5,\"total_tokens\":6}}\n\n")
+		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{"openai": upstream.URL + "/v1"})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*"}},
+	}
+	cfg.Guardrails = config.GuardrailsConfig{Enabled: true, Policies: []config.GuardrailPolicyConfig{
+		{Name: "redact-pii", Phase: "response", Action: "redact", Detectors: map[string]config.GuardrailDetectorConfig{"pii": {Types: []string{"email"}}}},
+	}}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    testSQLiteStore(t),
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"openai/gpt-4o","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+
+	body := res.Body.String()
+	if strings.Contains(body, "bob@example.com") {
+		t.Fatalf("streamed response leaked email across chunk boundaries: %s", body)
+	}
+	if !strings.Contains(body, "[REDACTED:pii.email]") {
+		t.Fatalf("streamed response not redacted: %s", body)
+	}
+}
+
 func TestGuardrailsObserveDoesNotAlter(t *testing.T) {
 	leakyJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"reach bob@example.com"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`
 	engine, _ := guardrailEngine(t, leakyJSON, []config.GuardrailPolicyConfig{
