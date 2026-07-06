@@ -35,7 +35,9 @@ func (h *ChatHandler) prepareConversation(c *gin.Context, req *modality.ChatRequ
 		return chatTarget{}, nil, err
 	}
 	fallbacks := h.resolveFallbackTargets(c, registry, auth, primary.model.ID, requiredCapabilities)
-	return primary, fallbacks, nil
+	// Apply the routing strategy (P3). Static default → unchanged order.
+	targets := h.routeTargets(c, append([]chatTarget{primary}, fallbacks...), modality.ModalityChat)
+	return targets[0], targets[1:], nil
 }
 
 func (h *ChatHandler) executeConversation(c *gin.Context, req *modality.ChatRequest, interfaceFamily string) (*modality.ChatResponse, middleware.RequestOutcome, string, error) {

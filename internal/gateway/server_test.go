@@ -3134,6 +3134,77 @@ func TestChatFallbackStopsAtFirstSuccess(t *testing.T) {
 	}
 }
 
+func TestRoutingLeastLatencyReorders(t *testing.T) {
+	openaiCalls := 0
+	openaiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		openaiCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"openai"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer openaiSrv.Close()
+
+	deepseekCalls := 0
+	deepseekSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		deepseekCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"d","object":"chat.completion","created":1744329600,"model":"deepseek-chat","choices":[{"index":0,"message":{"role":"assistant","content":"deepseek"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer deepseekSrv.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{
+		"openai":   openaiSrv.URL + "/v1",
+		"deepseek": deepseekSrv.URL + "/v1",
+	})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*", "deepseek/*"}},
+	}
+	cfg.Routing.Fallbacks = []config.FallbackRule{
+		{From: "openai/gpt-4o", To: []string{"deepseek/deepseek-chat"}, On: []string{"rate_limit", "timeout", "server_error"}},
+	}
+	cfg.Routing.Policies = []config.RoutePolicy{
+		{Match: config.RouteMatch{Model: "openai/*"}, Strategy: "least_latency"},
+	}
+
+	// Feed the manager: the primary (openai) is slow, the fallback (deepseek) fast.
+	mgr := reliability.NewManager(reliability.Config{}, nil)
+	for i := 0; i < 10; i++ {
+		mgr.Report("openai", true, 500*time.Millisecond)
+		mgr.Report("deepseek", true, 40*time.Millisecond)
+	}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:      cfg,
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:       testSQLiteStore(t),
+		Cache:       cache.NewMemory(),
+		Registry:    registry,
+		Reliability: mgr,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hi"}]}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	engine.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", res.Code, res.Body.String())
+	}
+	// least_latency reorders deepseek ahead of openai, so it serves the request
+	// and the slow primary is never called.
+	if deepseekCalls != 1 || openaiCalls != 0 {
+		t.Fatalf("least_latency routing: deepseek=%d openai=%d, want 1/0", deepseekCalls, openaiCalls)
+	}
+}
+
 func TestChatBreakerDemotesOpenPrimary(t *testing.T) {
 	primaryCalls := 0
 	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

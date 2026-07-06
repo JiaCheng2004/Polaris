@@ -13,6 +13,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/reliability"
+	"github.com/JiaCheng2004/Polaris/internal/routing"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ type ChatHandler struct {
 	cache       cachepkg.Cache
 	store       store.Store
 	reliability *reliability.Manager
+	router      *routing.Router
 }
 
 type chatTarget struct {
@@ -33,7 +35,7 @@ type chatTarget struct {
 }
 
 func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store, reliabilityManager *reliability.Manager) *ChatHandler {
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager}
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter()}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {

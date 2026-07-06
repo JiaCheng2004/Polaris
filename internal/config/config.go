@@ -211,6 +211,27 @@ type RoutingConfig struct {
 	Fallbacks []FallbackRule             `yaml:"fallbacks"`
 	Aliases   map[string]string          `yaml:"aliases"`
 	Selectors map[string]RoutingSelector `yaml:"selectors"`
+	Policies  []RoutePolicy              `yaml:"policies"`
+}
+
+// RoutePolicy selects a routing strategy for requests matching a model glob and
+// optional modality. Without a matching policy (the default), routing is
+// "static" — the configured fallback order, unchanged.
+type RoutePolicy struct {
+	Match    RouteMatch   `yaml:"match"`
+	Strategy string       `yaml:"strategy"`
+	Weights  RouteWeights `yaml:"weights"`
+}
+
+type RouteMatch struct {
+	Model    string `yaml:"model"`
+	Modality string `yaml:"modality"`
+}
+
+type RouteWeights struct {
+	Success float64 `yaml:"success"`
+	Latency float64 `yaml:"latency"`
+	Cost    float64 `yaml:"cost"`
 }
 
 type RoutingSelector struct {
