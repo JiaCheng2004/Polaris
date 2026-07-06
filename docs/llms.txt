@@ -1,0 +1,31 @@
+# Polaris
+
+> Polaris is a stateless, config-driven, multi-modality AI gateway written in Go. It sits between applications and AI providers (OpenAI, Anthropic, Google, DeepSeek, xAI, Qwen, Mistral, Groq, Together, Fireworks, NVIDIA, Ollama, ElevenLabs, MiniMax, ByteDance, Bedrock, Vertex, OpenRouter, Replicate) and exposes one OpenAI-compatible API surface for chat, images, video, voice, embeddings, translation, music, and full-duplex audio.
+
+Polaris is infrastructure: an API gateway. It is not an LLM framework, a model host, a chat UI, or a prompt/agent/RAG engine. It is stateless (horizontally scalable behind Postgres + Redis), config-driven (YAML with `${ENV}` references, hot-reloadable), and degrades gracefully (in-memory fallbacks when Redis/DB are down; provider failover).
+
+## Docs
+
+- [Quickstart & overview](https://github.com/JiaCheng2004/Polaris/blob/main/README.md): what Polaris is, why it exists, and a Docker one-liner to a first request.
+- [API Reference](https://github.com/JiaCheng2004/Polaris/blob/main/docs/API_REFERENCE.md): every HTTP endpoint, request/response shapes, and SSE streaming semantics.
+- [OpenAPI contract](https://github.com/JiaCheng2004/Polaris/blob/main/spec/openapi/polaris.v1.yaml): machine-readable 3.1 spec (bearer auth; typed core request/response schemas).
+- [Configuration](https://github.com/JiaCheng2004/Polaris/blob/main/docs/CONFIGURATION.md): every config key, precedence (flags > env > YAML > defaults), and `${ENV}` references.
+- [Authentication](https://github.com/JiaCheng2004/Polaris/blob/main/docs/AUTHENTICATION.md): static, multi-user, and virtual-key auth modes; SHA-256 key hashing.
+- [Providers](https://github.com/JiaCheng2004/Polaris/blob/main/docs/PROVIDERS.md): the curated provider set, per-provider auth quirks, and capabilities.
+- [Architecture](https://github.com/JiaCheng2004/Polaris/blob/main/docs/ARCHITECTURE.md): request lifecycle, layering, statelessness, hot-reload, and the transport core.
+
+## Reliability & frontier features
+
+- [Routing & failover](https://github.com/JiaCheng2004/Polaris/blob/main/docs/API_REFERENCE.md): static, weighted, least-latency, cost-optimized, and adaptive strategies with circuit breaking, hedging, and idempotency.
+- [Guardrails](https://github.com/JiaCheng2004/Polaris/blob/main/docs/GUARDRAILS.md): PII/secrets/prompt-injection detection with observe/redact/block actions and streaming redaction.
+- [Semantic cache](https://github.com/JiaCheng2004/Polaris/blob/main/docs/SEMANTIC_CACHE.md): exact-hash L1 + embedding L2 cache with per-project isolation.
+- [MCP gateway](https://github.com/JiaCheng2004/Polaris/blob/main/docs/MCP.md): stateless streamable-HTTP Model Context Protocol server + upstream proxy with OAuth 2.1.
+
+## SDKs
+
+- [Go SDK](https://pkg.go.dev/github.com/JiaCheng2004/Polaris/pkg/client): the importable Go client for every endpoint.
+
+## Operations
+
+- [Benchmarks](https://github.com/JiaCheng2004/Polaris/blob/main/docs/benchmarks.md): gateway overhead methodology and published numbers.
+- [Load testing](https://github.com/JiaCheng2004/Polaris/blob/main/docs/LOAD_TESTING.md): the load-validation harness and SLOs.

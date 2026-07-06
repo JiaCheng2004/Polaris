@@ -1,0 +1,9 @@
+# Placeholder / example hosts used intentionally in docs and config.
+https://gateway.example.com.*
+http://localhost.*
+https://polaris.example.com.*
+# The published docs site (self-referential; may not exist until first deploy).
+https://jiacheng2004.github.io/Polaris.*
+# Hosts that rate-limit unauthenticated CI checkers (links are known-good).
+https://pkg.go.dev.*
+https://bestpractices.dev.*

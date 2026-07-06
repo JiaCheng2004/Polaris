@@ -28,6 +28,12 @@ theme:
     - search.suggest
     - search.highlight
 
+# Material for MkDocs is in maintenance mode; its successor is Zensical, which
+# reads mkdocs.yml natively. Stay on the 9.7.x line and avoid Insiders-only
+# features so the eventual migration is mechanical.
+plugins:
+  - search
+
 markdown_extensions:
   - admonition
   - tables
@@ -57,6 +63,7 @@ nav:
   - Reference:
       - API Reference: API_REFERENCE.md
       - Architecture: ARCHITECTURE.md
+      - Provider Validation: PROVIDER_VALIDATION.md
   - Operations:
       - Load Testing: LOAD_TESTING.md
       - Benchmarks: benchmarks.md

@@ -43,7 +43,7 @@
 - **Cache marker:** cache-aware synchronous endpoints may carry `X-Polaris-Cache: hit`, `miss`, or `bypass`.
 - **Request body limit:** `runtime.server.max_body_bytes` defaults to 64 MiB. Oversized JSON or multipart requests return `413 invalid_request_error / request_body_too_large`.
 - **OpenAI compatibility:** where an endpoint is implemented, Polaris follows the OpenAI wire shape where possible. In the current build, that applies to chat, models, and the OpenAI-style administrative error envelope.
-- **Machine-readable contract:** [`spec/openapi/polaris.v1.yaml`](../spec/openapi/polaris.v1.yaml) is the OpenAPI companion for this human reference. Endpoint changes must keep the implementation, this file, the OpenAPI spec, and contract fixtures in sync.
+- **Machine-readable contract:** [`spec/openapi/polaris.v1.yaml`](https://github.com/JiaCheng2004/Polaris/blob/main/spec/openapi/polaris.v1.yaml) is the OpenAPI companion for this human reference. Endpoint changes must keep the implementation, this file, the OpenAPI spec, and contract fixtures in sync.
 
 ---
 
