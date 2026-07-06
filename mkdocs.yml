@@ -1,0 +1,66 @@
+site_name: Polaris
+site_description: A stateless, config-driven, multi-modality AI gateway.
+site_url: https://jiacheng2004.github.io/Polaris/
+repo_url: https://github.com/JiaCheng2004/Polaris
+repo_name: JiaCheng2004/Polaris
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+exclude_docs: |
+  internal/
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Configuration: CONFIGURATION.md
+      - Authentication: AUTHENTICATION.md
+      - Integration Recipes: INTEGRATION_RECIPES.md
+  - Guides:
+      - Guardrails: GUARDRAILS.md
+      - Semantic Cache: SEMANTIC_CACHE.md
+      - MCP Gateway: MCP.md
+      - Providers: PROVIDERS.md
+      - Pricing: PRICING.md
+  - Reference:
+      - API Reference: API_REFERENCE.md
+      - Architecture: ARCHITECTURE.md
+  - Operations:
+      - Load Testing: LOAD_TESTING.md
+  - Contributing:
+      - Contributing: CONTRIBUTING.md
+      - Adding a Provider: ADDING_PROVIDER.md
+  - Release:
+      - Release Runbook: RELEASE_RUNBOOK.md

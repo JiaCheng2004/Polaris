@@ -9,6 +9,9 @@
 [![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
 [![License](https://img.shields.io/badge/License-Apache--2.0-F97316?style=for-the-badge)](./LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/JiaCheng2004/Polaris/ci.yml?style=for-the-badge&label=CI)](https://github.com/JiaCheng2004/Polaris/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/JiaCheng2004/Polaris?style=for-the-badge)](https://github.com/JiaCheng2004/Polaris/releases)
+[![Go Reference](https://img.shields.io/badge/pkg.go.dev-reference-00ADD8?style=for-the-badge&logo=go)](https://pkg.go.dev/github.com/JiaCheng2004/Polaris/pkg/client)
 
 [Quick Start](#quick-start) · [API Surface](#api-surface) · [Providers](#providers) · [Configuration](#configuration) · [Documentation](#documentation)
 
@@ -40,6 +43,33 @@ It is designed for teams that want one self-hosted gateway for multiple model fa
 
 Polaris is not a workflow orchestrator, prompt framework, RAG engine, model host, vector database, chat UI, or application-auth provider. Keep user login, Google OAuth, SMS OTP, SSO, product permissions, prompts, retrieval, and business workflows in your application. Polaris should be the gateway layer underneath them.
 
+## Why Polaris?
+
+There are several good AI gateways. Polaris optimizes for a specific shape:
+**one self-hosted, stateless Go binary that is multi-modal, reliability-first,
+and frontier on the 2026 gateway features** — while staying strictly
+wire-compatible with the OpenAI API you already use.
+
+- **Single static binary, stateless.** Pure-Go (CGo-free) build; scale
+  horizontally behind any load balancer with Postgres + Redis as the only
+  optional state. No runtime, no interpreter.
+- **Truly multi-modal.** Chat, responses, messages, embeddings, images, audio
+  (speech/transcription/realtime), video, and music are first-class — not just
+  chat and embeddings.
+- **Reliability as a product feature.** Circuit breaking, health-aware adaptive
+  routing, jittered retries with `Retry-After`, load shedding, hedging,
+  idempotency keys, graceful stream drain, and durable usage logging — all
+  chaos-tested and off-by-default so behavior is opt-in.
+- **Frontier features built in.** A guardrails engine (PII/secrets/prompt-
+  injection + webhook/LLM-judge), an embedding semantic cache, and an
+  MCP-native gateway (stateless streamable HTTP + OAuth 2.1) ship in the core.
+- **Apache-2.0.** Permissive licensing for straightforward adoption.
+
+Compared to the ecosystem: LiteLLM is the broadest provider list (Python);
+Bifrost leads on raw Go throughput; Portkey is a strong hosted guardrails
+product. Polaris's bet is the combination above in one boring, self-hostable Go
+service. Feature sets move quickly — check each project for current specifics.
+
 ## Project Status
 
 The current codebase ships a broad multi-provider runtime with local validation gates. Real-provider proof depends on credentials, quota, billing, regional availability, and provider plan access.
@@ -53,6 +83,22 @@ Use this rule of thumb:
 - Missing provider credentials are not a local development blocker; they only block claims that a provider was live-smoked in your environment.
 
 ## Quick Start
+
+### Try it in 60 seconds
+
+Run the published image with the container-safe default config, then send a
+request (set a provider key and model you have access to):
+
+```bash
+docker run --rm -p 8080:8080 -e OPENAI_API_KEY=sk-... \
+  ghcr.io/jiacheng2004/polaris:v1.0.0
+
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'
+```
+
+For a source build, production config, and provider setup, continue below.
 
 ### 1. Prerequisites
 
