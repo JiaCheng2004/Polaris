@@ -59,6 +59,7 @@ nav:
       - Architecture: ARCHITECTURE.md
   - Operations:
       - Load Testing: LOAD_TESTING.md
+      - Benchmarks: benchmarks.md
   - Contributing:
       - Contributing: CONTRIBUTING.md
       - Adding a Provider: ADDING_PROVIDER.md

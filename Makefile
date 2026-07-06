@@ -14,7 +14,7 @@ GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test lint check-layering security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test bench lint check-layering security-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -61,6 +61,10 @@ run: build
 
 test:
 	go test -race ./...
+
+bench:
+	go test -run '^$$' -bench . -benchmem \
+		./internal/gateway ./internal/guardrails ./internal/routing ./internal/semcache
 
 lint:
 	$(GOLANGCI_LINT) run ./...
