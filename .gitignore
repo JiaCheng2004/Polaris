@@ -11,6 +11,10 @@ Thumbs.db
 
 # Go build / tooling
 /polaris
+# Stray binaries from `go build ./examples/go/<name>/` at the repo root.
+/chat
+/stream
+/embeddings
 /bin/
 /dist/
 /build/
