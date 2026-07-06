@@ -2,11 +2,25 @@ package handler
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/gin-gonic/gin"
 )
+
+// sseWriteGrace is the per-frame write budget. Resetting the write deadline
+// before each SSE frame lets a stream run past the server's WriteTimeout (R7)
+// while still bounding a single stuck write.
+const sseWriteGrace = 60 * time.Second
+
+// extendSSEDeadline pushes the connection's write deadline forward before an SSE
+// frame. If the underlying writer does not support deadlines (e.g. httptest), it
+// degrades silently.
+func extendSSEDeadline(c *gin.Context) {
+	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(sseWriteGrace))
+}
 
 func writeSSEData(c *gin.Context, value any) error {
 	payload, err := json.Marshal(value)
@@ -17,6 +31,7 @@ func writeSSEData(c *gin.Context, value any) error {
 }
 
 func writeRawSSEData(c *gin.Context, payload []byte) error {
+	extendSSEDeadline(c)
 	if _, err := c.Writer.Write([]byte("data: ")); err != nil {
 		return err
 	}
@@ -46,6 +61,7 @@ func writeRawSSEEvent(c *gin.Context, event string, payload []byte) error {
 }
 
 func writeSSEDone(c *gin.Context) error {
+	extendSSEDeadline(c)
 	if _, err := c.Writer.Write([]byte("data: [DONE]\n\n")); err != nil {
 		return err
 	}

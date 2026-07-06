@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
@@ -32,6 +33,7 @@ type Dependencies struct {
 	AuditLogger     *store.AsyncAuditLogger
 	ToolRegistry    *tooling.Registry
 	Reliability     *reliability.Manager
+	StreamDrainer   *drain.Registry
 }
 
 func NewEngine(deps Dependencies) (*gin.Engine, error) {
@@ -58,6 +60,9 @@ func NewEngine(deps Dependencies) (*gin.Engine, error) {
 		// observer feeds it (only main.go registers one), so tests stay wire-neutral.
 		deps.Reliability = reliability.NewManager(gwruntime.ReliabilityConfig(deps.Config), deps.Metrics)
 	}
+	if deps.StreamDrainer == nil {
+		deps.StreamDrainer = drain.NewRegistry()
+	}
 
 	engine := gin.New()
 	engine.HandleMethodNotAllowed = true
@@ -76,5 +81,6 @@ func NewHTTPServer(deps Dependencies) (*http.Server, error) {
 		Handler:      engine,
 		ReadTimeout:  deps.Config.Server.ReadTimeout,
 		WriteTimeout: deps.Config.Server.WriteTimeout,
+		IdleTimeout:  deps.Config.Server.IdleTimeout,
 	}, nil
 }

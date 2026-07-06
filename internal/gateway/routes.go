@@ -62,15 +62,15 @@ func buildRouteHandlers(deps Dependencies) routeHandlers {
 		idempotency: func(endpoint string) gin.HandlerFunc {
 			return middleware.Idempotency(deps.Runtime, deps.Store, idempotencyCoord, deps.Metrics, endpoint)
 		},
-		audio:        handler.NewAudioHandler(deps.Runtime),
+		audio:        handler.NewAudioHandler(deps.Runtime, deps.StreamDrainer),
 		batches:      handler.NewBatchesHandler(deps.Runtime, deps.Store),
 		chat:         chatHandler,
 		controlPlane: handler.NewControlPlaneHandler(deps.Runtime, deps.Store, deps.VirtualKeyCache, deps.AuditLogger, deps.ToolRegistry),
 		embed:        handler.NewEmbedHandler(deps.Runtime, deps.Cache),
 		files:        handler.NewFilesHandler(deps.Runtime, deps.Store, deps.AuditLogger, deps.Logger),
-		health:       handler.NewHealthHandler(deps.Store, deps.Cache, deps.Runtime),
+		health:       handler.NewHealthHandler(deps.Store, deps.Cache, deps.Runtime, deps.StreamDrainer, deps.Reliability),
 		image:        handler.NewImageHandler(deps.Runtime, deps.Cache),
-		interpreting: handler.NewInterpretingHandler(deps.Runtime),
+		interpreting: handler.NewInterpretingHandler(deps.Runtime, deps.StreamDrainer),
 		keys:         handler.NewKeysHandler(deps.Runtime, deps.Store, deps.AuthCache, deps.VirtualKeyCache),
 		mcp:          handler.NewMCPHandler(deps.Runtime, deps.Store, deps.ToolRegistry, deps.Metrics),
 		metrics:      handler.NewMetricsHandler(deps.Runtime, deps.Metrics),
@@ -82,7 +82,7 @@ func buildRouteHandlers(deps Dependencies) routeHandlers {
 		translation:  handler.NewTranslationHandler(deps.Runtime),
 		usage:        handler.NewUsageHandler(deps.Store),
 		video:        handler.NewVideoHandler(deps.Runtime),
-		voice:        handler.NewVoiceHandler(deps.Runtime, deps.Cache),
+		voice:        handler.NewVoiceHandler(deps.Runtime, deps.Cache, deps.StreamDrainer),
 		voices:       handler.NewVoicesHandler(deps.Runtime, deps.Store),
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
@@ -18,10 +19,11 @@ import (
 
 type InterpretingHandler struct {
 	runtime *gwruntime.Holder
+	drainer *drain.Registry
 }
 
-func NewInterpretingHandler(runtime *gwruntime.Holder) *InterpretingHandler {
-	return &InterpretingHandler{runtime: runtime}
+func NewInterpretingHandler(runtime *gwruntime.Holder, drainer *drain.Registry) *InterpretingHandler {
+	return &InterpretingHandler{runtime: runtime, drainer: drainer}
 }
 
 func (h *InterpretingHandler) Create(c *gin.Context) {
@@ -135,6 +137,8 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 	defer func() {
 		_ = session.Close()
 	}()
+	deregisterDrain := registerWSDrain(h.drainer, conn)
+	defer deregisterDrain()
 
 	var (
 		writeMu      sync.Mutex
@@ -149,6 +153,7 @@ func (h *InterpretingHandler) WebSocket(c *gin.Context) {
 	writeEvent := func(event modality.InterpretingServerEvent) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
+		_ = conn.SetWriteDeadline(time.Now().Add(sseWriteGrace))
 		return conn.WriteJSON(event)
 	}
 

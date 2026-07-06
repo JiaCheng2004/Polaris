@@ -63,6 +63,7 @@ type ServerConfig struct {
 	Port            int           `yaml:"port"`
 	ReadTimeout     time.Duration `yaml:"read_timeout"`
 	WriteTimeout    time.Duration `yaml:"write_timeout"`
+	IdleTimeout     time.Duration `yaml:"idle_timeout"`
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
 	MaxBodyBytes    int64         `yaml:"max_body_bytes"`
 	CORS            CORSConfig    `yaml:"cors"`
@@ -382,6 +383,7 @@ func Default() Config {
 			Port:            8080,
 			ReadTimeout:     30 * time.Second,
 			WriteTimeout:    120 * time.Second,
+			IdleTimeout:     120 * time.Second,
 			ShutdownTimeout: 15 * time.Second,
 			MaxBodyBytes:    DefaultMaxBodyBytes,
 			CORS:            DefaultCORSConfig(),

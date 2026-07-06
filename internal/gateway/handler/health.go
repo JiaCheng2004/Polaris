@@ -3,24 +3,30 @@ package handler
 import (
 	"net/http"
 
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
+	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
 )
 
 type HealthHandler struct {
-	store   store.Store
-	cache   cache.Cache
-	runtime *gwruntime.Holder
+	store       store.Store
+	cache       cache.Cache
+	runtime     *gwruntime.Holder
+	drainer     *drain.Registry
+	reliability *reliability.Manager
 }
 
-func NewHealthHandler(store store.Store, cache cache.Cache, runtime *gwruntime.Holder) *HealthHandler {
+func NewHealthHandler(store store.Store, cache cache.Cache, runtime *gwruntime.Holder, drainer *drain.Registry, reliabilityManager *reliability.Manager) *HealthHandler {
 	return &HealthHandler{
-		store:   store,
-		cache:   cache,
-		runtime: runtime,
+		store:       store,
+		cache:       cache,
+		runtime:     runtime,
+		drainer:     drainer,
+		reliability: reliabilityManager,
 	}
 }
 
@@ -29,6 +35,13 @@ func (h *HealthHandler) Liveness(c *gin.Context) {
 }
 
 func (h *HealthHandler) Readiness(c *gin.Context) {
+	// During graceful shutdown, report not-ready immediately so load balancers
+	// stop sending new traffic while in-flight streams drain (R6).
+	if h.drainer != nil && h.drainer.Draining() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "draining"})
+		return
+	}
+
 	statusCode := http.StatusOK
 	status := gin.H{
 		"status":    "ready",

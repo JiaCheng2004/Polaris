@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
@@ -17,10 +18,11 @@ import (
 type VoiceHandler struct {
 	runtime *gwruntime.Holder
 	cache   cachepkg.Cache
+	drainer *drain.Registry
 }
 
-func NewVoiceHandler(runtime *gwruntime.Holder, cache cachepkg.Cache) *VoiceHandler {
-	return &VoiceHandler{runtime: runtime, cache: cache}
+func NewVoiceHandler(runtime *gwruntime.Holder, cache cachepkg.Cache, drainer *drain.Registry) *VoiceHandler {
+	return &VoiceHandler{runtime: runtime, cache: cache, drainer: drainer}
 }
 
 func (h *VoiceHandler) Speech(c *gin.Context) {

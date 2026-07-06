@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/httputil"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
@@ -20,12 +22,26 @@ var audioUpgrader = websocket.Upgrader{
 	CheckOrigin: func(*http.Request) bool { return true },
 }
 
-type AudioHandler struct {
-	runtime *gwruntime.Holder
+// registerWSDrain registers a graceful-close callback for a live WebSocket so
+// shutdown can send a close frame and break the read loop. Nil-safe; returns a
+// deregister func to defer.
+func registerWSDrain(drainer *drain.Registry, conn *websocket.Conn) func() {
+	if drainer == nil {
+		return func() {}
+	}
+	return drainer.Register(func(context.Context) {
+		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseServiceRestart, "server shutting down"), time.Now().Add(2*time.Second))
+		_ = conn.Close()
+	})
 }
 
-func NewAudioHandler(runtime *gwruntime.Holder) *AudioHandler {
-	return &AudioHandler{runtime: runtime}
+type AudioHandler struct {
+	runtime *gwruntime.Holder
+	drainer *drain.Registry
+}
+
+func NewAudioHandler(runtime *gwruntime.Holder, drainer *drain.Registry) *AudioHandler {
+	return &AudioHandler{runtime: runtime, drainer: drainer}
 }
 
 func (h *AudioHandler) Create(c *gin.Context) {
@@ -140,6 +156,8 @@ func (h *AudioHandler) WebSocket(c *gin.Context) {
 	defer func() {
 		_ = session.Close()
 	}()
+	deregisterDrain := registerWSDrain(h.drainer, conn)
+	defer deregisterDrain()
 
 	var (
 		writeMu      sync.Mutex
@@ -153,6 +171,7 @@ func (h *AudioHandler) WebSocket(c *gin.Context) {
 	writeEvent := func(event modality.AudioServerEvent) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
+		_ = conn.SetWriteDeadline(time.Now().Add(sseWriteGrace))
 		return conn.WriteJSON(event)
 	}
 

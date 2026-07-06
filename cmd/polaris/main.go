@@ -14,6 +14,7 @@ import (
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
 	"github.com/JiaCheng2004/Polaris/internal/gateway"
+	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
 	"github.com/JiaCheng2004/Polaris/internal/obs"
@@ -138,6 +139,7 @@ func run() error {
 	reliabilityManager := reliability.NewManager(gwruntime.ReliabilityConfig(cfg), metricsRecorder)
 	transport.AddObserver(reliabilityManager.Observe)
 	defer reliabilityManager.Close()
+	streamDrainer := drain.NewRegistry()
 
 	requestLogger := store.NewAsyncRequestLogger(appStore, logger, store.NewLoggerConfig(cfg.Store.LogBufferSize, cfg.Store.LogFlushInterval))
 	requestLogger.SetMetrics(metricsRecorder)
@@ -202,6 +204,7 @@ func run() error {
 		AuditLogger:   auditLogger,
 		ToolRegistry:  toolRegistry,
 		Reliability:   reliabilityManager,
+		StreamDrainer: streamDrainer,
 	})
 	if err != nil {
 		return err
@@ -228,9 +231,41 @@ func run() error {
 	defer signal.Stop(stop)
 	<-stop
 
+	logger.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
-	return server.Shutdown(ctx)
+
+	// Graceful drain (R6): (1) flip readiness so load balancers stop routing new
+	// traffic and give in-flight readiness checks a moment to observe it; (2) send
+	// close frames to live WebSocket streams and wait (bounded); (3) drain
+	// in-flight HTTP including SSE; (4) flush the loggers within the deadline (the
+	// deferred Close(Background) calls become no-ops via sync.Once).
+	streamDrainer.SetDraining()
+	sleepContext(ctx, readinessDrainDelay)
+	streamDrainer.Drain(ctx)
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Warn("server shutdown returned an error", "error", err)
+	}
+	if err := requestLogger.Close(ctx); err != nil {
+		logger.Warn("request logger flush on shutdown incomplete", "error", err)
+	}
+	if auditLogger != nil {
+		if err := auditLogger.Close(ctx); err != nil {
+			logger.Warn("audit logger flush on shutdown incomplete", "error", err)
+		}
+	}
+	return nil
+}
+
+const readinessDrainDelay = 500 * time.Millisecond
+
+func sleepContext(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-ctx.Done():
+	}
 }
 
 func runVerificationReport(cfg *config.Config, warnings []string, jsonOutput bool) error {

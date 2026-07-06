@@ -118,6 +118,8 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 	defer func() {
 		_ = session.Close()
 	}()
+	deregisterDrain := registerWSDrain(h.drainer, conn)
+	defer deregisterDrain()
 
 	var (
 		writeMu    sync.Mutex
@@ -137,6 +139,7 @@ func (h *VoiceHandler) StreamingTranscriptionWebSocket(c *gin.Context) {
 	writeEvent := func(event modality.StreamingTranscriptionServerEvent) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
+		_ = conn.SetWriteDeadline(time.Now().Add(sseWriteGrace))
 		return conn.WriteJSON(event)
 	}
 	recordOutcomeError := func(errorType string) {
