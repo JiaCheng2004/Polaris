@@ -1,6 +1,7 @@
 package guardrails
 
 import (
+	"context"
 	"regexp"
 	"unicode"
 	"unicode/utf8"
@@ -36,7 +37,7 @@ func newPromptInjectionDetector() *promptInjectionDetector {
 
 func (d *promptInjectionDetector) Name() string { return "prompt_injection" }
 
-func (d *promptInjectionDetector) Detect(text string, spec DetectorSpec) []Finding {
+func (d *promptInjectionDetector) Detect(_ context.Context, text string, spec DetectorSpec) ([]Finding, error) {
 	threshold := spec.Threshold
 	if threshold <= 0 {
 		threshold = 0.5
@@ -60,9 +61,9 @@ func (d *promptInjectionDetector) Detect(text string, spec DetectorSpec) []Findi
 	}
 
 	if score < threshold {
-		return nil
+		return nil, nil
 	}
-	return findings
+	return findings, nil
 }
 
 // invisibleUnicodeSpans flags runs of Unicode format characters (Cf category:

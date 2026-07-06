@@ -1,6 +1,7 @@
 package guardrails
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,7 +30,7 @@ func newPIIDetector() *piiDetector {
 
 func (d *piiDetector) Name() string { return "pii" }
 
-func (d *piiDetector) Detect(text string, spec DetectorSpec) []Finding {
+func (d *piiDetector) Detect(_ context.Context, text string, spec DetectorSpec) ([]Finding, error) {
 	enabled := typeSet(spec.Types, d.order...)
 	var findings []Finding
 	for _, typ := range d.order {
@@ -44,7 +45,7 @@ func (d *piiDetector) Detect(text string, spec DetectorSpec) []Finding {
 			findings = append(findings, Finding{Detector: "pii", Type: typ, Start: loc[0], End: loc[1], Severity: piiSeverity(typ)})
 		}
 	}
-	return findings
+	return findings, nil
 }
 
 func validatePII(typ, match string) bool {

@@ -57,10 +57,16 @@ type Finding struct {
 
 // DetectorSpec configures one detector within a policy.
 type DetectorSpec struct {
-	Name      string   // "pii", "secrets", "prompt_injection", "content"
+	Name      string   // "pii", "secrets", "prompt_injection", "content", "webhook", "llm_judge"
 	Types     []string // enabled sub-types (empty = detector default)
 	Terms     []string // literal terms/patterns (content detector)
 	Threshold float64  // score threshold (prompt_injection)
+
+	// Remote-detector options.
+	URL       string // webhook endpoint
+	TimeoutMs int    // remote call timeout (webhook, llm_judge)
+	Model     string // llm_judge model (provider/model)
+	Prompt    string // llm_judge policy description appended to the classifier prompt
 }
 
 // Policy is a compiled guardrail policy.

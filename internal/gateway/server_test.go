@@ -3300,6 +3300,28 @@ func TestGuardrailsRedactResponse(t *testing.T) {
 	}
 }
 
+func TestGuardrailsWebhookBlocksViaGateway(t *testing.T) {
+	// External classifier flags everything.
+	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"findings":[{"detector":"webhook","type":"policy_violation","start":0,"end":1,"severity":"high"}]}`))
+	}))
+	defer webhook.Close()
+
+	okJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`
+	engine, calls := guardrailEngine(t, okJSON, []config.GuardrailPolicyConfig{
+		{Name: "webhook-block", Phase: "request", Action: "block", Detectors: map[string]config.GuardrailDetectorConfig{
+			"webhook": {URL: webhook.URL, TimeoutMs: 2000},
+		}},
+	})
+	w := guardrailChat(engine, "any content at all")
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "guardrail_blocked") {
+		t.Fatalf("webhook-block status = %d body=%s", w.Code, w.Body.String())
+	}
+	if *calls != 0 {
+		t.Fatalf("provider called %d times, want 0 (webhook blocked the request)", *calls)
+	}
+}
+
 func TestGuardrailsStreamRedact(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

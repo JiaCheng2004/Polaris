@@ -39,7 +39,10 @@ func guardrailPolicies(cfg *config.Config, modelID string) []guardrails.Policy {
 		}
 		specs := make([]guardrails.DetectorSpec, 0, len(pc.Detectors))
 		for name, dc := range pc.Detectors {
-			specs = append(specs, guardrails.DetectorSpec{Name: name, Types: dc.Types, Terms: dc.Terms, Threshold: dc.Threshold})
+			specs = append(specs, guardrails.DetectorSpec{
+				Name: name, Types: dc.Types, Terms: dc.Terms, Threshold: dc.Threshold,
+				URL: dc.URL, TimeoutMs: dc.TimeoutMs, Model: dc.Model, Prompt: dc.Prompt,
+			})
 		}
 		out = append(out, guardrails.Policy{
 			Name:      pc.Name,
@@ -97,7 +100,7 @@ func (h *ChatHandler) guardTextFields(c *gin.Context, phase guardrails.Phase, po
 		if f == nil || *f == "" {
 			continue
 		}
-		verdict := h.guardrails.Evaluate(phase, *f, policies)
+		verdict := h.guardrails.Evaluate(c.Request.Context(), phase, *f, policies)
 		if verdict.Blocked {
 			writeGuardrailBlocked(c, modelID, phase)
 			return true
@@ -133,7 +136,7 @@ func (h *ChatHandler) newResponseRedactor(c *gin.Context, modelID string) *guard
 	if len(policies) == 0 {
 		return nil
 	}
-	return guardrails.NewStreamRedactor(h.guardrails, policies, 0)
+	return guardrails.NewStreamRedactor(c.Request.Context(), h.guardrails, policies, 0)
 }
 
 func writeStreamGuardrailBlocked(c *gin.Context, outcome *middleware.RequestOutcome) {

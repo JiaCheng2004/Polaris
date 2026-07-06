@@ -55,7 +55,7 @@ func TestDetectorPrecisionRecall(t *testing.T) {
 		}
 		var r pr
 		for _, pos := range cc.positives {
-			if len(d.Detect(pos, cc.spec)) > 0 {
+			if len(detect(d, pos, cc.spec)) > 0 {
 				r.tp++
 			} else {
 				r.fn++
@@ -63,7 +63,7 @@ func TestDetectorPrecisionRecall(t *testing.T) {
 			}
 		}
 		for _, neg := range cc.negatives {
-			if len(d.Detect(neg, cc.spec)) > 0 {
+			if len(detect(d, neg, cc.spec)) > 0 {
 				r.fp++
 				t.Logf("%s FALSE POSITIVE: %q", cc.label, neg)
 			}

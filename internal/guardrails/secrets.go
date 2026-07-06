@@ -1,6 +1,7 @@
 package guardrails
 
 import (
+	"context"
 	"math"
 	"regexp"
 )
@@ -28,7 +29,7 @@ func newSecretsDetector() *secretsDetector {
 
 func (d *secretsDetector) Name() string { return "secrets" }
 
-func (d *secretsDetector) Detect(text string, spec DetectorSpec) []Finding {
+func (d *secretsDetector) Detect(_ context.Context, text string, spec DetectorSpec) ([]Finding, error) {
 	enabled := typeSet(spec.Types, d.order...)
 	var findings []Finding
 	for _, typ := range d.order {
@@ -42,7 +43,7 @@ func (d *secretsDetector) Detect(text string, spec DetectorSpec) []Finding {
 	if enabled["high_entropy"] {
 		findings = append(findings, highEntropyFindings(text)...)
 	}
-	return findings
+	return findings, nil
 }
 
 var entropyTokenRe = regexp.MustCompile(`[A-Za-z0-9+/=_\-]{20,}`)

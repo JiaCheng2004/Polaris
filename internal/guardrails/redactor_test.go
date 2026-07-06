@@ -1,6 +1,7 @@
 package guardrails
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -33,7 +34,7 @@ func redactPolicies() []Policy {
 func TestStreamRedactorNoLeakAtAnyBoundary(t *testing.T) {
 	text := "please reach bob@example.com and use key AKIAIOSFODNN7EXAMPLE right away"
 	for chunk := 1; chunk <= len(text); chunk++ {
-		r := NewStreamRedactor(NewEngine(nil), redactPolicies(), 64)
+		r := NewStreamRedactor(context.Background(), NewEngine(nil), redactPolicies(), 64)
 		out, blocked := redactStream(r, text, chunk)
 		if blocked {
 			t.Fatalf("chunk=%d unexpectedly blocked", chunk)
@@ -55,7 +56,7 @@ func TestStreamRedactorNoLeakAtAnyBoundary(t *testing.T) {
 }
 
 func TestStreamRedactorPassthroughWhenObserve(t *testing.T) {
-	r := NewStreamRedactor(NewEngine(nil), []Policy{{Name: "p", Phase: PhaseResponse, Action: ActionObserve, Detectors: []DetectorSpec{{Name: "pii"}}}}, 8)
+	r := NewStreamRedactor(context.Background(), NewEngine(nil), []Policy{{Name: "p", Phase: PhaseResponse, Action: ActionObserve, Detectors: []DetectorSpec{{Name: "pii"}}}}, 8)
 	if r.Active() {
 		t.Fatal("observe-only redactor should be inactive")
 	}
@@ -66,7 +67,7 @@ func TestStreamRedactorPassthroughWhenObserve(t *testing.T) {
 }
 
 func TestStreamRedactorBlock(t *testing.T) {
-	r := NewStreamRedactor(NewEngine(nil), []Policy{{Name: "p", Phase: PhaseResponse, Action: ActionBlock, Detectors: []DetectorSpec{{Name: "pii"}}}}, 64)
+	r := NewStreamRedactor(context.Background(), NewEngine(nil), []Policy{{Name: "p", Phase: PhaseResponse, Action: ActionBlock, Detectors: []DetectorSpec{{Name: "pii"}}}}, 64)
 	_, blocked := redactStream(r, "here is an email bob@example.com in the stream", 4)
 	if !blocked {
 		t.Fatal("block policy did not block the stream")
@@ -93,7 +94,7 @@ func FuzzStreamRedactorNoLeak(f *testing.F) {
 			chunkSize = 1
 		}
 		text := "intro reach bob@example.com then key AKIAIOSFODNN7EXAMPLE end"
-		r := NewStreamRedactor(NewEngine(nil), redactPolicies(), 64)
+		r := NewStreamRedactor(context.Background(), NewEngine(nil), redactPolicies(), 64)
 		out, _ := redactStream(r, text, chunkSize)
 		if strings.Contains(out, "bob@example.com") {
 			t.Fatalf("email leaked at chunkSize=%d: %q", chunkSize, out)

@@ -37,7 +37,9 @@ type chatTarget struct {
 }
 
 func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store, reliabilityManager *reliability.Manager) *ChatHandler {
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter(), guardrails: guardrails.NewEngine(recorder)}
+	engine := guardrails.NewEngine(recorder)
+	engine.SetJudge(&registryJudge{runtime: runtime})
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter(), guardrails: engine}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {

@@ -1,6 +1,9 @@
 package guardrails
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
 // contentDetector flags operator-configured literal terms (case-insensitive).
 // No ML classification is claimed — it is a term/phrase list.
@@ -10,9 +13,9 @@ func newContentDetector() *contentDetector { return &contentDetector{} }
 
 func (d *contentDetector) Name() string { return "content" }
 
-func (d *contentDetector) Detect(text string, spec DetectorSpec) []Finding {
+func (d *contentDetector) Detect(_ context.Context, text string, spec DetectorSpec) ([]Finding, error) {
 	if len(spec.Terms) == 0 {
-		return nil
+		return nil, nil
 	}
 	lower := strings.ToLower(text)
 	var findings []Finding
@@ -32,5 +35,5 @@ func (d *contentDetector) Detect(text string, spec DetectorSpec) []Finding {
 			from = start + len(t)
 		}
 	}
-	return findings
+	return findings, nil
 }

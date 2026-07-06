@@ -51,6 +51,10 @@ type GuardrailDetectorConfig struct {
 	Types     []string `yaml:"types"`
 	Terms     []string `yaml:"terms"`
 	Threshold float64  `yaml:"threshold"`
+	URL       string   `yaml:"url"`
+	TimeoutMs int      `yaml:"timeout_ms"`
+	Model     string   `yaml:"model"`
+	Prompt    string   `yaml:"prompt"`
 }
 
 // ReliabilityConfig tunes the process-lifetime reliability manager (circuit

@@ -1,6 +1,9 @@
 package guardrails
 
-import "unicode/utf8"
+import (
+	"context"
+	"unicode/utf8"
+)
 
 // defaultHoldback is the number of trailing runes buffered between chunks so a
 // pattern that straddles a chunk boundary is caught before any part of it is
@@ -12,6 +15,7 @@ const defaultHoldback = 64
 // emitted, then redacts or blocks. When the matched policies are observe-only it
 // passes text through without buffering.
 type StreamRedactor struct {
+	ctx       context.Context
 	engine    *Engine
 	policies  []Policy
 	holdback  int
@@ -21,7 +25,10 @@ type StreamRedactor struct {
 
 // NewStreamRedactor builds a redactor for the response phase. A nil engine or no
 // enforcing policy yields a pass-through redactor.
-func NewStreamRedactor(engine *Engine, policies []Policy, holdback int) *StreamRedactor {
+func NewStreamRedactor(ctx context.Context, engine *Engine, policies []Policy, holdback int) *StreamRedactor {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if holdback <= 0 {
 		holdback = defaultHoldback
 	}
@@ -35,7 +42,7 @@ func NewStreamRedactor(engine *Engine, policies []Policy, holdback int) *StreamR
 			break
 		}
 	}
-	return &StreamRedactor{engine: engine, policies: policies, holdback: holdback, enforcing: enforcing}
+	return &StreamRedactor{ctx: ctx, engine: engine, policies: policies, holdback: holdback, enforcing: enforcing}
 }
 
 // Active reports whether the redactor will buffer/transform the stream.
@@ -62,7 +69,7 @@ func (r *StreamRedactor) Flush() (string, bool) {
 }
 
 func (r *StreamRedactor) drain(final bool) (string, bool) {
-	verdict := r.engine.Evaluate(PhaseResponse, r.buffer, r.policies)
+	verdict := r.engine.Evaluate(r.ctx, PhaseResponse, r.buffer, r.policies)
 	if verdict.Blocked {
 		return "", true
 	}

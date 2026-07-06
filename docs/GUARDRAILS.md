@@ -43,9 +43,36 @@ runtime:
 | `secrets` | `aws_access_key`, `github_pat`, `slack_token`, `jwt`, `pem`, `gcp_sa`, opt-in `high_entropy` | high-entropy tokens are opt-in (noisy) |
 | `prompt_injection` | `threshold` (default 0.5) | scored heuristics: multilingual instruction-override, jailbreak markers, role-play, invisible/bidi unicode |
 | `content` | `terms: [...]` | operator literal term list (case-insensitive) |
+| `webhook` | `url`, `timeout_ms` | POSTs `{texts:[...]}` to an external classifier expecting `{findings:[{detector,type,start,end,severity}]}` |
+| `llm_judge` | `model`, `prompt`, `timeout_ms` | routes a classifier prompt through Polaris's own provider layer; expects a strict JSON verdict |
 
-Detection is pure Go and fast: each detector evaluates a 4 KB payload in well
-under 1 ms.
+The four local detectors are pure Go and fast: each evaluates a 4 KB payload in
+well under 1 ms.
+
+## Remote detectors
+
+`webhook` and `llm_judge` call external services, so they can fail. The policy's
+**`fail_mode`** controls behavior on error or timeout:
+
+- `open` (default) — skip the failed detector and continue (availability first).
+- `closed` — block the request/response (safety first: if we cannot verify, deny).
+
+```yaml
+- name: judge-toxicity
+  phase: request
+  action: block
+  fail_mode: open
+  detectors:
+    llm_judge:
+      model: openai/gpt-4o-mini
+      prompt: "toxic, harassing, or hateful content"
+      timeout_ms: 3000
+```
+
+`llm_judge` runs its completion through the provider registry **directly** (not
+the HTTP handler), so the judge call never re-enters guardrails or the semantic
+cache — recursion is structurally impossible. Keep the judge model small and
+cheap; each flagged phase is one extra completion.
 
 ## Detection quality (labeled corpus)
 
@@ -89,6 +116,6 @@ type, and byte offsets only.
 ## v1 scope
 
 Text modalities only (chat/completions, messages, responses). Images, audio, and
-files receive filename/metadata screening only. Remote detectors (webhook,
-llm_judge) and DB-backed policy CRUD extend the config-driven engine documented
-here.
+files receive filename/metadata screening only. Policies are configured in
+`runtime.guardrails` (compiled into the hot-reloadable snapshot); DB-backed policy
+CRUD is a fast-follow.

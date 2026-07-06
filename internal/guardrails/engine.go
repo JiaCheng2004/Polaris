@@ -1,12 +1,16 @@
 package guardrails
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
-// Detector inspects text and returns findings. Detectors must be pure, fast
-// (local detectors target <1ms on 4KB), and safe for concurrent use.
+// Detector inspects text and returns findings. Local detectors must be pure,
+// fast (<1ms on 4KB), and safe for concurrent use; remote detectors honor the
+// context deadline and may return an error (handled per the policy fail_mode).
 type Detector interface {
 	Name() string
-	Detect(text string, spec DetectorSpec) []Finding
+	Detect(ctx context.Context, text string, spec DetectorSpec) ([]Finding, error)
 }
 
 // MetricsSink receives guardrail metric updates. The gateway metrics.Recorder
@@ -37,16 +41,22 @@ func NewEngine(metrics MetricsSink) *Engine {
 	e.Register(newSecretsDetector())
 	e.Register(newPromptInjectionDetector())
 	e.Register(newContentDetector())
+	e.Register(newWebhookDetector())
+	e.Register(newLLMJudgeDetector(nil)) // no judge until SetJudge
 	return e
 }
 
 // Register adds or overrides a detector (used for remote detectors too).
 func (e *Engine) Register(d Detector) { e.detectors[d.Name()] = d }
 
+// SetJudge wires the llm_judge completion backend (the gateway routes it through
+// the provider layer). Until set, an llm_judge detector is a no-op.
+func (e *Engine) SetJudge(judge Judge) { e.Register(newLLMJudgeDetector(judge)) }
+
 // Evaluate runs every policy covering phase over text and returns the strongest
-// verdict (block > redact > observe). Redaction, when it wins, masks all
-// findings. An empty text or no policies yields a no-op verdict.
-func (e *Engine) Evaluate(phase Phase, text string, policies []Policy) Verdict {
+// verdict (block > redact > observe). A detector error is handled by the policy
+// fail_mode: "closed" blocks, "open" (default) skips that detector.
+func (e *Engine) Evaluate(ctx context.Context, phase Phase, text string, policies []Policy) Verdict {
 	verdict := Verdict{}
 	if text == "" || len(policies) == 0 {
 		return verdict
@@ -60,16 +70,31 @@ func (e *Engine) Evaluate(phase Phase, text string, policies []Policy) Verdict {
 			continue
 		}
 		var policyFindings []Finding
+		failClosed := false
 		for _, spec := range p.Detectors {
 			d, ok := e.detectors[spec.Name]
 			if !ok {
 				continue
 			}
-			fs := d.Detect(text, spec)
+			fs, err := d.Detect(ctx, text, spec)
+			if err != nil {
+				e.metrics.IncGuardrailEvaluation(spec.Name, "error", string(phase))
+				if p.FailMode == "closed" {
+					failClosed = true
+				}
+				continue
+			}
 			if len(fs) > 0 {
 				e.metrics.IncGuardrailEvaluation(spec.Name, string(p.Action), string(phase))
 				policyFindings = append(policyFindings, fs...)
 			}
+		}
+		if failClosed {
+			if actionRank(ActionBlock) > actionRank(verdict.Action) {
+				verdict.Action = ActionBlock
+				verdict.PolicyHit = p.Name
+			}
+			continue
 		}
 		if len(policyFindings) == 0 {
 			continue
