@@ -35,6 +35,8 @@ type Recorder struct {
 	usageDropped         *prometheus.CounterVec
 	idempotentReplays    *prometheus.CounterVec
 	rateLimitDegraded    *prometheus.CounterVec
+	guardrailEvals       *prometheus.CounterVec
+	guardrailLatency     prometheus.Histogram
 }
 
 func NewRecorder() *Recorder {
@@ -132,6 +134,15 @@ func NewRecorder() *Recorder {
 			Name: "polaris_ratelimit_degraded_total",
 			Help: "Total requests where the primary rate limiter was unavailable, by fail mode and action.",
 		}, []string{"mode", "action"}),
+		guardrailEvals: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_guardrail_evaluations_total",
+			Help: "Total guardrail detector matches by detector, action, and phase.",
+		}, []string{"detector", "action", "phase"}),
+		guardrailLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "polaris_guardrail_latency_seconds",
+			Help:    "Guardrail evaluation latency in seconds.",
+			Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1},
+		}),
 	}
 
 	registry.MustRegister(
@@ -157,6 +168,8 @@ func NewRecorder() *Recorder {
 		recorder.usageDropped,
 		recorder.idempotentReplays,
 		recorder.rateLimitDegraded,
+		recorder.guardrailEvals,
+		recorder.guardrailLatency,
 	)
 
 	return recorder
@@ -302,6 +315,22 @@ func (r *Recorder) IncIdempotentReplay(endpoint string) {
 		endpoint = "unknown"
 	}
 	r.idempotentReplays.WithLabelValues(endpoint).Inc()
+}
+
+// IncGuardrailEvaluation records a guardrail detector match.
+func (r *Recorder) IncGuardrailEvaluation(detector, action, phase string) {
+	if r == nil || detector == "" {
+		return
+	}
+	r.guardrailEvals.WithLabelValues(detector, action, phase).Inc()
+}
+
+// ObserveGuardrailLatency records guardrail evaluation latency in seconds.
+func (r *Recorder) ObserveGuardrailLatency(seconds float64) {
+	if r == nil {
+		return
+	}
+	r.guardrailLatency.Observe(seconds)
 }
 
 // IncRateLimitDegraded records a request where the primary rate limiter was

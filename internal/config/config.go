@@ -28,6 +28,29 @@ type Config struct {
 	Pricing       PricingConfig             `yaml:"pricing"`
 	Observability ObservabilityConfig       `yaml:"observability"`
 	Reliability   ReliabilityConfig         `yaml:"reliability"`
+	Guardrails    GuardrailsConfig          `yaml:"guardrails"`
+}
+
+// GuardrailsConfig configures the content-safety policy engine. Disabled by
+// default; a policy must opt a route in.
+type GuardrailsConfig struct {
+	Enabled  bool                    `yaml:"enabled"`
+	Policies []GuardrailPolicyConfig `yaml:"policies"`
+}
+
+type GuardrailPolicyConfig struct {
+	Name      string                             `yaml:"name"`
+	Phase     string                             `yaml:"phase"`  // request|response|both
+	Action    string                             `yaml:"action"` // observe|redact|block
+	FailMode  string                             `yaml:"fail_mode"`
+	Match     RouteMatch                         `yaml:"match"`
+	Detectors map[string]GuardrailDetectorConfig `yaml:"detectors"`
+}
+
+type GuardrailDetectorConfig struct {
+	Types     []string `yaml:"types"`
+	Terms     []string `yaml:"terms"`
+	Threshold float64  `yaml:"threshold"`
 }
 
 // ReliabilityConfig tunes the process-lifetime reliability manager (circuit

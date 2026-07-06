@@ -114,6 +114,7 @@ package polaris
 		}
 		observability?: _
 		reliability?: _
+		guardrails?: _
 	}
 
 	providers?: [string]: {

@@ -42,6 +42,7 @@
         "files": { "$ref": "#/$defs/files" },
         "pricing": { "$ref": "#/$defs/pricing" },
         "observability": { "$ref": "#/$defs/observability" },
+        "guardrails": { "type": "object" },
         "reliability": {
           "type": "object",
           "additionalProperties": false,
