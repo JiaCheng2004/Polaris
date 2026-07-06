@@ -3222,6 +3222,95 @@ func TestSimulationDeadPrimaryBoundedLatency(t *testing.T) {
 	}
 }
 
+func guardrailEngine(t *testing.T, upstreamJSON string, policies []config.GuardrailPolicyConfig) (*gin.Engine, *int) {
+	t.Helper()
+	calls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(upstreamJSON))
+	}))
+	t.Cleanup(upstream.Close)
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{"openai": upstream.URL + "/v1"})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*"}},
+	}
+	cfg.Guardrails = config.GuardrailsConfig{Enabled: true, Policies: policies}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    testSQLiteStore(t),
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+	return engine, &calls
+}
+
+func guardrailChat(engine *gin.Engine, content string) *httptest.ResponseRecorder {
+	body := `{"model":"openai/gpt-4o","messages":[{"role":"user","content":"` + content + `"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+	return w
+}
+
+func TestGuardrailsBlockRequest(t *testing.T) {
+	okJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`
+	engine, calls := guardrailEngine(t, okJSON, []config.GuardrailPolicyConfig{
+		{Name: "block-pii", Phase: "request", Action: "block", Detectors: map[string]config.GuardrailDetectorConfig{"pii": {}}},
+	})
+	w := guardrailChat(engine, "my email is alice@example.com please help")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("blocked request status = %d, want 400 (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "guardrail_blocked") {
+		t.Fatalf("body missing guardrail_blocked: %s", w.Body.String())
+	}
+	if *calls != 0 {
+		t.Fatalf("provider called %d times on a blocked request, want 0", *calls)
+	}
+}
+
+func TestGuardrailsRedactResponse(t *testing.T) {
+	leakyJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"You can reach Bob at bob@example.com anytime"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`
+	engine, _ := guardrailEngine(t, leakyJSON, []config.GuardrailPolicyConfig{
+		{Name: "redact-pii", Phase: "response", Action: "redact", Detectors: map[string]config.GuardrailDetectorConfig{"pii": {Types: []string{"email"}}}},
+	})
+	w := guardrailChat(engine, "what is bob's email")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "bob@example.com") {
+		t.Fatalf("response leaked email despite redact policy: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "[REDACTED:pii.email]") {
+		t.Fatalf("response not redacted: %s", w.Body.String())
+	}
+}
+
+func TestGuardrailsObserveDoesNotAlter(t *testing.T) {
+	leakyJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"reach bob@example.com"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`
+	engine, _ := guardrailEngine(t, leakyJSON, []config.GuardrailPolicyConfig{
+		{Name: "obs-pii", Phase: "both", Action: "observe", Detectors: map[string]config.GuardrailDetectorConfig{"pii": {}}},
+	})
+	w := guardrailChat(engine, "hello")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "bob@example.com") {
+		t.Fatalf("observe altered/blocked the response: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestChatHedgingCutsTailLatency(t *testing.T) {
 	openaiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(500 * time.Millisecond) // slow tail

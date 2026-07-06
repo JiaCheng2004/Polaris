@@ -156,10 +156,16 @@ func (h *ChatHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	if h.checkRequestGuardrails(c, chatReq) {
+		return
+	}
 	response, outcome, fallbackModel, err := h.executeConversation(c, chatReq, "responses")
 	if err != nil {
 		middleware.SetRequestOutcome(c, outcome)
 		writeConversationTargetError(c, "responses", err)
+		return
+	}
+	if h.applyResponseGuardrails(c, response, outcome.Model) {
 		return
 	}
 	if fallbackModel != "" {

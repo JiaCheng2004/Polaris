@@ -10,6 +10,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
+	"github.com/JiaCheng2004/Polaris/internal/guardrails"
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/reliability"
@@ -26,6 +27,7 @@ type ChatHandler struct {
 	store       store.Store
 	reliability *reliability.Manager
 	router      *routing.Router
+	guardrails  *guardrails.Engine
 }
 
 type chatTarget struct {
@@ -35,7 +37,7 @@ type chatTarget struct {
 }
 
 func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store, reliabilityManager *reliability.Manager) *ChatHandler {
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter()}
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter(), guardrails: guardrails.NewEngine(recorder)}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {
@@ -46,6 +48,11 @@ func (h *ChatHandler) Complete(c *gin.Context) {
 	}
 	if err := validateChatRequest(&req); err != nil {
 		httputil.WriteError(c, err)
+		return
+	}
+
+	// Request-phase guardrails run after validate, before routing/cache.
+	if h.checkRequestGuardrails(c, &req) {
 		return
 	}
 
@@ -104,6 +111,11 @@ func (h *ChatHandler) Complete(c *gin.Context) {
 		h.metrics.IncFailover(primary.model.ID, fallbackModel)
 		c.Header("X-Polaris-Resolved-Model", outcome.Model)
 		c.Header("X-Polaris-Resolved-Provider", outcome.Provider)
+	}
+	// Response-phase guardrails run before caching/writing (the cache stores the
+	// post-redaction text).
+	if h.applyResponseGuardrails(c, response, outcome.Model) {
+		return
 	}
 	middleware.SetRequestOutcome(c, outcome)
 	if cacheCtl != nil && candidate.Enabled && fallbackModel == "" {
