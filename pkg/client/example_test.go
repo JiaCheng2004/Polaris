@@ -57,15 +57,15 @@ func ExampleClient_StreamChatCompletion() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer stream.Close()
 	for stream.Next() {
 		for _, choice := range stream.Chunk().Choices {
 			fmt.Print(choice.Delta.Content)
 		}
 	}
 	if err := stream.Err(); err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
+	_ = stream.Close()
 }
 
 func ExampleClient_CreateEmbedding() {
