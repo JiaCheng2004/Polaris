@@ -14,7 +14,7 @@ GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test bench lint check-layering security-check license-check reuse-check doc-check openapi-lint migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test bench lint check-layering security-check license-check reuse-check sdk-ts doc-check openapi-lint migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -104,6 +104,9 @@ license-check:
 
 reuse-check:
 	python3 -m reuse lint
+
+sdk-ts:
+	cd sdk/typescript && npm install && npm run typecheck && npm test && npm run build && npm publish --dry-run
 
 migrate:
 	go run ./cmd/polaris --config $(CONFIG) --migrate

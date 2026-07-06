@@ -1,0 +1,51 @@
+{
+  "name": "@polaris/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for the Polaris AI gateway — one typed, OpenAI-compatible client for chat, embeddings, images, audio, and more.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JiaCheng2004/Polaris.git",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://github.com/JiaCheng2004/Polaris/tree/main/sdk/typescript",
+  "keywords": [
+    "polaris",
+    "ai",
+    "gateway",
+    "llm",
+    "openai",
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "generate": "openapi-ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.99.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}
