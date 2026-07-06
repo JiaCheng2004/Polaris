@@ -64,6 +64,7 @@ type RequestOutcome struct {
 	Characters         int
 	Images             int
 	UnitCounts         map[string]int
+	FinishReasons      []string
 }
 
 func SetAuthContext(c *gin.Context, auth AuthContext) {

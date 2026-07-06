@@ -170,6 +170,22 @@ func onCompleteSuccess(response *modality.ChatResponse, outcome *middleware.Requ
 	outcome.CompletionTokens = response.Usage.CompletionTokens
 	outcome.TotalTokens = response.Usage.TotalTokens
 	outcome.TokenSource = providerUsageSource(response.Usage)
+	outcome.FinishReasons = collectFinishReasons(response)
+}
+
+func collectFinishReasons(response *modality.ChatResponse) []string {
+	if response == nil {
+		return nil
+	}
+	var reasons []string
+	seen := map[string]bool{}
+	for _, choice := range response.Choices {
+		if r := choice.FinishReason; r != "" && !seen[r] {
+			seen[r] = true
+			reasons = append(reasons, r)
+		}
+	}
+	return reasons
 }
 
 func noAvailableProviderError() error {

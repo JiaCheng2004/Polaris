@@ -80,5 +80,13 @@ func (h *HealthHandler) Readiness(c *gin.Context) {
 		status["status"] = "not_ready"
 	}
 
+	// Passive provider-health section (no active probes): breaker state, error
+	// rate, and in-flight per provider, as accumulated from real traffic.
+	if h.reliability != nil {
+		if views := h.reliability.Snapshot(); len(views) > 0 {
+			status["reliability"] = views
+		}
+	}
+
 	c.JSON(statusCode, status)
 }

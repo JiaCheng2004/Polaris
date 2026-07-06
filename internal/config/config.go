@@ -357,6 +357,9 @@ type TracesConfig struct {
 	Insecure    bool    `yaml:"insecure"`
 	ServiceName string  `yaml:"service_name"`
 	SampleRatio float64 `yaml:"sample_ratio"`
+	// GenAI opts into OpenTelemetry GenAI semantic-convention span attributes
+	// (gen_ai.*) at request-span close. No prompt/completion content is captured.
+	GenAI bool `yaml:"genai"`
 }
 
 type AuditConfig struct {

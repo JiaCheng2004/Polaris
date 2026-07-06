@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -72,8 +73,41 @@ func Tracing() gin.HandlerFunc {
 		if outcome.MCPBinding != "" {
 			span.SetAttributes(attribute.String("polaris.mcp_binding_id", outcome.MCPBinding))
 		}
+		if outcome.Model != "" && genaiTracingEnabled(c) {
+			// OpenTelemetry GenAI semantic conventions (opt-in). No prompt or
+			// completion content is captured — metadata only.
+			span.SetAttributes(
+				attribute.String("gen_ai.operation.name", genaiOperation(outcome.Modality)),
+				attribute.String("gen_ai.request.model", outcome.Model),
+				attribute.String("gen_ai.response.model", outcome.Model),
+			)
+			if outcome.Provider != "" {
+				span.SetAttributes(attribute.String("gen_ai.system", outcome.Provider))
+			}
+			if outcome.PromptTokens > 0 {
+				span.SetAttributes(attribute.Int("gen_ai.usage.input_tokens", outcome.PromptTokens))
+			}
+			if outcome.CompletionTokens > 0 {
+				span.SetAttributes(attribute.Int("gen_ai.usage.output_tokens", outcome.CompletionTokens))
+			}
+			if len(outcome.FinishReasons) > 0 {
+				span.SetAttributes(attribute.StringSlice("gen_ai.response.finish_reasons", outcome.FinishReasons))
+			}
+		}
 		if status >= http.StatusBadRequest {
 			span.SetStatus(codes.Error, http.StatusText(status))
 		}
 	}
+}
+
+func genaiTracingEnabled(c *gin.Context) bool {
+	snapshot, ok := GetRuntimeSnapshot(c)
+	return ok && snapshot != nil && snapshot.Config != nil && snapshot.Config.Observability.Traces.GenAI
+}
+
+func genaiOperation(m modality.Modality) string {
+	if m == "" || m == modality.ModalityChat {
+		return "chat"
+	}
+	return string(m)
 }

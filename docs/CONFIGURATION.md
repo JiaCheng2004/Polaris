@@ -73,6 +73,19 @@ Local defaults bind Polaris to `127.0.0.1` with `auth.mode: none`. Use `0.0.0.0`
 
 `runtime.server.cors` is config-driven. The local default allows localhost and 127.0.0.1 browser origins, including wildcard ports such as `http://localhost:*`. Production configs should list exact application origins. `allow_credentials: true` is rejected when `allowed_origins` contains `*`.
 
+`runtime.server.idle_timeout` (default `120s`) bounds idle keep-alive connections. Long streaming responses reset their write deadline per frame, so they are not truncated by `runtime.server.write_timeout`.
+
+## Reliability
+
+`runtime.reliability` tunes the process-lifetime reliability manager (circuit breaking, load shedding, retry budgets, idempotency). Everything defaults to off/permissive, so behavior is unchanged until you opt in.
+
+- `runtime.reliability.breaker_defaults` — per-provider circuit breaker: `error_rate` (default `0.5`), `min_samples` (`20`), `open_for` (`30s`), `half_open_probes` (`3`). A provider whose windowed error rate crosses the threshold is demoted in failover (its dead-primary timeout is skipped) until it recovers.
+- `runtime.reliability.shed` — load shedding, disabled by default: `enabled`, `global_max_inflight` (front-door cap → `503 overloaded` + `Retry-After`), `per_provider_max_inflight`.
+- `runtime.reliability.retry_budget_ratio` — failover attempts are capped at this fraction of recent successes (default `0.2`) to prevent retry storms during an outage.
+- `runtime.reliability.idempotency` — `enabled` (default `true`), `ttl` (`24h`). Job-submit endpoints (`/v1/batches`, `/v1/video/generations`, `/v1/music/generations`, `/v1/audio/notes`, `/v1/audio/podcasts`) honor an `Idempotency-Key` request header: a repeated key replays the original response, and a reused key with a different request body returns `409 idempotency_key_reuse`.
+
+`runtime.cache.rate_limit.fail_mode` controls behavior when the primary rate limiter (Redis) is unavailable: `open` (default) degrades to best-effort process-local counting; `closed` returns `503` to cap runaway provider spend.
+
 ## Files
 
 The files surface is enabled by `runtime.files.enabled` and stores small uploads inline in the database. Larger direct uploads require an opt-in blob store.
@@ -410,6 +423,7 @@ When `runtime.observability.traces.enabled` is true, Polaris exports OTLP traces
 - `runtime.observability.traces.insecure`
 - `runtime.observability.traces.service_name`
 - `runtime.observability.traces.sample_ratio`
+- `runtime.observability.traces.genai` — opt into OpenTelemetry GenAI semantic-convention span attributes (`gen_ai.*`: system, request/response model, usage tokens, finish reasons). Metadata only; no prompt or completion content is captured. Default `false`.
 
 The emitted trace tree is deeper than a single HTTP span. Polaris adds child spans for auth lookup, rate-limit and budget checks, cache lookup/store, provider HTTP calls, fallback attempts, and MCP/tool execution, while keeping prompts, raw bodies, and secret material out of trace attributes.
 
