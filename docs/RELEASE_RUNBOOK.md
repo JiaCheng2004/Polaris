@@ -15,20 +15,22 @@ in order. Do not skip the audit gate.
 ## 1. License & authorship audit (hard gate)
 
 ```bash
-go install github.com/google/go-licenses@latest
-go-licenses report ./... > /tmp/licenses.txt   # all deps must be Apache-compatible
+make license-check   # go-licenses v2: every dep must be Apache-compatible
+make reuse-check     # REUSE 3.3 (SPDX) compliance across the tree
+go run github.com/google/go-licenses/v2@latest report ./cmd/polaris ./pkg/client > /tmp/licenses.txt
 ```
 
-- Review `/tmp/licenses.txt`: every dependency must be Apache-2.0-compatible
-  (Apache/MIT/BSD/ISC). Reciprocal licenses (GPL/AGPL/LGPL) are blockers.
+- `make license-check` fails on any reciprocal (GPL/AGPL/LGPL) dependency; the
+  current tree is all Apache/MIT/BSD. Review `/tmp/licenses.txt` for the full
+  inventory that seeds `NOTICE`.
 - Verify embedded-asset provenance: `internal/provider/catalog/models.yaml`,
-  `internal/pricing/data/*.yaml`, and the astpb generated types (documented in
-  `NOTICE`).
+  `internal/pricing/data/*.yaml`, and the astpb generated types (declared in
+  `NOTICE` + `REUSE.toml`).
 - Confirm sole authorship of all commits (the relicense prerequisite).
 
-**If the audit fails, stop.** Reconcile findings into `NOTICE` or remove the
-offending dependency before proceeding. The relicense is only sound once this
-passes.
+**If the audit fails, stop.** Reconcile findings into `NOTICE`/`REUSE.toml` or
+remove the offending dependency before proceeding. The relicense is only sound
+once this passes.
 
 ## 2. Hygiene sweep
 
@@ -41,15 +43,15 @@ git ls-files | grep -E "BLUEPRINT.md|AGENTS.md|CLAUDE.md|spec/phase_" # dropped 
 ## 3. Fresh curated history
 
 ```bash
-git checkout --orphan v1 overhaul/v1
-git rm -r --cached BLUEPRINT.md AGENTS.md CLAUDE.md spec/phase_* 2>/dev/null || true
-rm -rf spec/phase_*        # keep spec/openapi
-# Stage the tree in a curated Conventional-Commit sequence (10-15 commits):
-#   contracts -> apierror/obs/transport -> provider kit + providers -> store ->
-#   gateway/middleware -> reliability -> routing -> guardrails -> semcache ->
-#   mcp -> SDKs -> docs -> CI/release/community.
-# No AI attribution anywhere in messages or trailers.
+scripts/build-launch-history.sh          # builds a local orphan `v1` (16 commits)
+git log --oneline v1                      # inspect the curated narrative
+git checkout v1 && go build ./... && go test -race ./...   # verify the tree
 ```
+
+The script drops `spec/phase_*` (BLUEPRINT/AGENTS/CLAUDE are already gitignored),
+lays down 16 Conventional Commits along the dependency layering, and self-checks
+that the final tree is byte-identical to `overhaul/v1` minus the dropped files.
+It never pushes. No AI attribution appears in any message or trailer.
 
 - Archive the full original history to a **private mirror** before any force-push.
 - Force-push `v1` as the new `main`; set it as the default branch; delete stale
@@ -58,14 +60,17 @@ rm -rf spec/phase_*        # keep spec/openapi
 ## 4. Tag & release
 
 ```bash
-git tag -a v1.0.0 -m "Polaris v1.0.0"
+# Signed annotated tag — GitHub verifies GPG/SSH signatures (configure signing first).
+git tag -s v1.0.0 -m "Polaris v1.0.0"
 git push origin v1.0.0        # triggers release.yml -> goreleaser
 ```
 
 `release.yml` runs `make release-check` then `goreleaser release --clean`,
-producing signed multi-arch binaries + `checksums.txt` + SBOMs attached to the
-GitHub Release. `publish-image.yml` fires on the same tag for the signed
-multi-arch container image.
+producing multi-arch binaries + `checksums.txt` + **both SPDX and CycloneDX
+SBOMs** + **cosign keyless signatures**, and then attaches a **SLSA build
+provenance attestation** (`actions/attest-build-provenance`) — all attached to
+the GitHub Release. `publish-image.yml` fires on the same tag for the signed,
+attested multi-arch container image.
 
 ## 5. Smoke test the release
 
@@ -84,9 +89,14 @@ This is the end-state validation against real providers.
 
 ## 7. Publish & register
 
-- npm: `cd sdk/typescript && npm publish` (once the TS SDK ships).
+- Docs: `mike deploy --push --update-aliases 1.0 latest` publishes the versioned
+  MkDocs site to GitHub Pages.
+- npm (TS SDK): publish via **npm OIDC Trusted Publishing** from CI (npm CLI
+  ≥ 11.5.1) — configure the trusted publisher once; provenance is then generated
+  automatically (no `--provenance` flag, no long-lived npm token).
 - pkg.go.dev auto-indexes `github.com/JiaCheng2004/Polaris/pkg/client` on tag.
-- Apply for the OpenSSF Best Practices badge; the Scorecard workflow runs weekly.
+- Apply for the OpenSSF Best Practices badge at bestpractices.dev; the Scorecard
+  workflow already publishes results weekly.
 - Submit to relevant awesome-lists.
 
 ## Rollback
