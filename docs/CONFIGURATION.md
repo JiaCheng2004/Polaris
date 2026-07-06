@@ -667,3 +667,34 @@ Use these for repo-local release validation:
 `make release-check` uses `stack-validate`, not `stack-config`, so shared CI logs do not print environment-expanded Compose configuration. Run `stack-config` only when you intentionally need a local rendered config.
 
 The live-smoke targets default `LIVE_SMOKE_TIMEOUT` to `45m`; override it only when running a deliberately smaller provider slice. Provider credential, quota, billing, and entitlement failures are manual blockers for claiming live-provider proof on the affected provider paths, but they are not repo-local implementation blockers. The default open-source contributor gate does not require a production Postgres/Redis load environment.
+
+## Additional Configuration Keys
+
+Keys accepted by the loader that are not covered inline above. `make docs-config-check` asserts every config struct `yaml:` tag is documented somewhere under `docs/`; the feature guides ([Guardrails](GUARDRAILS.md), [Semantic Cache](SEMANTIC_CACHE.md), [MCP Gateway](MCP.md)) cover their blocks in depth.
+
+| Key | Type | Description |
+|---|---|---|
+| `admin_key_hash` | string | SHA-256 hash of the bootstrap admin key (auth). |
+| `project_name` | string | Default project name used when auto-provisioning. |
+| `allowed_methods` | list | CORS: HTTP methods allowed cross-origin. |
+| `allowed_headers` | list | CORS: request headers allowed cross-origin. |
+| `exposed_headers` | list | CORS: response headers exposed to the browser. |
+| `max_age` | duration | CORS: preflight cache lifetime. |
+| `read_timeout` | duration | HTTP server: maximum time to read a request. |
+| `shutdown_timeout` | duration | HTTP server: graceful-drain window on shutdown. |
+| `max_connections` | int | HTTP server: max concurrent connections (0 = unlimited). |
+| `log_buffer_size` | int | Usage logging: buffered channel capacity. |
+| `log_flush_interval` | duration | Usage logging: batch flush cadence. |
+| `log_retention_days` | int | Usage logging: retention in days (0 = keep). |
+| `bucket` | string | Blob store: object-storage bucket name. |
+| `use_ssl` | bool | Blob store: use TLS to the object store. |
+| `secret_access_key` | string | Blob store: S3-compatible secret (use `${ENV}`). |
+| `weights` | object | Adaptive routing: per-signal scoring weights. |
+| `hedge` | object | Routing: hedged-request configuration. |
+| `delay_ms` | int | Routing hedge: delay before firing a hedged attempt. |
+| `max_extra` | int | Routing hedge: maximum extra hedged attempts. |
+| `chunking` | object | File understanding: chunking configuration. |
+| `max_chars` | int | File-understanding chunking: maximum characters per chunk. |
+| `overlap_chars` | int | File-understanding chunking: overlap between adjacent chunks. |
+| `mime_types` | list | File understanding: eligible MIME types. |
+| `file_classes` | list | File understanding: eligible file classes. |

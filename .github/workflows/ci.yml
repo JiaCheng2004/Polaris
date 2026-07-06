@@ -33,6 +33,9 @@ jobs:
       - name: OpenAPI quality (vacuum)
         run: make openapi-lint
 
+      - name: Config-key doc completeness
+        run: make docs-config-check
+
       - name: gosec
         run: make security-check
 
