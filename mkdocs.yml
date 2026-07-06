@@ -70,5 +70,12 @@ nav:
   - Contributing:
       - Contributing: CONTRIBUTING.md
       - Adding a Provider: ADDING_PROVIDER.md
+      - Architecture Decisions:
+          - Overview: adr/README.md
+          - 1. Stateless & config-driven: adr/0001-stateless-config-driven.md
+          - 2. Strict layering: adr/0002-strict-layering.md
+          - 3. Wire compatibility: adr/0003-wire-compatibility.md
+          - 4. Reliability & frontier features: adr/0004-reliability-and-frontier-features.md
+          - 5. Apache-2.0 license: adr/0005-apache-2-license.md
   - Release:
       - Release Runbook: RELEASE_RUNBOOK.md
