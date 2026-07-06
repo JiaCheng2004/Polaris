@@ -21,14 +21,13 @@ import (
 //
 //	go test ./internal/gateway -run TestGoldenWireContracts -update-golden
 //
-// The golden suite is the campaign-wide safety net (plan §7.1): it replays a
-// fixed set of requests through the full engine against deterministic provider
-// mocks and asserts the client-visible response is byte-identical to the
-// committed fixture. It guards the surfaces most endangered by the Phase 1
-// transport/provider rewrite — provider request/response translation, SSE
-// framing, and the OpenAI-compatible error envelope — so any accidental wire
-// change fails loudly. Route/method parity for the full endpoint set is
-// enforced separately by tests/contract.
+// The golden suite is the wire-compatibility safety net: it replays a fixed set
+// of requests through the full engine against deterministic provider mocks and
+// asserts the client-visible response is byte-identical to the committed
+// fixture. It guards the surfaces most sensitive to internal change — provider
+// request/response translation, SSE framing, and the OpenAI-compatible error
+// envelope — so any accidental wire change fails loudly. Route/method parity for
+// the full endpoint set is enforced separately by tests/contract.
 var updateGolden = flag.Bool("update-golden", false, "regenerate golden wire-compat fixtures")
 
 type goldenCase struct {

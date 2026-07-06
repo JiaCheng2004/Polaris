@@ -245,7 +245,7 @@ Use `external` when Polaris is embedded behind a product backend. Use `virtual_k
 
 ## Current Phase Guidance
 
-Phase 5 music hardening is current. The shipped runtime supports:
+The shipped runtime supports:
 
 - `providers.openai`
 - `providers.anthropic`
@@ -539,7 +539,7 @@ When MiniMax music is enabled, set `providers.minimax.transport.base_url` explic
 
 ## Hot Reload Behavior
 
-Phase 2 hot reload updates the runtime routing layer without restarting the HTTP server. Reloadable settings include:
+Hot reload updates the runtime routing layer without restarting the HTTP server. Reloadable settings include:
 
 - provider credentials, base URLs, retry policy, and model catalog references
 - `routing.aliases`

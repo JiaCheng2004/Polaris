@@ -1,32 +1,48 @@
 # Changelog
 
-This repository is preparing the Polaris `v1.0.0` release. Do not mark `v1.0.0` released until the strict live-smoke matrix for the release set passes. ElevenLabs music remains preview-only unless explicitly opted into smoke validation.
+All notable changes to Polaris are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Polaris follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - Pending release
+## [1.0.0]
 
-### Added
+Initial public release: a stateless, config-driven, multi-modality AI gateway
+that presents one OpenAI-compatible API across many providers.
 
-- Multi-provider video support across ByteDance Seedance, OpenAI Sora, and Google Vertex Veo.
-- Full-duplex audio sessions over the Polaris session contract with OpenAI and ByteDance cascaded execution.
-- Broad sync response caching with `X-Polaris-Cache` markers.
-- First-class music support with unified generation, edit, stems, lyrics, plans, async jobs, content download, and Go SDK helpers.
-- MiniMax music generation, cover edit, and lyrics adapters.
-- ElevenLabs music generation, streaming generation, stems, and plan adapters in preview.
-- Public Go SDK coverage for chat, embeddings, images, voice, video, audio sessions, usage, models, and admin keys.
-- Committed live-smoke validation assets in `config/polaris.live-smoke.yaml` and `tests/e2e/live_smoke_test.go`.
-- Phase 4 close-out record in `spec/phase_4_video_audio_polish/4E_phase_4_hardening_and_acceptance.md`.
-- Phase 5 music close-out record in `spec/phase_5_music/5B_phase_5_hardening_and_acceptance.md`.
+### Gateway
 
-### Changed
+- Unified `/v1` API for chat, responses, messages, embeddings, images, video,
+  voice, audio sessions, transcription, translation, notes, podcasts, and music.
+- 24 provider integrations across chat, embeddings, image, audio, video, and
+  music, with `provider/model` naming, aliases, and family-aware routing.
+- Auth modes: none, static keys, external signed headers, virtual keys, and a
+  control plane for projects, keys, policies, budgets, tools, and MCP bindings.
+- SQLite and PostgreSQL stores; in-memory and Redis caches; Prometheus metrics,
+  structured logs, and optional OpenTelemetry tracing (incl. GenAI semconv).
 
-- `GET /v1/usage` now accepts `modality=audio`, matching the shipped runtime logging path.
-- Release readiness now includes `make release-check`, `make live-smoke`, and the updated load-validation checklist for music, video, and audio, with ElevenLabs music smoke gated behind explicit preview opt-in.
-- Operator docs now describe the `v1.0.0` close-out, explicit MiniMax regional config, and async guidance for long-running music jobs in a single consistent way.
+### Reliability
 
-### Fixed
+- Circuit breaking, health-aware adaptive routing, jittered retries with
+  `Retry-After`, load shedding, request hedging, and idempotency keys.
+- Graceful shutdown with WebSocket drain and long-lived SSE survival; durable,
+  never-block-the-response usage and audit logging.
 
-- OpenAI GPT Image inline output is normalized correctly back into Polaris `url|b64_json` responses.
-- Google embedding responses correctly handle both `embedContent` and `batchEmbedContents`.
-- Audio usage can now be queried the same way as the other shipped modalities.
-- Provider HTTP and transport failures now normalize through one shared Polaris error translator with stable subcodes such as `quota_exceeded`.
-- Music sync and async timeout paths now preserve `timeout_error / provider_timeout` while directing operators toward `mode=async` or a longer provider timeout for long-running jobs.
+### Frontier features
+
+- **Guardrails** engine: PII, secrets, and prompt-injection detection plus
+  webhook and LLM-judge remote detectors, with observe/redact/block actions on
+  both unary and streaming responses.
+- **Semantic cache**: exact (SHA-256) + embedding (cosine) layers with
+  security-grade project/model/settings/epoch isolation and graceful degradation.
+- **MCP-native gateway**: stateless streamable-HTTP Model Context Protocol server
+  and upstream client with tool aggregation and an OAuth 2.1 resource server.
+
+### SDKs & tooling
+
+- Go SDK (`pkg/client`) covering every surface, with package docs and examples.
+- Signed, multi-arch container images (cosign + SLSA provenance + SBOM) and
+  signed release binaries via GoReleaser.
+
+### License
+
+- Released under the Apache License 2.0.
