@@ -1,0 +1,21 @@
+version = 1
+
+# Polaris is Apache-2.0. This single-file REUSE annotation (REUSE Spec 3.3)
+# declares licensing for the whole tree without per-file SPDX headers.
+# See https://reuse.software/spec-3.3/ and the LICENSES/ directory.
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Polaris Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Generated Go message types from ByteDance/Volcengine's published AST
+# (Audio-Streaming Transport) protocol-buffer definitions. Only the generated Go
+# is vendored; the .proto sources are ByteDance/Volcengine's. See
+# internal/provider/bytedance/astpb/README.md and the NOTICE file for provenance.
+[[annotations]]
+path = "internal/provider/bytedance/astpb/**"
+precedence = "override"
+SPDX-FileCopyrightText = "ByteDance/Volcengine; generated types vendored by the Polaris Authors"
+SPDX-License-Identifier = "Apache-2.0"

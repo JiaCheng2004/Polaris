@@ -47,9 +47,19 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+# Per-artifact SBOMs in both SPDX (NTIA / EO-14028 compliance) and CycloneDX
+# (security tooling) via syft.
 sboms:
-  - id: archive
+  - id: spdx
     artifacts: archive
+    documents:
+      - "${artifact}.spdx.sbom.json"
+    args: ["$artifact", "--output", "spdx-json=$document"]
+  - id: cyclonedx
+    artifacts: archive
+    documents:
+      - "${artifact}.cdx.sbom.json"
+    args: ["$artifact", "--output", "cyclonedx-json=$document"]
 
 # Keyless cosign signing of the checksums file (matches publish-image.yml's
 # cosign identity model). Requires cosign in the release environment.

@@ -7,7 +7,8 @@ on:
 
 permissions:
   contents: write # create the GitHub Release and upload assets
-  id-token: write # cosign keyless signing
+  id-token: write # cosign keyless signing + SLSA provenance
+  attestations: write # SLSA build-provenance attestations
 
 jobs:
   release:
@@ -37,3 +38,13 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # GitHub-native SLSA build provenance (Build L2; L3 in an isolated
+      # reusable workflow), complementing GoReleaser's cosign signatures + SBOMs.
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
