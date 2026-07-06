@@ -27,6 +27,10 @@ func TestTracingRecordsProviderAndCacheSpans(t *testing.T) {
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/v1/embeddings" {
+			_, _ = w.Write([]byte(fixedEmbeddingResponse))
+			return
+		}
 		_, _ = w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
 	}))
 	defer upstream.Close()
@@ -43,6 +47,7 @@ func TestTracingRecordsProviderAndCacheSpans(t *testing.T) {
 	cfg.Cache.ResponseCache.TTL = time.Hour
 	cfg.Cache.ResponseCache.SimilarityThreshold = 0.95
 	cfg.Cache.ResponseCache.MaxEntriesPerModel = 10
+	enableSemanticCacheForTest(cfg)
 
 	sqliteStore := testSQLiteStore(t)
 	registry, _, err := provider.New(cfg)

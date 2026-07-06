@@ -180,6 +180,8 @@ paths:
   /v1/mcp/bindings:
     get: {operationId: listMCPBindings, tags: [control-plane], responses: {"200": {description: MCP binding list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
     post: {operationId: createMCPBinding, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/admin/cache/purge:
+    post: {operationId: purgeSemanticCache, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
 components:
   parameters:

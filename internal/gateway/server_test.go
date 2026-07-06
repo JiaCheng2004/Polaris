@@ -1753,11 +1753,15 @@ func TestEmbeddingCacheHitPreservesUsageOutcome(t *testing.T) {
 func TestSemanticChatCacheHitPreservesUsageOutcome(t *testing.T) {
 	upstreamCalls := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/v1/embeddings" {
+			_, _ = w.Write([]byte(fixedEmbeddingResponse))
+			return
+		}
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		upstreamCalls++
-		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"id":"chatcmpl-cache",
 			"object":"chat.completion",
@@ -1781,6 +1785,7 @@ func TestSemanticChatCacheHitPreservesUsageOutcome(t *testing.T) {
 	cfg.Cache.ResponseCache.TTL = time.Hour
 	cfg.Cache.ResponseCache.SimilarityThreshold = 0.95
 	cfg.Cache.ResponseCache.MaxEntriesPerModel = 10
+	enableSemanticCacheForTest(cfg)
 
 	sqliteStore := testSQLiteStore(t)
 	registry, warnings, err := provider.New(cfg)
@@ -1821,7 +1826,7 @@ func TestSemanticChatCacheHitPreservesUsageOutcome(t *testing.T) {
 		}
 		want := "miss"
 		if i == 1 {
-			want = "hit"
+			want = "hit-semantic"
 		}
 		if got := res.Header().Get("X-Polaris-Cache"); got != want {
 			t.Fatalf("request %d: expected X-Polaris-Cache=%s, got %q", i+1, want, got)
@@ -3297,6 +3302,95 @@ func TestGuardrailsRedactResponse(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "[REDACTED:pii.email]") {
 		t.Fatalf("response not redacted: %s", w.Body.String())
+	}
+}
+
+// enableSemanticCacheForTest turns on the embedding semantic cache and registers
+// the embedding model on the openai provider.
+func enableSemanticCacheForTest(cfg *config.Config) {
+	op := cfg.Providers["openai"]
+	if op.Models == nil {
+		op.Models = map[string]config.ModelConfig{}
+	}
+	op.Models["text-embedding-3-small"] = config.ModelConfig{Modality: modality.ModalityEmbed}
+	cfg.Providers["openai"] = op
+	cfg.Cache.ResponseCache.Semantic = config.SemanticCacheConfig{
+		Enabled: true, Embedder: "registry", EmbeddingModel: "openai/text-embedding-3-small", MaxTurns: 4, MaxTemperature: 0.3,
+	}
+}
+
+// fixedEmbeddingResponse is a semantic-cache embedding reply where every input
+// maps to the same vector, so any second request is a guaranteed hit.
+const fixedEmbeddingResponse = `{"object":"list","data":[{"object":"embedding","index":0,"embedding":[1.0,0.0,0.0,0.0]}],"model":"text-embedding-3-small","usage":{"prompt_tokens":1,"total_tokens":1}}`
+
+func TestSemanticCacheHitE2E(t *testing.T) {
+	chatCalls := 0
+	chatJSON := `{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"four"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "embeddings") {
+			// Fixed vector: any query embeds identically, so the second (differently
+			// worded) request is a guaranteed semantic hit.
+			_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","index":0,"embedding":[1.0,0.0,0.0,0.0]}],"model":"text-embedding-3-small","usage":{"prompt_tokens":1,"total_tokens":1}}`))
+			return
+		}
+		chatCalls++
+		_, _ = w.Write([]byte(chatJSON))
+	}))
+	defer upstream.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{"openai": upstream.URL + "/v1"})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*"}},
+	}
+	// Enable the embedding model used by the semantic cache.
+	op := cfg.Providers["openai"]
+	op.Models["text-embedding-3-small"] = config.ModelConfig{Modality: modality.ModalityEmbed}
+	cfg.Providers["openai"] = op
+	cfg.Cache.ResponseCache = config.ResponseCache{
+		Enabled: true, TTL: time.Hour, MaxEntriesPerModel: 100, SimilarityThreshold: 0.9,
+		Semantic: config.SemanticCacheConfig{Enabled: true, Embedder: "registry", EmbeddingModel: "openai/text-embedding-3-small", MaxTurns: 4, MaxTemperature: 0.3},
+	}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store: testSQLiteStore(t), Cache: cache.NewMemory(), Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	do := func(content string) *httptest.ResponseRecorder {
+		body := `{"model":"openai/gpt-4o","messages":[{"role":"user","content":"` + content + `"}]}`
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer secret")
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		return w
+	}
+
+	w1 := do("what is 2+2")
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first request status = %d body=%s", w1.Code, w1.Body.String())
+	}
+	w2 := do("compute two plus two please")
+	if w2.Code != http.StatusOK {
+		t.Fatalf("second request status = %d body=%s", w2.Code, w2.Body.String())
+	}
+	if chatCalls != 1 {
+		t.Fatalf("chat provider called %d times, want 1 (2nd request should be a semantic hit)", chatCalls)
+	}
+	if got := w2.Header().Get("X-Polaris-Cache"); got != "hit-semantic" {
+		t.Fatalf("2nd request X-Polaris-Cache = %q, want hit-semantic", got)
+	}
+	if !strings.Contains(w2.Body.String(), "four") {
+		t.Fatalf("2nd request did not return the cached body: %s", w2.Body.String())
 	}
 }
 

@@ -78,6 +78,14 @@ runtime:
       ttl: 24h
       max_entries_per_model: 100
       similarity_threshold: 0.95
+      # Embedding (L2) semantic cache. Off by default; when enabled, paraphrased
+      # requests hit the cache. Isolated per model/settings/project/epoch.
+      semantic:
+        enabled: false
+        embedder: registry
+        embedding_model: openai/text-embedding-3-small
+        max_turns: 4
+        max_temperature: 0.3
 
   files:
     enabled: true

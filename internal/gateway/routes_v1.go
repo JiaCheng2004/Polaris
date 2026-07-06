@@ -111,4 +111,5 @@ func registerV1ControlPlaneRoutes(v1 *gin.RouterGroup, deps Dependencies, handle
 	control.GET("/toolsets", handlers.controlPlane.ListToolsets)
 	control.POST("/mcp/bindings", handlers.controlPlane.CreateMCPBinding)
 	control.GET("/mcp/bindings", handlers.controlPlane.ListMCPBindings)
+	control.POST("/admin/cache/purge", handlers.chat.PurgeSemanticCache)
 }

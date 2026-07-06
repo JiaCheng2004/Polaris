@@ -2252,6 +2252,18 @@ Registers MCP broker bindings.
 | `headers` | object | no | Static headers injected into upstream proxy requests. |
 | `enabled` | boolean | no | Defaults to `true`. |
 
+### `POST /v1/admin/cache/purge`
+
+Drops semantic-cache entries. Admin-only. An empty body purges everything; the
+optional filters scope the purge.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `model` | string | no | Only purge entries for this model (e.g. `openai/gpt-4o`). |
+| `project` | string | no | Only purge entries for this project. |
+
+Returns `{"object": "cache.purge", "purged": <namespaces removed>}`.
+
 ### Legacy compatibility: `POST /v1/keys`, `GET /v1/keys`, `DELETE /v1/keys/:id`
 
 These endpoints remain implemented for compatibility.

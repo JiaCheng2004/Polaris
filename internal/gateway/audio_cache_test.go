@@ -464,6 +464,11 @@ func TestEmbeddingsEndpointUsesResponseCache(t *testing.T) {
 func TestChatCompletionUsesSemanticResponseCache(t *testing.T) {
 	var upstreamCalls int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/embeddings" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fixedEmbeddingResponse))
+			return
+		}
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -492,6 +497,7 @@ func TestChatCompletionUsesSemanticResponseCache(t *testing.T) {
 	cfg.Cache.ResponseCache.TTL = time.Hour
 	cfg.Cache.ResponseCache.SimilarityThreshold = 0.95
 	cfg.Cache.ResponseCache.MaxEntriesPerModel = 10
+	enableSemanticCacheForTest(cfg)
 
 	engine := newTestEngine(t, cfg)
 	requests := []string{
@@ -509,7 +515,7 @@ func TestChatCompletionUsesSemanticResponseCache(t *testing.T) {
 		}
 		want := "miss"
 		if i == 1 {
-			want = "hit"
+			want = "hit-semantic"
 		}
 		if got := res.Header().Get("X-Polaris-Cache"); got != want {
 			t.Fatalf("request %d: expected X-Polaris-Cache=%s, got %q", i+1, want, got)

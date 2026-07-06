@@ -37,6 +37,9 @@ type Recorder struct {
 	rateLimitDegraded    *prometheus.CounterVec
 	guardrailEvals       *prometheus.CounterVec
 	guardrailLatency     prometheus.Histogram
+	semcacheSimilarity   prometheus.Histogram
+	semcacheSavings      *prometheus.CounterVec
+	semcacheDegraded     prometheus.Gauge
 }
 
 func NewRecorder() *Recorder {
@@ -138,6 +141,19 @@ func NewRecorder() *Recorder {
 			Name: "polaris_guardrail_evaluations_total",
 			Help: "Total guardrail detector matches by detector, action, and phase.",
 		}, []string{"detector", "action", "phase"}),
+		semcacheSimilarity: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "polaris_semcache_similarity",
+			Help:    "Cosine similarity of semantic cache hits.",
+			Buckets: []float64{0.5, 0.7, 0.8, 0.85, 0.9, 0.92, 0.95, 0.97, 0.99, 1.0},
+		}),
+		semcacheSavings: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "polaris_semcache_savings_usd",
+			Help: "Estimated USD saved by semantic cache hits.",
+		}, []string{"model"}),
+		semcacheDegraded: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "polaris_semcache_degraded",
+			Help: "1 when the semantic cache is in exact-only degraded mode.",
+		}),
 		guardrailLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "polaris_guardrail_latency_seconds",
 			Help:    "Guardrail evaluation latency in seconds.",
@@ -170,6 +186,9 @@ func NewRecorder() *Recorder {
 		recorder.rateLimitDegraded,
 		recorder.guardrailEvals,
 		recorder.guardrailLatency,
+		recorder.semcacheSimilarity,
+		recorder.semcacheSavings,
+		recorder.semcacheDegraded,
 	)
 
 	return recorder
@@ -331,6 +350,34 @@ func (r *Recorder) ObserveGuardrailLatency(seconds float64) {
 		return
 	}
 	r.guardrailLatency.Observe(seconds)
+}
+
+// ObserveSemanticSimilarity records the cosine similarity of a semantic hit.
+func (r *Recorder) ObserveSemanticSimilarity(score float64) {
+	if r == nil {
+		return
+	}
+	r.semcacheSimilarity.Observe(score)
+}
+
+// AddCacheSavings adds estimated USD saved by a semantic hit.
+func (r *Recorder) AddCacheSavings(model string, usd float64) {
+	if r == nil {
+		return
+	}
+	r.semcacheSavings.WithLabelValues(model).Add(usd)
+}
+
+// SetSemcacheDegraded sets the exact-only degraded gauge.
+func (r *Recorder) SetSemcacheDegraded(degraded bool) {
+	if r == nil {
+		return
+	}
+	v := 0.0
+	if degraded {
+		v = 1.0
+	}
+	r.semcacheDegraded.Set(v)
 }
 
 // IncRateLimitDegraded records a request where the primary rate limiter was

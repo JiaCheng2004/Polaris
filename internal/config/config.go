@@ -165,10 +165,21 @@ type RateLimitConfig struct {
 }
 
 type ResponseCache struct {
-	Enabled             bool          `yaml:"enabled"`
-	TTL                 time.Duration `yaml:"ttl"`
-	MaxEntriesPerModel  int           `yaml:"max_entries_per_model"`
-	SimilarityThreshold float64       `yaml:"similarity_threshold"`
+	Enabled             bool                `yaml:"enabled"`
+	TTL                 time.Duration       `yaml:"ttl"`
+	MaxEntriesPerModel  int                 `yaml:"max_entries_per_model"`
+	SimilarityThreshold float64             `yaml:"similarity_threshold"`
+	Semantic            SemanticCacheConfig `yaml:"semantic"`
+}
+
+// SemanticCacheConfig configures the embedding (L2) semantic cache. Disabled by
+// default; when off, only the exact (L1) response cache runs.
+type SemanticCacheConfig struct {
+	Enabled        bool    `yaml:"enabled"`
+	Embedder       string  `yaml:"embedder"`        // registry | none
+	EmbeddingModel string  `yaml:"embedding_model"` // provider/model
+	MaxTurns       int     `yaml:"max_turns"`
+	MaxTemperature float64 `yaml:"max_temperature"`
 }
 
 type ProviderConfig struct {

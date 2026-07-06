@@ -15,6 +15,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/provider"
 	"github.com/JiaCheng2004/Polaris/internal/reliability"
 	"github.com/JiaCheng2004/Polaris/internal/routing"
+	"github.com/JiaCheng2004/Polaris/internal/semcache"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	cachepkg "github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,7 @@ type ChatHandler struct {
 	reliability *reliability.Manager
 	router      *routing.Router
 	guardrails  *guardrails.Engine
+	semcache    *semcache.Cache
 }
 
 type chatTarget struct {
@@ -39,7 +41,12 @@ type chatTarget struct {
 func NewChatHandler(runtime *gwruntime.Holder, recorder *metrics.Recorder, cache cachepkg.Cache, appStore store.Store, reliabilityManager *reliability.Manager) *ChatHandler {
 	engine := guardrails.NewEngine(recorder)
 	engine.SetJudge(&registryJudge{runtime: runtime})
-	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter(), guardrails: engine}
+	var backend semcache.ResponseStore
+	if cache != nil {
+		backend = cache
+	}
+	sc := semcache.New(&registryEmbedder{runtime: runtime}, backend, recorder, semcache.Config{})
+	return &ChatHandler{runtime: runtime, metrics: recorder, cache: cache, store: appStore, reliability: reliabilityManager, router: routing.NewRouter(), guardrails: engine, semcache: sc}
 }
 
 func (h *ChatHandler) Complete(c *gin.Context) {
@@ -89,16 +96,13 @@ func (h *ChatHandler) Complete(c *gin.Context) {
 		return
 	}
 
-	candidate := semanticChatCandidate{}
-	if cacheCtl != nil {
-		candidate = cacheCtl.prepareSemanticChat(primary.model, &req)
-		if candidate.Enabled {
-			if cacheCtl.trySemanticChat(c, primary.model, modality.ModalityChat, candidate) {
-				return
-			}
-		} else {
-			cacheCtl.markBypass(c)
+	semCand := h.prepareSemantic(c, primary.model, &req)
+	if semCand.enabled {
+		if h.trySemantic(c, semCand) {
+			return
 		}
+	} else if cacheCtl != nil {
+		cacheCtl.markBypass(c)
 	}
 
 	response, outcome, fallbackModel, err := h.completeWithFailover(c, primary, fallbacks, &req)
@@ -120,8 +124,8 @@ func (h *ChatHandler) Complete(c *gin.Context) {
 		return
 	}
 	middleware.SetRequestOutcome(c, outcome)
-	if cacheCtl != nil && candidate.Enabled && fallbackModel == "" {
-		cacheCtl.storeSemanticChat(c, candidate, http.StatusOK, response)
+	if semCand.enabled && fallbackModel == "" {
+		h.storeSemantic(c, semCand, response)
 	}
 	c.JSON(http.StatusOK, response)
 }
