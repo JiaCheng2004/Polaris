@@ -103,3 +103,29 @@ This is the end-state validation against real providers.
 
 The container and binaries are immutable once published. To correct a bad
 release, cut a new patch tag (`v1.0.1`); do not delete a published tag.
+
+## Appendix: OpenSSF Best Practices self-assessment
+
+Most passing criteria at [bestpractices.dev](https://bestpractices.dev) are
+already satisfied by the repo. Reference points when filling the application:
+
+- **Basics** — Apache-2.0 `LICENSE`; MkDocs docs site on Pages; `CONTRIBUTING.md`,
+  `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `SUPPORT.md`; GitHub Issues +
+  Discussions for interaction; HTTPS throughout.
+- **Change control** — public git on GitHub; semver tags (`v1.0.0`);
+  `CHANGELOG.md`; unique, monotonic version numbering.
+- **Reporting** — `SECURITY.md` (private disclosure + supported versions);
+  GitHub Issues for bugs with templates.
+- **Quality** — GoReleaser build; `go test -race` in CI; golden wire-compat +
+  contract + chaos + fuzz suites; new functionality ships with tests
+  (contributor gate); `golangci-lint` warning flags on.
+- **Security** — `cosign` keyless signing + SLSA build-provenance attestation +
+  SPDX & CycloneDX SBOMs on release; no hard-coded secrets (`${ENV}` references,
+  SHA-256 key hashing, `key_prefix`-only logs); `govulncheck` + `gosec` + CodeQL
+  in CI; `go-licenses` + REUSE compliance gates; `golang-jwt` for OAuth 2.1.
+- **Analysis** — static (`gosec`, CodeQL, `govulncheck`); dynamic (Go fuzz
+  targets on the SSE decoder, guardrail redactor, and JSON-RPC codec); OpenSSF
+  Scorecard published weekly.
+
+Fill in the project-specific fields (URLs, maintainer contact) and submit; the
+initial passing percentage should be high.
