@@ -14,6 +14,28 @@ Use the simplest mode that matches the deployment:
 
 For embedding Polaris into another platform quickly, use `external`. For exposing Polaris directly as a gateway product, use `virtual_keys`.
 
+## Mode Comparison
+
+| Mode | Identity lives in | Best for |
+|---|---|---|
+| `none` | — | Local development only. |
+| `static` | YAML (`sha256:` hashes) | Small trusted deployments, CI. |
+| `external` | Your app (signed claims) | Embedding Polaris behind an app that already owns users. |
+| `virtual_keys` | Polaris store (projects, policies, budgets, audit) | Exposing Polaris directly as a gateway product. |
+| `multi-user` | Database keys | Legacy compatibility. |
+
+Every mode enforces the same downstream checks — model, modality, toolset, MCP-binding, rate-limit, and budget — so switching modes changes only *where* identity comes from, not *what* it is allowed to do.
+
+## Keys And Hashing
+
+Polaris never stores or logs plaintext API keys. It persists only the SHA-256 hash; the 8-character `key_prefix` is the only key material that appears in logs. Generate a key and its hash with:
+
+```bash
+go run ./scripts/generate-key.go
+```
+
+Commit only the emitted `sha256:` hash (into `static` keys or `bootstrap_admin_key_hash`), never the raw key. See [CONFIGURATION.md](CONFIGURATION.md) for the exact `auth.static` and `auth.virtual_keys` shapes.
+
 ## External Signed Headers
 
 Configure:

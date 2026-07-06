@@ -48,7 +48,7 @@ git log --oneline v1                      # inspect the curated narrative
 git checkout v1 && go build ./... && go test -race ./...   # verify the tree
 ```
 
-The script drops `spec/phase_*` (BLUEPRINT/AGENTS/CLAUDE are already gitignored),
+The script drops `spec/phase_*` and `docs/internal/` (BLUEPRINT/AGENTS/CLAUDE are already gitignored),
 lays down 16 Conventional Commits along the dependency layering, and self-checks
 that the final tree is byte-identical to `overhaul/v1` minus the dropped files.
 It never pushes. No AI attribution appears in any message or trailer.

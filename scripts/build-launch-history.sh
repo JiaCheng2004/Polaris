@@ -62,6 +62,7 @@ echo "==> creating orphan branch $TARGET from $SOURCE"
 git checkout --quiet --orphan "$TARGET"
 git reset --quiet                       # unstage all; working tree preserved
 rm -rf spec/phase_*                     # drop internal planning specs
+rm -rf docs/internal                    # drop internal point-in-time baselines
 
 echo "==> committing curated history (${#COMMIT_GROUPS[@]} commits)"
 for entry in "${COMMIT_GROUPS[@]}"; do
@@ -88,7 +89,7 @@ if [ -n "$leftover" ]; then
 fi
 
 # --- integrity check: final tree == source tree minus dropped files --------
-diff="$(git diff "$SOURCE" "$TARGET" -- . ':(exclude)spec/phase_*' || true)"
+diff="$(git diff "$SOURCE" "$TARGET" -- . ':(exclude)spec/phase_*' ':(exclude)docs/internal' || true)"
 if [ -n "$diff" ]; then
   echo "ERROR: $TARGET tree differs from $SOURCE (excluding spec/phase_*):" >&2
   echo "$diff" | head -40 >&2

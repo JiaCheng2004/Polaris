@@ -10,6 +10,18 @@ Read these files before making non-trivial changes:
 
 `docs/ARCHITECTURE.md` is the source of truth. If a local file disagrees with it, the architecture document wins.
 
+## Dev Loop
+
+```bash
+make build          # build ./bin/polaris
+make run            # build + run with ./config/polaris.yaml
+make test           # go test -race ./...
+make lint           # golangci-lint
+make release-check  # the full repo-local close-out gate
+```
+
+`make help` lists every target. The gateway needs no external services to run locally (SQLite + in-memory cache by default); Postgres and Redis are opt-in via config.
+
 ## Ground Rules
 
 - Keep the project boring and dependency-light.
@@ -49,6 +61,6 @@ Read these files before making non-trivial changes:
 - Do not hit real provider APIs in tests.
 - Store changes should be covered by integration tests.
 
-## Implementation Phasing
+## Project Direction
 
-The early implementation phases are complete. New work should keep `/v1` stable, add provider variants only through the model matrix when a real adapter exists, and prioritize capability completion, routing quality, validation proof, and operational hardening over generic provider expansion.
+Polaris is production infrastructure, not a breadth-of-providers race. New work should keep the public `/v1` surface wire-stable (the golden suite enforces this), add provider variants only through the model matrix when a real adapter exists, and prioritize capability completeness, routing quality, validation proof, and operational hardening over raw provider count.

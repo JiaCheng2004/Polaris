@@ -259,11 +259,6 @@ The shipped runtime supports:
 - `providers.together`
 - `providers.groq`
 - `providers.fireworks`
-- `providers.featherless`
-- `providers.moonshot`
-- `providers.glm`
-- `providers.zai-token`
-- `providers.minimax-token` (experimental/opt-in chat; do not route by default until final-answer behavior is validated for your workload)
 - `providers.mistral`
 - `providers.bedrock`
 - `providers.nvidia`
@@ -290,7 +285,7 @@ The shipped runtime supports:
 
 `config/polaris.live-smoke.yaml` is the committed release-validation config. It is designed for env-driven credential injection plus the real-provider smoke matrix in `tests/e2e/live_smoke_test.go`.
 
-The chat-first expansion families OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, and Mistral all use the shared provider-common OpenAI-compatible adapter base. Their Polaris config shape is intentionally uniform:
+The chat-first expansion families OpenRouter, Together, Groq, Fireworks, Mistral, NVIDIA, DeepSeek, and xAI all use the shared OpenAI-compatible adapter base (`internal/provider/openaicompat`, built on `internal/transport`). Their Polaris config shape is intentionally uniform:
 
 - `credentials.api_key`
 - optional `transport.base_url`

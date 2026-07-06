@@ -7,12 +7,12 @@ This guide is the implementation checklist for adding a provider to Polaris with
 - Add providers only when there is a real adapter, config entry, catalog metadata, tests, and documentation.
 - Keep provider code isolated in `internal/provider/<name>/`.
 - Preserve provider-native model IDs internally; use aliases only at the Polaris routing layer.
-- Prefer existing shared helpers in `internal/provider/common/` before adding new transport code.
+- Build on the shared transport + adapter kit (below) before writing new transport code; most providers are a thin config over an existing compatibility base.
 - Do not add public endpoints for provider-specific features unless the shared Polaris contract needs that capability.
 
 ## Required Implementation Steps
 
-1. Create `internal/provider/<name>/client.go` for base URL, auth headers, timeout, retry, and shared request helpers.
+1. Create `internal/provider/<name>/client.go` — construct a `transport.Client` (see the kit below) with the provider's base URL, auth strategy, and error translator. Do not hand-roll HTTP, retries, or SSE.
 2. Add one file per supported modality, such as `chat.go`, `embed.go`, `image.go`, `video.go`, `voice.go`, or `music.go`.
 3. Implement only the relevant `internal/modality` interfaces.
 4. Add `internal/provider/registry_<name>.go` with an `init()` call to `registerProviderFamilyRegistrar("<name>", register<Name>Provider)`.
@@ -35,6 +35,27 @@ func init() {
 ```
 
 The central registry validates duplicates and exposes a sorted supported-provider list. Do not edit the registry factory map directly; there is no central map to extend.
+
+## The transport + adapter kit
+
+Provider code is thin because the hard parts are shared. Build on these, in order of preference:
+
+- **`internal/transport`** — the single outbound HTTP core. One `transport.Client` gives you jittered exponential backoff, `Retry-After` honoring, per-attempt timeouts, a reusable SSE decoder, an outbound SSRF-safe client, and pluggable auth strategies (bearer, header map, `x-api-key`+version, SigV4, OAuth token source). No provider hand-rolls HTTP, retries, or streaming.
+- **`internal/provider/openaicompat` and `internal/provider/anthropiccompat`** — the two compatibility bases, both reparented onto `transport`. If the upstream speaks the OpenAI or Anthropic wire format (most do), your provider is a thin config over one of these: a base URL, an auth decorator, an error translator, and optional per-request tweaks (extra headers, a request translator, thinking / hosted-tool options).
+- **`internal/provider/core`** — shared adapter helpers (model-name normalization, content and tool-choice translation, safe numeric conversions) reused across adapters and the verification package.
+
+**The thin-provider pattern.** A provider whose wire format already matches a base is a few lines: its `registry_<name>.go` constructs the client and registers models against the shared base. For example, `deepseek`:
+
+```go
+func registerDeepSeekProvider(registry *Registry, warnings *[]string, name string, cfg config.ProviderConfig) {
+    client := deepseek.NewClient(cfg) // wraps openaicompat, which is built on transport
+    registerChatOnlyModels(registry, warnings, name, cfg.Models, func(modelID string) modality.ChatAdapter {
+        return deepseek.NewChatAdapter(client, modelID)
+    })
+}
+```
+
+Reach for a hand-written adapter only when the upstream wire format is genuinely different (Google Gemini, Volcengine Ark, ElevenLabs). Even then the client builds on `transport` and reuses `core` helpers, and provider packages never import `internal/gateway` (enforced by `make check-layering`).
 
 ## Test Requirements
 

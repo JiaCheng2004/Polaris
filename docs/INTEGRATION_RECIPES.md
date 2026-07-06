@@ -29,7 +29,7 @@ curl http://127.0.0.1:8080/v1/models
 
 ## OpenAI-Compatible Provider
 
-Use this for providers such as OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, or Mistral.
+Use this for providers such as OpenRouter, Together, Groq, Fireworks, Mistral, NVIDIA, DeepSeek, or xAI.
 
 ```yaml
 version: 2
