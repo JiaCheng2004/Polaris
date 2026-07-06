@@ -36,7 +36,17 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" }
+            "enabled": { "type": "boolean" },
+            "auth": { "type": "array", "items": { "type": "string" } },
+            "oauth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "resource_uri": { "type": "string" },
+                "authorization_servers": { "type": "array", "items": { "type": "string" } },
+                "jwks_cache_ttl": { "type": "string" }
+              }
+            }
           }
         },
         "files": { "$ref": "#/$defs/files" },

@@ -53,6 +53,12 @@ package polaris
 		tools?: _
 		mcp?: {
 			enabled?: bool
+			auth?: [...string]
+			oauth?: {
+				resource_uri?: string
+				authorization_servers?: [...string]
+				jwks_cache_ttl?: string
+			}
 		}
 		files?: {
 			enabled?: bool
