@@ -1,6 +1,6 @@
 # Polaris API Reference
 
-> **Version:** 2.1.0
+> **Version:** 1.0.0
 > **Status:** Phase 4 video, full-duplex audio sessions, broad sync response caching, Phase 5A music, and provider-family hardening are live in code. Release readiness is gated by repo-local validation plus live-provider proof where credentials, quota, and plan access are available. Production Postgres/Redis load validation is optional operator proof for service deployments. ElevenLabs music stays implemented behind the same API but is treated as preview until explicitly opted into live smoke.
 > **Authority:** Every PR that adds, modifies, or removes an endpoint MUST update this file in the same commit. If this document and the implementation disagree, the implementation is wrong OR this document is wrong — one of them must be fixed before the PR merges.
 
@@ -1069,7 +1069,7 @@ Response:
 
 ## 11. Music
 
-Current implementation note: music is a first-class Polaris modality. The shipped Phase 5A surface is provider-neutral but capability-gated. For `v2.1.0`, MiniMax is the release-blocking music provider and backs generation, cover edits, and lyrics. ElevenLabs backs generation, streaming generation, stems, and composition plans through the same API shape, but that provider path is currently treated as preview until it is explicitly opted into live smoke. Async music jobs are Polaris-managed and require a configured cache backend. `sync` remains the default request mode, but long-running music jobs, especially MiniMax generation, should use `mode: "async"`.
+Current implementation note: music is a first-class Polaris modality. The shipped Phase 5A surface is provider-neutral but capability-gated. For `v1.0.0`, MiniMax is the release-blocking music provider and backs generation, cover edits, and lyrics. ElevenLabs backs generation, streaming generation, stems, and composition plans through the same API shape, but that provider path is currently treated as preview until it is explicitly opted into live smoke. Async music jobs are Polaris-managed and require a configured cache backend. `sync` remains the default request mode, but long-running music jobs, especially MiniMax generation, should use `mode: "async"`.
 
 ### `POST /v1/music/generations`
 

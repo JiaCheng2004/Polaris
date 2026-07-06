@@ -1,6 +1,6 @@
 # Polaris Load Testing
 
-This document is the pre-release load-validation checklist for the `v2.1.0` close-out. It is intentionally opt-in because it calls live providers and can spend provider credits. It is not a default CI gate.
+This document is the pre-release load-validation checklist for the `v1.0.0` close-out. It is intentionally opt-in because it calls live providers and can spend provider credits. It is not a default CI gate.
 
 ## Baseline
 
@@ -127,4 +127,4 @@ The automated load check covers the scenarios below. If you run them manually ag
 
 ## Recording
 
-Record the outcome of `make load-check` in `spec/phase_5_music/5B_phase_5_hardening_and_acceptance.md` before cutting the `v2.1.0` tag, with MiniMax in the release-blocking matrix and ElevenLabs, when exercised, in the preview matrix.
+Record the outcome of `make load-check` in `spec/phase_5_music/5B_phase_5_hardening_and_acceptance.md` before cutting the `v1.0.0` tag, with MiniMax in the release-blocking matrix and ElevenLabs, when exercised, in the preview matrix.

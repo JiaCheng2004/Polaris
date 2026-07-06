@@ -8,7 +8,7 @@
 [![API](https://img.shields.io/badge/API-v1-2563EB?style=for-the-badge)](./docs/API_REFERENCE.md)
 [![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-F97316?style=for-the-badge)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-F97316?style=for-the-badge)](./LICENSE)
 
 [Quick Start](#quick-start) · [API Surface](#api-surface) · [Providers](#providers) · [Configuration](#configuration) · [Documentation](#documentation)
 
@@ -368,7 +368,7 @@ Keep changes narrow and contract-driven:
 
 ## License
 
-Polaris is licensed under [AGPL-3.0](./LICENSE).
+Polaris is licensed under [Apache-2.0](./LICENSE).
 
 ---
 

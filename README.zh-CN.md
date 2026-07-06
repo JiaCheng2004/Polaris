@@ -8,7 +8,7 @@
 [![API](https://img.shields.io/badge/API-v1-2563EB?style=for-the-badge)](./docs/API_REFERENCE.md)
 [![Config](https://img.shields.io/badge/Config-v2-16A34A?style=for-the-badge)](./docs/CONFIGURATION.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./deployments/Dockerfile)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-F97316?style=for-the-badge)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-F97316?style=for-the-badge)](./LICENSE)
 
 [快速开始](#快速开始) · [API 能力](#api-能力) · [供应商](#供应商) · [配置](#配置) · [文档导航](#文档导航)
 
@@ -357,7 +357,7 @@ tests/                    contract、integration、e2e、smoke 和 load 验证
 
 ## 许可证
 
-Polaris 使用 [AGPL-3.0](./LICENSE) 许可证。
+Polaris 使用 [Apache-2.0](./LICENSE) 许可证。
 
 ---
 

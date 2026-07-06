@@ -4,7 +4,7 @@ This file records provider-specific authentication rules, compatibility quirks, 
 
 Provider/model metadata is sourced from the embedded matrix in `internal/provider/catalog/models.yaml`. Docs describe that matrix-driven implementation; they are not the source of truth for model IDs, family IDs, aliases, or verification classes.
 
-Release rule for `v2.1.0`: every provider path described here as shipped and release-blocking must pass the strict live-smoke matrix before live-provider proof is claimed when credentials, quota, and plan access are available, and the repo-local open-source gate must pass before release completion is claimed. Production Postgres/Redis load testing is optional operator proof for service deployments. The live-smoke harness now derives `strict`, `opt_in`, and `skipped` coverage from the embedded provider model matrix. Opt-in provider paths do not block the tag unless they are explicitly included with `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` or a provider-specific opt-in env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1`.
+Release rule for `v1.0.0`: every provider path described here as shipped and release-blocking must pass the strict live-smoke matrix before live-provider proof is claimed when credentials, quota, and plan access are available, and the repo-local open-source gate must pass before release completion is claimed. Production Postgres/Redis load testing is optional operator proof for service deployments. The live-smoke harness now derives `strict`, `opt_in`, and `skipped` coverage from the embedded provider model matrix. Opt-in provider paths do not block the tag unless they are explicitly included with `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` or a provider-specific opt-in env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1`.
 
 ## Files Surface
 
@@ -161,7 +161,7 @@ Polaris beta file understanding is separate from provider-native processing. It 
 
 - Auth: bearer token
 - Scope: music
-- Status: music generation, cover edit, and lyrics implemented in Phase 5A; release-blocking for `v2.1.0`
+- Status: music generation, cover edit, and lyrics implemented in Phase 5A; release-blocking for `v1.0.0`
 - Notes: Polaris uses MiniMax `/v1/music_generation` for synchronous music generation and cover workflows, always requests provider-native hex audio, and normalizes the decoded bytes back into the shared binary music response contract. Lyrics generation uses `/v1/lyrics_generation`. Token Plan / global keys must point at `https://api.minimax.io`, while China mainland accounts use `https://api.minimaxi.com`; set `providers.minimax.base_url` explicitly instead of assuming one endpoint fits both. MiniMax can also return business errors inside HTTP `200` responses via `base_resp.status_code`, so Polaris treats non-zero `base_resp.status_code` values as provider failures instead of false successes. Real MiniMax generation can take minutes, so `mode=async` is the recommended Polaris path for long-running jobs and the release-facing configs use a generous provider timeout. MiniMax streaming, stems, and composition-plan helpers are intentionally not exposed through the current adapter because those provider paths are not part of the shipped MiniMax music surface in Polaris.
 
 ### MiniMax Token Plan (`minimax-token`)
@@ -176,8 +176,8 @@ Polaris beta file understanding is separate from provider-native processing. It 
 
 - Auth: `xi-api-key`
 - Scope: music
-- Status: music generation, streaming generation, composition plans, and stems implemented in Phase 5A; preview for `v2.1.0` until explicitly opted into live smoke
-- Notes: Polaris uses `/v1/music` for synchronous generation, `/v1/music/stream` for streamed generation, `/v1/music/plan` for composition-plan helpers, and `/v1/music/stem-separation` for stems ZIP output. The current ElevenLabs adapter does not expose editing or lyrics helpers through Polaris, so those capabilities are omitted from the model metadata and enforced through capability gating at request time. For `v2.1.0`, ElevenLabs remains in the reference config and codebase, but its live-smoke path follows the matrix-driven `opt_in` policy and runs only when opt-in coverage is enabled globally or for the `elevenlabs` provider.
+- Status: music generation, streaming generation, composition plans, and stems implemented in Phase 5A; preview for `v1.0.0` until explicitly opted into live smoke
+- Notes: Polaris uses `/v1/music` for synchronous generation, `/v1/music/stream` for streamed generation, `/v1/music/plan` for composition-plan helpers, and `/v1/music/stem-separation` for stems ZIP output. The current ElevenLabs adapter does not expose editing or lyrics helpers through Polaris, so those capabilities are omitted from the model metadata and enforced through capability gating at request time. For `v1.0.0`, ElevenLabs remains in the reference config and codebase, but its live-smoke path follows the matrix-driven `opt_in` policy and runs only when opt-in coverage is enabled globally or for the `elevenlabs` provider.
 
 ### Ollama
 

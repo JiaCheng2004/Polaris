@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Polaris API
-  version: 2.1.0
+  version: 1.0.0
   summary: Machine-readable contract for the Polaris HTTP gateway.
   description: |
     This file is the CI-checkable public HTTP contract for Polaris.

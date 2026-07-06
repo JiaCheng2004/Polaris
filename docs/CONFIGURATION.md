@@ -347,7 +347,7 @@ Replicate is currently a native async video provider family. Configure:
 
 Replicate models should use official `owner/model` identifiers in config, for example `minimax/video-01`. The first Polaris scope is the Predictions API for async video jobs, so Replicate models should currently be configured with `modality: video`.
 
-For `v2.1.0`, MiniMax music is part of the release-blocking smoke set. Opt-in provider paths, including ElevenLabs music, are classified by the embedded provider model matrix and run only when `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` is set or the matching provider-specific env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1` is set.
+For `v1.0.0`, MiniMax music is part of the release-blocking smoke set. Opt-in provider paths, including ElevenLabs music, are classified by the embedded provider model matrix and run only when `POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1` is set or the matching provider-specific env such as `POLARIS_LIVE_SMOKE_PROVIDER_ELEVENLABS=1` is set.
 
 `modality: audio` is now a runnable model type. Audio models are Polaris session definitions rather than a raw upstream endpoint, and they require:
 

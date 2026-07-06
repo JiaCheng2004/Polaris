@@ -1,0 +1,28 @@
+Polaris
+Copyright 2026 Polaris Authors
+
+This product includes software developed by the Polaris Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this software except in compliance with the License. A copy of the License is
+included in the LICENSE file and is available at
+http://www.apache.org/licenses/LICENSE-2.0.
+
+--------------------------------------------------------------------------------
+Third-party notices
+--------------------------------------------------------------------------------
+
+internal/provider/bytedance/astpb/
+
+  Contains Go message types generated from ByteDance/Volcengine's published AST
+  (Audio-Streaming Transport) protocol buffer definitions, used by the ByteDance
+  provider's realtime audio transport. The .proto sources are ByteDance/
+  Volcengine's; only the generated Go message types are vendored here. See
+  internal/provider/bytedance/astpb/README.md for provenance and regeneration.
+
+Go module dependencies are distributed under their own licenses (predominantly
+Apache-2.0, MIT, and BSD-3-Clause); run `go-licenses report ./...` for the full,
+current inventory. Notable direct dependencies include Gin (MIT), pgx (MIT),
+go-redis (BSD-2-Clause), minio-go (Apache-2.0), prometheus/client_golang
+(Apache-2.0), OpenTelemetry (Apache-2.0), modernc.org/sqlite (BSD-3-Clause),
+and golang-jwt/jwt (MIT).

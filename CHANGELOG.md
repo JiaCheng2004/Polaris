@@ -1,8 +1,8 @@
 # Changelog
 
-This repository is preparing the Polaris `v2.1.0` release. Do not mark `v2.1.0` released until the strict live-smoke matrix for the release set passes. ElevenLabs music remains preview-only unless explicitly opted into smoke validation.
+This repository is preparing the Polaris `v1.0.0` release. Do not mark `v1.0.0` released until the strict live-smoke matrix for the release set passes. ElevenLabs music remains preview-only unless explicitly opted into smoke validation.
 
-## [2.1.0] - Pending release
+## [1.0.0] - Pending release
 
 ### Added
 
@@ -21,7 +21,7 @@ This repository is preparing the Polaris `v2.1.0` release. Do not mark `v2.1.0` 
 
 - `GET /v1/usage` now accepts `modality=audio`, matching the shipped runtime logging path.
 - Release readiness now includes `make release-check`, `make live-smoke`, and the updated load-validation checklist for music, video, and audio, with ElevenLabs music smoke gated behind explicit preview opt-in.
-- Operator docs now describe the `v2.1.0` close-out, explicit MiniMax regional config, and async guidance for long-running music jobs in a single consistent way.
+- Operator docs now describe the `v1.0.0` close-out, explicit MiniMax regional config, and async guidance for long-running music jobs in a single consistent way.
 
 ### Fixed
 

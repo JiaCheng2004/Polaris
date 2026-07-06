@@ -5,18 +5,35 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write # create the GitHub Release and upload assets
+  id-token: write # cosign keyless signing
+
 jobs:
-  release-artifacts:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser needs full history for the changelog
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.3"
+          go-version: "1.26.4"
 
-      - name: Run security check
-        run: make security-check
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
 
-      - name: Build release binary
-        run: go build -trimpath -ldflags="-s -w" -o polaris ./cmd/polaris
+      - name: Install syft (SBOM generation)
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Release gate
+        run: make release-check
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -67,7 +67,7 @@ jobs:
             org.opencontainers.image.title=Polaris
             org.opencontainers.image.description=Stateless, config-driven, multi-modality AI gateway
             org.opencontainers.image.vendor=JiaCheng2004
-            org.opencontainers.image.licenses=AGPL-3.0
+            org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.documentation=https://github.com/JiaCheng2004/Polaris/blob/main/docs/API_REFERENCE.md
 
       - name: Build and push
