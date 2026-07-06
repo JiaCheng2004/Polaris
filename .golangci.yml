@@ -50,8 +50,10 @@ linters:
               desc: "foundation packages must not import provider adapters"
     revive:
       rules:
-        # Exported-symbol doc enforcement is staged on for the public SDK in
-        # Phase 7; enabling it repo-wide now would bury the new-issue signal.
+        # Exported-symbol doc enforcement runs as a dedicated, tree-wide gate
+        # scoped to the public SDK: `make doc-check` (see .revive-doc.toml).
+        # Enabling it repo-wide here would flag internal/ (not a public API) and
+        # bury the new-issue signal.
         - name: exported
           disabled: true
         - name: unreachable-code

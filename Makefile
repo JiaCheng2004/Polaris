@@ -14,7 +14,7 @@ GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test bench lint check-layering security-check license-check reuse-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
+.PHONY: help dev build run test bench lint check-layering security-check license-check reuse-check doc-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
 	local-up local-down local-restart local-logs local-ps local-config \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
@@ -93,6 +93,9 @@ security-check:
 	rm -f "$$tmp" "$$log"; \
 	exit $$check_status
 
+doc-check:
+	go run github.com/mgechev/revive@latest -config .revive-doc.toml -set_exit_status ./pkg/client/...
+
 license-check:
 	go run github.com/google/go-licenses/v2@latest check ./cmd/polaris ./pkg/client
 
@@ -148,6 +151,7 @@ release-check:
 	$(MAKE) security-check
 	$(MAKE) reuse-check
 	$(MAKE) license-check
+	$(MAKE) doc-check
 	$(MAKE) panic-scan
 	$(MAKE) config-check
 	$(MAKE) verify-models CONFIG=$(CONFIG)

@@ -10,10 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// AudioSessionConn is a realtime WebSocket connection for audio session.
 type AudioSessionConn struct {
 	conn *websocket.Conn
 }
 
+// CreateAudioSession creates an audio session.
 func (c *Client) CreateAudioSession(ctx context.Context, req *AudioSessionRequest) (*AudioSession, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -26,6 +28,7 @@ func (c *Client) CreateAudioSession(ctx context.Context, req *AudioSessionReques
 	return &response, nil
 }
 
+// DialAudioSession dials an audio session.
 func (c *Client) DialAudioSession(ctx context.Context, session *AudioSession) (*AudioSessionConn, error) {
 	if session == nil {
 		return nil, fmt.Errorf("session is required")
@@ -51,6 +54,7 @@ func (c *Client) DialAudioSession(ctx context.Context, session *AudioSession) (*
 	return &AudioSessionConn{conn: conn}, nil
 }
 
+// Send sends a message on the connection.
 func (s *AudioSessionConn) Send(event *AudioClientEvent) error {
 	if s == nil || s.conn == nil {
 		return fmt.Errorf("audio session connection is not initialized")
@@ -61,6 +65,7 @@ func (s *AudioSessionConn) Send(event *AudioClientEvent) error {
 	return s.conn.WriteJSON(event)
 }
 
+// Receive receives the next message from the connection.
 func (s *AudioSessionConn) Receive() (*AudioServerEvent, error) {
 	if s == nil || s.conn == nil {
 		return nil, fmt.Errorf("audio session connection is not initialized")
@@ -72,6 +77,7 @@ func (s *AudioSessionConn) Receive() (*AudioServerEvent, error) {
 	return &event, nil
 }
 
+// Close closes the underlying connection.
 func (s *AudioSessionConn) Close() error {
 	if s == nil || s.conn == nil {
 		return nil

@@ -6,6 +6,7 @@ import (
 	"net/url"
 )
 
+// ListModels lists models.
 func (c *Client) ListModels(ctx context.Context, includeAliases bool) (*ModelList, error) {
 	query := url.Values{}
 	if includeAliases {
@@ -19,6 +20,7 @@ func (c *Client) ListModels(ctx context.Context, includeAliases bool) (*ModelLis
 	return &response, nil
 }
 
+// ListModelCapabilities lists model capabilities.
 func (c *Client) ListModelCapabilities(ctx context.Context, includeAliases bool) (*ModelList, error) {
 	query := url.Values{}
 	if includeAliases {

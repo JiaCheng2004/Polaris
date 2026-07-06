@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// CreateMusicGeneration creates a music generation.
 func (c *Client) CreateMusicGeneration(ctx context.Context, req *MusicGenerationRequest) (*MusicOperationResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -34,6 +35,7 @@ func (c *Client) CreateMusicGeneration(ctx context.Context, req *MusicGeneration
 	}
 }
 
+// StreamMusicGeneration opens a streaming music generation.
 func (c *Client) StreamMusicGeneration(ctx context.Context, req *MusicGenerationRequest) (*MusicStream, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -53,6 +55,7 @@ func (c *Client) StreamMusicGeneration(ctx context.Context, req *MusicGeneration
 	return &MusicStream{Body: resp.Body, ContentType: resp.Header.Get("Content-Type")}, nil
 }
 
+// EditMusic edits the music.
 func (c *Client) EditMusic(ctx context.Context, req *MusicEditRequest) (*MusicOperationResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -89,6 +92,7 @@ func (c *Client) EditMusic(ctx context.Context, req *MusicEditRequest) (*MusicOp
 	return &MusicOperationResponse{Asset: &MusicAsset{Data: data, ContentType: contentType}}, nil
 }
 
+// StreamMusicEdit opens a streaming music edit.
 func (c *Client) StreamMusicEdit(ctx context.Context, req *MusicEditRequest) (*MusicStream, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -121,6 +125,7 @@ func (c *Client) StreamMusicEdit(ctx context.Context, req *MusicEditRequest) (*M
 	return &MusicStream{Body: resp.Body, ContentType: resp.Header.Get("Content-Type")}, nil
 }
 
+// SeparateMusicStems submits a job that separates a track into stems.
 func (c *Client) SeparateMusicStems(ctx context.Context, req *MusicStemRequest) (*MusicOperationResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -154,6 +159,7 @@ func (c *Client) SeparateMusicStems(ctx context.Context, req *MusicStemRequest) 
 	return &MusicOperationResponse{Asset: &MusicAsset{Data: data, ContentType: contentType}}, nil
 }
 
+// CreateMusicLyrics creates a music lyrics.
 func (c *Client) CreateMusicLyrics(ctx context.Context, req *MusicLyricsRequest) (*MusicLyricsResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -165,6 +171,7 @@ func (c *Client) CreateMusicLyrics(ctx context.Context, req *MusicLyricsRequest)
 	return &response, nil
 }
 
+// CreateMusicPlan creates a music plan.
 func (c *Client) CreateMusicPlan(ctx context.Context, req *MusicPlanRequest) (*MusicPlanResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -176,6 +183,7 @@ func (c *Client) CreateMusicPlan(ctx context.Context, req *MusicPlanRequest) (*M
 	return &response, nil
 }
 
+// GetMusicJob retrieves the music job.
 func (c *Client) GetMusicJob(ctx context.Context, jobID string) (*MusicStatus, error) {
 	if jobID == "" {
 		return nil, fmt.Errorf("jobID is required")
@@ -187,6 +195,7 @@ func (c *Client) GetMusicJob(ctx context.Context, jobID string) (*MusicStatus, e
 	return &response, nil
 }
 
+// CancelMusicJob cancels an in-flight music generation job.
 func (c *Client) CancelMusicJob(ctx context.Context, jobID string) error {
 	if jobID == "" {
 		return fmt.Errorf("jobID is required")
@@ -194,6 +203,7 @@ func (c *Client) CancelMusicJob(ctx context.Context, jobID string) error {
 	return c.doJSON(ctx, http.MethodDelete, "/v1/music/jobs/"+jobID, nil, nil, nil)
 }
 
+// GetMusicJobContent retrieves the music job content.
 func (c *Client) GetMusicJobContent(ctx context.Context, jobID string) (*MusicAsset, error) {
 	if jobID == "" {
 		return nil, fmt.Errorf("jobID is required")

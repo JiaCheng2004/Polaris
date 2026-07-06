@@ -10,10 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// InterpretingConn is a realtime WebSocket connection for interpreting.
 type InterpretingConn struct {
 	conn *websocket.Conn
 }
 
+// CreateInterpretingSession creates an interpreting session.
 func (c *Client) CreateInterpretingSession(ctx context.Context, req *InterpretingSessionRequest) (*InterpretingSession, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -26,6 +28,7 @@ func (c *Client) CreateInterpretingSession(ctx context.Context, req *Interpretin
 	return &response, nil
 }
 
+// DialInterpretingSession dials an interpreting session.
 func (c *Client) DialInterpretingSession(ctx context.Context, session *InterpretingSession) (*InterpretingConn, error) {
 	if session == nil {
 		return nil, fmt.Errorf("session is required")
@@ -51,6 +54,7 @@ func (c *Client) DialInterpretingSession(ctx context.Context, session *Interpret
 	return &InterpretingConn{conn: conn}, nil
 }
 
+// Send sends a message on the connection.
 func (s *InterpretingConn) Send(event *InterpretingClientEvent) error {
 	if s == nil || s.conn == nil {
 		return fmt.Errorf("interpreting connection is not initialized")
@@ -61,6 +65,7 @@ func (s *InterpretingConn) Send(event *InterpretingClientEvent) error {
 	return s.conn.WriteJSON(event)
 }
 
+// Receive receives the next message from the connection.
 func (s *InterpretingConn) Receive() (*InterpretingEvent, error) {
 	if s == nil || s.conn == nil {
 		return nil, fmt.Errorf("interpreting connection is not initialized")
@@ -72,6 +77,7 @@ func (s *InterpretingConn) Receive() (*InterpretingEvent, error) {
 	return &event, nil
 }
 
+// Close closes the underlying connection.
 func (s *InterpretingConn) Close() error {
 	if s == nil || s.conn == nil {
 		return nil

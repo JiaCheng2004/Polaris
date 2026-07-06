@@ -1,0 +1,9 @@
+# Exported-symbol documentation gate for the public Go SDK (pkg/client only).
+#
+# Run tree-wide (not new-from-merge-base) via `make doc-check` so every exported
+# symbol in the published SDK carries a doc comment — a green run is 100%
+# exported-doc coverage. The repo-wide golangci-lint run keeps `exported`
+# disabled on purpose: internal/ packages are not a public API surface and
+# gating them would only bury the SDK signal.
+[rule.exported]
+  arguments = ["checkPublicInterface", "checkPrivateReceivers"]

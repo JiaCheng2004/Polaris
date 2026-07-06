@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// CountTokens counts tokens.
 func (c *Client) CountTokens(ctx context.Context, req *TokenCountRequest) (*TokenCountResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")

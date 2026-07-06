@@ -9,6 +9,7 @@ import (
 	"net/http"
 )
 
+// CreateMessage creates a message.
 func (c *Client) CreateMessage(ctx context.Context, req *MessagesRequest) (*MessagesResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -23,6 +24,7 @@ func (c *Client) CreateMessage(ctx context.Context, req *MessagesRequest) (*Mess
 	return &response, nil
 }
 
+// StreamMessage opens a streaming message.
 func (c *Client) StreamMessage(ctx context.Context, req *MessagesRequest) (*MessagesStream, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -46,6 +48,7 @@ func (c *Client) StreamMessage(ctx context.Context, req *MessagesRequest) (*Mess
 	}, nil
 }
 
+// MessagesStream is a server-sent-event iterator over messages chunks.
 type MessagesStream struct {
 	body   io.ReadCloser
 	reader *bufio.Reader
@@ -54,6 +57,7 @@ type MessagesStream struct {
 	done   bool
 }
 
+// Next advances the iterator, returning false at end of stream or on error.
 func (stream *MessagesStream) Next() bool {
 	if stream == nil || stream.done {
 		return false
@@ -83,6 +87,7 @@ func (stream *MessagesStream) Next() bool {
 	return true
 }
 
+// Event returns the most recent event yielded by the stream.
 func (stream *MessagesStream) Event() MessagesStreamEvent {
 	if stream == nil {
 		return MessagesStreamEvent{}
@@ -90,6 +95,7 @@ func (stream *MessagesStream) Event() MessagesStreamEvent {
 	return stream.event
 }
 
+// Err returns the terminal stream error, if any.
 func (stream *MessagesStream) Err() error {
 	if stream == nil {
 		return nil
@@ -97,6 +103,7 @@ func (stream *MessagesStream) Err() error {
 	return stream.err
 }
 
+// Close closes the underlying connection.
 func (stream *MessagesStream) Close() error {
 	if stream == nil || stream.body == nil {
 		return nil

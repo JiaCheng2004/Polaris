@@ -13,6 +13,7 @@ import (
 	"strings"
 )
 
+// UploadFile uploads a local file to the gateway's file store.
 func (c *Client) UploadFile(ctx context.Context, req *FileUploadRequest) (*FileObject, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -68,6 +69,7 @@ func (c *Client) UploadFile(ctx context.Context, req *FileUploadRequest) (*FileO
 	return &out, nil
 }
 
+// UploadFileURL registers a file with the gateway by its source URL.
 func (c *Client) UploadFileURL(ctx context.Context, req *FileURLUploadRequest) (*FileObject, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -79,6 +81,7 @@ func (c *Client) UploadFileURL(ctx context.Context, req *FileURLUploadRequest) (
 	return &out, nil
 }
 
+// ListFiles lists files.
 func (c *Client) ListFiles(ctx context.Context, params *ListFilesParams) (*FileList, error) {
 	query := url.Values{}
 	if params != nil {
@@ -99,6 +102,7 @@ func (c *Client) ListFiles(ctx context.Context, params *ListFilesParams) (*FileL
 	return &out, nil
 }
 
+// GetFile retrieves the file.
 func (c *Client) GetFile(ctx context.Context, fileID string) (*FileObject, error) {
 	fileID = strings.TrimSpace(fileID)
 	if fileID == "" {
@@ -111,6 +115,7 @@ func (c *Client) GetFile(ctx context.Context, fileID string) (*FileObject, error
 	return &out, nil
 }
 
+// DeleteFile deletes the file.
 func (c *Client) DeleteFile(ctx context.Context, fileID string) error {
 	fileID = strings.TrimSpace(fileID)
 	if fileID == "" {
@@ -119,6 +124,7 @@ func (c *Client) DeleteFile(ctx context.Context, fileID string) error {
 	return c.doJSON(ctx, http.MethodDelete, "/v1/files/"+url.PathEscape(fileID), nil, nil, nil)
 }
 
+// MaterializeFile materializes the file.
 func (c *Client) MaterializeFile(ctx context.Context, fileID string, provider string) (*FileMaterialization, error) {
 	fileID = strings.TrimSpace(fileID)
 	if fileID == "" {
@@ -136,6 +142,7 @@ func (c *Client) MaterializeFile(ctx context.Context, fileID string, provider st
 	return &out, nil
 }
 
+// DownloadFileContent downloads the file content.
 func (c *Client) DownloadFileContent(ctx context.Context, contentURL string) ([]byte, string, error) {
 	contentURL = strings.TrimSpace(contentURL)
 	if contentURL == "" {

@@ -14,12 +14,18 @@ import (
 
 const defaultTimeout = time.Minute
 
+// Client is a Polaris gateway API client. It is safe for concurrent use by
+// multiple goroutines. Construct one with [New] and configure it with the
+// With* [Option] helpers.
 type Client struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
 }
 
+// New constructs a Client for the Polaris gateway at baseURL (which must
+// include a scheme and host). Pass [WithAPIKey], [WithTimeout], or
+// [WithHTTPClient] to configure authentication and transport.
 func New(baseURL string, opts ...Option) (*Client, error) {
 	trimmed := strings.TrimSpace(baseURL)
 	if trimmed == "" {

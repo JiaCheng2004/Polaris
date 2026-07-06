@@ -27,6 +27,9 @@ jobs:
       - name: golangci-lint
         run: make lint
 
+      - name: SDK doc coverage (revive exported, pkg/client)
+        run: make doc-check
+
       - name: gosec
         run: make security-check
 

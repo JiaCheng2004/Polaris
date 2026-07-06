@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// CreateKey creates a key.
 func (c *Client) CreateKey(ctx context.Context, req *CreateKeyRequest) (*APIKey, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -21,6 +22,7 @@ func (c *Client) CreateKey(ctx context.Context, req *CreateKeyRequest) (*APIKey,
 	return &response, nil
 }
 
+// ListKeys lists keys.
 func (c *Client) ListKeys(ctx context.Context, params *ListKeysParams) (*APIKeyList, error) {
 	query := url.Values{}
 	if params != nil {
@@ -39,6 +41,7 @@ func (c *Client) ListKeys(ctx context.Context, params *ListKeysParams) (*APIKeyL
 	return &response, nil
 }
 
+// DeleteKey deletes the key.
 func (c *Client) DeleteKey(ctx context.Context, id string) error {
 	trimmedID := strings.TrimSpace(id)
 	if trimmedID == "" {

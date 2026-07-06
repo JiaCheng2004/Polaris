@@ -10,10 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// StreamingTranscriptionConn is a realtime WebSocket connection for streaming transcription.
 type StreamingTranscriptionConn struct {
 	conn *websocket.Conn
 }
 
+// CreateStreamingTranscriptionSession creates a streaming transcription session.
 func (c *Client) CreateStreamingTranscriptionSession(ctx context.Context, req *StreamingTranscriptionSessionRequest) (*StreamingTranscriptionSession, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -26,6 +28,7 @@ func (c *Client) CreateStreamingTranscriptionSession(ctx context.Context, req *S
 	return &response, nil
 }
 
+// DialStreamingTranscriptionSession dials a streaming transcription session.
 func (c *Client) DialStreamingTranscriptionSession(ctx context.Context, session *StreamingTranscriptionSession) (*StreamingTranscriptionConn, error) {
 	if session == nil {
 		return nil, fmt.Errorf("session is required")
@@ -51,6 +54,7 @@ func (c *Client) DialStreamingTranscriptionSession(ctx context.Context, session 
 	return &StreamingTranscriptionConn{conn: conn}, nil
 }
 
+// Send sends a message on the connection.
 func (s *StreamingTranscriptionConn) Send(event *StreamingTranscriptionClientEvent) error {
 	if s == nil || s.conn == nil {
 		return fmt.Errorf("streaming transcription connection is not initialized")
@@ -61,6 +65,7 @@ func (s *StreamingTranscriptionConn) Send(event *StreamingTranscriptionClientEve
 	return s.conn.WriteJSON(event)
 }
 
+// Receive receives the next message from the connection.
 func (s *StreamingTranscriptionConn) Receive() (*StreamingTranscriptionEvent, error) {
 	if s == nil || s.conn == nil {
 		return nil, fmt.Errorf("streaming transcription connection is not initialized")
@@ -72,6 +77,7 @@ func (s *StreamingTranscriptionConn) Receive() (*StreamingTranscriptionEvent, er
 	return &event, nil
 }
 
+// Close closes the underlying connection.
 func (s *StreamingTranscriptionConn) Close() error {
 	if s == nil || s.conn == nil {
 		return nil

@@ -7,6 +7,7 @@ import (
 	"net/url"
 )
 
+// CreateAudioNote creates an audio note.
 func (c *Client) CreateAudioNote(ctx context.Context, req *AudioNoteRequest) (*AudioNoteJob, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -18,6 +19,7 @@ func (c *Client) CreateAudioNote(ctx context.Context, req *AudioNoteRequest) (*A
 	return &response, nil
 }
 
+// GetAudioNote retrieves the audio note.
 func (c *Client) GetAudioNote(ctx context.Context, id string) (*AudioNoteJob, error) {
 	if id == "" {
 		return nil, fmt.Errorf("note id is required")
@@ -29,6 +31,7 @@ func (c *Client) GetAudioNote(ctx context.Context, id string) (*AudioNoteJob, er
 	return &response, nil
 }
 
+// DeleteAudioNote deletes the audio note.
 func (c *Client) DeleteAudioNote(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("note id is required")

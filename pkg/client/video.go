@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// CreateVideoGeneration creates a video generation.
 func (c *Client) CreateVideoGeneration(ctx context.Context, req *VideoGenerationRequest) (*VideoJob, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -18,6 +19,7 @@ func (c *Client) CreateVideoGeneration(ctx context.Context, req *VideoGeneration
 	return &response, nil
 }
 
+// GetVideoGeneration retrieves the video generation.
 func (c *Client) GetVideoGeneration(ctx context.Context, jobID string) (*VideoStatus, error) {
 	if jobID == "" {
 		return nil, fmt.Errorf("jobID is required")
@@ -30,6 +32,7 @@ func (c *Client) GetVideoGeneration(ctx context.Context, jobID string) (*VideoSt
 	return &response, nil
 }
 
+// CancelVideoGeneration cancels an in-flight video generation job.
 func (c *Client) CancelVideoGeneration(ctx context.Context, jobID string) error {
 	if jobID == "" {
 		return fmt.Errorf("jobID is required")
@@ -38,6 +41,7 @@ func (c *Client) CancelVideoGeneration(ctx context.Context, jobID string) error 
 	return c.doJSON(ctx, http.MethodDelete, "/v1/video/generations/"+jobID, nil, nil, nil)
 }
 
+// GetVideoGenerationContent retrieves the video generation content.
 func (c *Client) GetVideoGenerationContent(ctx context.Context, jobID string) (*VideoAsset, error) {
 	if jobID == "" {
 		return nil, fmt.Errorf("jobID is required")

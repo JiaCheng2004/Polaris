@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// APIError describes an error returned by the gateway.
 type APIError struct {
 	StatusCode int
 	Type       string
@@ -17,6 +18,7 @@ type APIError struct {
 	Body       []byte
 }
 
+// Error returns the error message, implementing the error interface.
 func (e *APIError) Error() string {
 	if e == nil {
 		return "polaris API error"

@@ -7,6 +7,7 @@ import (
 	"net/url"
 )
 
+// CreatePodcast creates a podcast.
 func (c *Client) CreatePodcast(ctx context.Context, req *PodcastRequest) (*PodcastJob, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -18,6 +19,7 @@ func (c *Client) CreatePodcast(ctx context.Context, req *PodcastRequest) (*Podca
 	return &response, nil
 }
 
+// GetPodcast retrieves the podcast.
 func (c *Client) GetPodcast(ctx context.Context, id string) (*PodcastStatus, error) {
 	if id == "" {
 		return nil, fmt.Errorf("podcast id is required")
@@ -29,6 +31,7 @@ func (c *Client) GetPodcast(ctx context.Context, id string) (*PodcastStatus, err
 	return &response, nil
 }
 
+// GetPodcastContent retrieves the podcast content.
 func (c *Client) GetPodcastContent(ctx context.Context, id string) (*PodcastAsset, error) {
 	if id == "" {
 		return nil, fmt.Errorf("podcast id is required")
@@ -40,6 +43,7 @@ func (c *Client) GetPodcastContent(ctx context.Context, id string) (*PodcastAsse
 	return &PodcastAsset{Data: data, ContentType: contentType}, nil
 }
 
+// CancelPodcast cancels an in-flight podcast generation job.
 func (c *Client) CancelPodcast(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("podcast id is required")

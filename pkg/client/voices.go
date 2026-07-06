@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// ListVoices lists voices.
 func (c *Client) ListVoices(ctx context.Context, req *VoiceListRequest) (*VoiceList, error) {
 	query := url.Values{}
 	if req != nil {
@@ -42,6 +43,7 @@ func (c *Client) ListVoices(ctx context.Context, req *VoiceListRequest) (*VoiceL
 	return &response, nil
 }
 
+// GetVoice retrieves the voice.
 func (c *Client) GetVoice(ctx context.Context, id string, req *VoiceListRequest) (*VoiceItem, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, fmt.Errorf("voice id is required")
@@ -71,6 +73,7 @@ func (c *Client) GetVoice(ctx context.Context, id string, req *VoiceListRequest)
 	return &response, nil
 }
 
+// CreateVoiceClone creates a voice clone.
 func (c *Client) CreateVoiceClone(ctx context.Context, req *VoiceCloneRequest) (*VoiceItem, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -82,6 +85,7 @@ func (c *Client) CreateVoiceClone(ctx context.Context, req *VoiceCloneRequest) (
 	return &response, nil
 }
 
+// CreateVoiceDesign creates a voice design.
 func (c *Client) CreateVoiceDesign(ctx context.Context, req *VoiceDesignRequest) (*VoiceItem, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -93,6 +97,7 @@ func (c *Client) CreateVoiceDesign(ctx context.Context, req *VoiceDesignRequest)
 	return &response, nil
 }
 
+// RetrainVoice retrains an existing custom voice.
 func (c *Client) RetrainVoice(ctx context.Context, id string, req *VoiceCloneRequest) (*VoiceItem, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, fmt.Errorf("voice id is required")
@@ -107,6 +112,7 @@ func (c *Client) RetrainVoice(ctx context.Context, id string, req *VoiceCloneReq
 	return &response, nil
 }
 
+// ActivateVoice marks a custom voice active for synthesis.
 func (c *Client) ActivateVoice(ctx context.Context, id string, req *VoiceActivationRequest) (*VoiceItem, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, fmt.Errorf("voice id is required")
@@ -121,6 +127,7 @@ func (c *Client) ActivateVoice(ctx context.Context, id string, req *VoiceActivat
 	return &response, nil
 }
 
+// DeleteVoice deletes the voice.
 func (c *Client) DeleteVoice(ctx context.Context, id string, req *VoiceListRequest) error {
 	if strings.TrimSpace(id) == "" {
 		return fmt.Errorf("voice id is required")
@@ -137,6 +144,7 @@ func (c *Client) DeleteVoice(ctx context.Context, id string, req *VoiceListReque
 	return c.doJSON(ctx, http.MethodDelete, "/v1/voices/"+url.PathEscape(id), query, nil, nil)
 }
 
+// ArchiveVoice archives a custom voice, retiring it from use.
 func (c *Client) ArchiveVoice(ctx context.Context, id string, req *VoiceListRequest) error {
 	if strings.TrimSpace(id) == "" {
 		return fmt.Errorf("voice id is required")
@@ -153,6 +161,7 @@ func (c *Client) ArchiveVoice(ctx context.Context, id string, req *VoiceListRequ
 	return c.doJSON(ctx, http.MethodPost, "/v1/voices/"+url.PathEscape(id)+"/archive", query, nil, nil)
 }
 
+// UnarchiveVoice restores a previously archived custom voice.
 func (c *Client) UnarchiveVoice(ctx context.Context, id string, req *VoiceListRequest) error {
 	if strings.TrimSpace(id) == "" {
 		return fmt.Errorf("voice id is required")

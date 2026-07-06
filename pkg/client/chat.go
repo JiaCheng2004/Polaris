@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// CreateChatCompletion creates a chat completion.
 func (c *Client) CreateChatCompletion(ctx context.Context, req *ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -25,6 +26,7 @@ func (c *Client) CreateChatCompletion(ctx context.Context, req *ChatCompletionRe
 	return &response, nil
 }
 
+// StreamChatCompletion opens a streaming chat completion.
 func (c *Client) StreamChatCompletion(ctx context.Context, req *ChatCompletionRequest) (*ChatStream, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -50,6 +52,7 @@ func (c *Client) StreamChatCompletion(ctx context.Context, req *ChatCompletionRe
 	}, nil
 }
 
+// ChatStream is a server-sent-event iterator over chat chunks.
 type ChatStream struct {
 	body   io.ReadCloser
 	reader *bufio.Reader
@@ -58,6 +61,7 @@ type ChatStream struct {
 	done   bool
 }
 
+// Next advances the iterator, returning false at end of stream or on error.
 func (stream *ChatStream) Next() bool {
 	if stream == nil || stream.done {
 		return false
@@ -148,6 +152,7 @@ func (stream *ChatStream) Next() bool {
 	}
 }
 
+// Chunk returns the current stream chunk.
 func (stream *ChatStream) Chunk() ChatCompletionChunk {
 	if stream == nil {
 		return ChatCompletionChunk{}
@@ -155,6 +160,7 @@ func (stream *ChatStream) Chunk() ChatCompletionChunk {
 	return stream.chunk
 }
 
+// Err returns the terminal stream error, if any.
 func (stream *ChatStream) Err() error {
 	if stream == nil {
 		return nil
@@ -162,6 +168,7 @@ func (stream *ChatStream) Err() error {
 	return stream.err
 }
 
+// Close closes the underlying connection.
 func (stream *ChatStream) Close() error {
 	if stream == nil || stream.body == nil {
 		return nil

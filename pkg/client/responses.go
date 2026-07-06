@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// CreateResponse creates a response.
 func (c *Client) CreateResponse(ctx context.Context, req *ResponsesRequest) (*ResponsesResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -24,6 +25,7 @@ func (c *Client) CreateResponse(ctx context.Context, req *ResponsesRequest) (*Re
 	return &response, nil
 }
 
+// StreamResponse opens a streaming response.
 func (c *Client) StreamResponse(ctx context.Context, req *ResponsesRequest) (*ResponsesStream, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -47,6 +49,7 @@ func (c *Client) StreamResponse(ctx context.Context, req *ResponsesRequest) (*Re
 	}, nil
 }
 
+// ResponsesStream is a server-sent-event iterator over responses chunks.
 type ResponsesStream struct {
 	body   io.ReadCloser
 	reader *bufio.Reader
@@ -55,6 +58,7 @@ type ResponsesStream struct {
 	done   bool
 }
 
+// Next advances the iterator, returning false at end of stream or on error.
 func (stream *ResponsesStream) Next() bool {
 	if stream == nil || stream.done {
 		return false
@@ -84,6 +88,7 @@ func (stream *ResponsesStream) Next() bool {
 	return true
 }
 
+// Event returns the most recent event yielded by the stream.
 func (stream *ResponsesStream) Event() ResponsesStreamEvent {
 	if stream == nil {
 		return ResponsesStreamEvent{}
@@ -91,6 +96,7 @@ func (stream *ResponsesStream) Event() ResponsesStreamEvent {
 	return stream.event
 }
 
+// Err returns the terminal stream error, if any.
 func (stream *ResponsesStream) Err() error {
 	if stream == nil {
 		return nil
@@ -98,6 +104,7 @@ func (stream *ResponsesStream) Err() error {
 	return stream.err
 }
 
+// Close closes the underlying connection.
 func (stream *ResponsesStream) Close() error {
 	if stream == nil || stream.body == nil {
 		return nil

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Usage reports token or resource usage.
 type Usage struct {
 	PromptTokens       int    `json:"prompt_tokens"`
 	CompletionTokens   int    `json:"completion_tokens"`
@@ -18,6 +19,7 @@ type Usage struct {
 	Source             string `json:"source,omitempty"`
 }
 
+// RoutingOptions configures optional behavior.
 type RoutingOptions struct {
 	Providers           []string `json:"providers,omitempty"`
 	ExcludeProviders    []string `json:"exclude_providers,omitempty"`
@@ -29,6 +31,7 @@ type RoutingOptions struct {
 	LatencyTier         string   `json:"latency_tier,omitempty"`
 }
 
+// FileUploadRequest is the request body for file upload.
 type FileUploadRequest struct {
 	File        []byte            `json:"-"`
 	Filename    string            `json:"-"`
@@ -39,6 +42,7 @@ type FileUploadRequest struct {
 	ExpiresAt   string            `json:"expires_at,omitempty"`
 }
 
+// FileURLUploadRequest is the request body for file url upload.
 type FileURLUploadRequest struct {
 	URL       string            `json:"url"`
 	Filename  string            `json:"filename,omitempty"`
@@ -48,6 +52,7 @@ type FileURLUploadRequest struct {
 	ExpiresAt string            `json:"expires_at,omitempty"`
 }
 
+// FileObject is a file object value exchanged with the Polaris API.
 type FileObject struct {
 	ID        string              `json:"id"`
 	Object    string              `json:"object"`
@@ -58,6 +63,7 @@ type FileObject struct {
 	Polaris   FilePolarisMetadata `json:"polaris"`
 }
 
+// FilePolarisMetadata is a file polaris metadata value exchanged with the Polaris API.
 type FilePolarisMetadata struct {
 	Sha256                string            `json:"sha256"`
 	MimeType              string            `json:"mime_type"`
@@ -71,18 +77,21 @@ type FilePolarisMetadata struct {
 	ContentURL            string            `json:"content_url,omitempty"`
 }
 
+// FileList is a file list value exchanged with the Polaris API.
 type FileList struct {
 	Object  string       `json:"object"`
 	Data    []FileObject `json:"data"`
 	HasMore bool         `json:"has_more"`
 }
 
+// ListFilesParams is a list files params value exchanged with the Polaris API.
 type ListFilesParams struct {
 	Limit   int
 	After   string
 	Purpose string
 }
 
+// FileMaterialization is a file materialization value exchanged with the Polaris API.
 type FileMaterialization struct {
 	Object         string `json:"object"`
 	FileID         string `json:"file_id"`
@@ -96,6 +105,7 @@ type FileMaterialization struct {
 	Cached         bool   `json:"cached"`
 }
 
+// ChatCompletionRequest is the request body for chat completion.
 type ChatCompletionRequest struct {
 	Model          string              `json:"model"`
 	Routing        *RoutingOptions     `json:"routing,omitempty"`
@@ -112,16 +122,19 @@ type ChatCompletionRequest struct {
 	Metadata       map[string]string   `json:"metadata,omitempty"`
 }
 
+// PolarisChatOptions configures optional behavior.
 type PolarisChatOptions struct {
 	FileUnderstanding *PolarisFileUnderstandingOptions `json:"file_understanding,omitempty"`
 }
 
+// PolarisFileUnderstandingOptions configures optional behavior.
 type PolarisFileUnderstandingOptions struct {
 	Enabled *bool  `json:"enabled,omitempty"`
 	Mode    string `json:"mode,omitempty"`
 	Profile string `json:"profile,omitempty"`
 }
 
+// ChatMessage is a chat message value exchanged with the Polaris API.
 type ChatMessage struct {
 	Role       string         `json:"role"`
 	Content    MessageContent `json:"content"`
@@ -130,19 +143,23 @@ type ChatMessage struct {
 	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
 }
 
+// MessageContent is a message content value exchanged with the Polaris API.
 type MessageContent struct {
 	Text  *string       `json:"-"`
 	Parts []ContentPart `json:"-"`
 }
 
+// NewTextContent constructs a new text content.
 func NewTextContent(text string) MessageContent {
 	return MessageContent{Text: &text}
 }
 
+// NewPartContent constructs a new part content.
 func NewPartContent(parts ...ContentPart) MessageContent {
 	return MessageContent{Parts: append([]ContentPart(nil), parts...)}
 }
 
+// MarshalJSON marshals the value to its JSON wire form.
 func (content MessageContent) MarshalJSON() ([]byte, error) {
 	if content.Text != nil {
 		return json.Marshal(*content.Text)
@@ -150,6 +167,7 @@ func (content MessageContent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(content.Parts)
 }
 
+// UnmarshalJSON unmarshals the value from its JSON wire form.
 func (content *MessageContent) UnmarshalJSON(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	switch {
@@ -178,6 +196,7 @@ func (content *MessageContent) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// ContentPart is one part of a structured, multi-modal payload.
 type ContentPart struct {
 	Type       string          `json:"type"`
 	Text       string          `json:"text,omitempty"`
@@ -187,16 +206,19 @@ type ContentPart struct {
 	Document   *FilePart       `json:"document,omitempty"`
 }
 
+// ImageURLPart is one part of a structured, multi-modal payload.
 type ImageURLPart struct {
 	URL    string `json:"url"`
 	Detail string `json:"detail,omitempty"`
 }
 
+// InputAudioPart is one part of a structured, multi-modal payload.
 type InputAudioPart struct {
 	Data   string `json:"data"`
 	Format string `json:"format"`
 }
 
+// FilePart is one part of a structured, multi-modal payload.
 type FilePart struct {
 	FileID    string `json:"file_id,omitempty"`
 	URL       string `json:"url,omitempty"`
@@ -206,22 +228,26 @@ type FilePart struct {
 	Citations *bool  `json:"citations,omitempty"`
 }
 
+// ToolDefinition is a tool definition value exchanged with the Polaris API.
 type ToolDefinition struct {
 	Type     string             `json:"type"`
 	Function FunctionDefinition `json:"function"`
 }
 
+// FunctionDefinition is a function definition value exchanged with the Polaris API.
 type FunctionDefinition struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
 }
 
+// ResponseFormat is a response format value exchanged with the Polaris API.
 type ResponseFormat struct {
 	Type       string             `json:"type"`
 	JSONSchema *JSONSchemaWrapper `json:"json_schema,omitempty"`
 }
 
+// JSONSchemaWrapper is a json schema wrapper value exchanged with the Polaris API.
 type JSONSchemaWrapper struct {
 	Name        string          `json:"name,omitempty"`
 	Description string          `json:"description,omitempty"`
@@ -229,17 +255,20 @@ type JSONSchemaWrapper struct {
 	Strict      bool            `json:"strict,omitempty"`
 }
 
+// ToolCall is a tool call value exchanged with the Polaris API.
 type ToolCall struct {
 	ID       string           `json:"id"`
 	Type     string           `json:"type"`
 	Function ToolCallFunction `json:"function"`
 }
 
+// ToolCallFunction is a tool call function value exchanged with the Polaris API.
 type ToolCallFunction struct {
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
 }
 
+// ChatCompletionResponse is the response returned for chat completion.
 type ChatCompletionResponse struct {
 	ID      string                 `json:"id"`
 	Object  string                 `json:"object"`
@@ -250,10 +279,12 @@ type ChatCompletionResponse struct {
 	Polaris *ChatPolarisMetadata   `json:"polaris,omitempty"`
 }
 
+// ChatPolarisMetadata is a chat polaris metadata value exchanged with the Polaris API.
 type ChatPolarisMetadata struct {
 	FileUnderstanding *FileUnderstandingUsage `json:"file_understanding,omitempty"`
 }
 
+// FileUnderstandingUsage reports token or resource usage.
 type FileUnderstandingUsage struct {
 	Used      bool                           `json:"used"`
 	Mode      string                         `json:"mode,omitempty"`
@@ -262,6 +293,7 @@ type FileUnderstandingUsage struct {
 	Artifacts []FileUnderstandingArtifactRef `json:"artifacts,omitempty"`
 }
 
+// FileUnderstandingArtifactRef is a file understanding artifact ref value exchanged with the Polaris API.
 type FileUnderstandingArtifactRef struct {
 	FileID    string `json:"file_id,omitempty"`
 	Sha256    string `json:"sha256,omitempty"`
@@ -273,12 +305,14 @@ type FileUnderstandingArtifactRef struct {
 	Source    string `json:"source,omitempty"`
 }
 
+// ChatCompletionChoice is a chat completion choice value exchanged with the Polaris API.
 type ChatCompletionChoice struct {
 	Index        int         `json:"index"`
 	Message      ChatMessage `json:"message"`
 	FinishReason string      `json:"finish_reason"`
 }
 
+// ChatCompletionChunk is one streamed chunk of chat completion.
 type ChatCompletionChunk struct {
 	ID      string                      `json:"id"`
 	Object  string                      `json:"object"`
@@ -288,18 +322,21 @@ type ChatCompletionChunk struct {
 	Usage   *Usage                      `json:"usage,omitempty"`
 }
 
+// ChatCompletionChunkChoice is a chat completion chunk choice value exchanged with the Polaris API.
 type ChatCompletionChunkChoice struct {
 	Index        int       `json:"index"`
 	Delta        ChatDelta `json:"delta"`
 	FinishReason *string   `json:"finish_reason"`
 }
 
+// ChatDelta is a chat delta value exchanged with the Polaris API.
 type ChatDelta struct {
 	Role      string     `json:"role,omitempty"`
 	Content   string     `json:"content,omitempty"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
+// ResponsesRequest is the request body for responses.
 type ResponsesRequest struct {
 	Model           string            `json:"model"`
 	Routing         *RoutingOptions   `json:"routing,omitempty"`
@@ -315,10 +352,12 @@ type ResponsesRequest struct {
 	Metadata        map[string]string `json:"metadata,omitempty"`
 }
 
+// ResponsesText is a responses text value exchanged with the Polaris API.
 type ResponsesText struct {
 	Format *ResponseFormat `json:"format,omitempty"`
 }
 
+// ResponsesResponse is the response returned for responses.
 type ResponsesResponse struct {
 	ID         string                `json:"id"`
 	Object     string                `json:"object"`
@@ -331,6 +370,7 @@ type ResponsesResponse struct {
 	Metadata   map[string]string     `json:"metadata,omitempty"`
 }
 
+// ResponsesOutputItem is a responses output item value exchanged with the Polaris API.
 type ResponsesOutputItem struct {
 	ID        string                 `json:"id,omitempty"`
 	Type      string                 `json:"type"`
@@ -341,11 +381,13 @@ type ResponsesOutputItem struct {
 	CallID    string                 `json:"call_id,omitempty"`
 }
 
+// ResponsesContentItem is a responses content item value exchanged with the Polaris API.
 type ResponsesContentItem struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
 }
 
+// ResponsesUsage reports token or resource usage.
 type ResponsesUsage struct {
 	InputTokens  int    `json:"input_tokens"`
 	OutputTokens int    `json:"output_tokens"`
@@ -353,6 +395,7 @@ type ResponsesUsage struct {
 	Source       string `json:"source,omitempty"`
 }
 
+// ResponsesStreamEvent is a responses stream event value exchanged with the Polaris API.
 type ResponsesStreamEvent struct {
 	Type         string               `json:"type"`
 	Response     *ResponsesResponse   `json:"response,omitempty"`
@@ -364,6 +407,7 @@ type ResponsesStreamEvent struct {
 	Text         string               `json:"text,omitempty"`
 }
 
+// MessagesRequest is the request body for messages.
 type MessagesRequest struct {
 	Model         string                   `json:"model"`
 	Routing       *RoutingOptions          `json:"routing,omitempty"`
@@ -379,17 +423,20 @@ type MessagesRequest struct {
 	Metadata      map[string]string        `json:"metadata,omitempty"`
 }
 
+// MessagesToolDefinition is a messages tool definition value exchanged with the Polaris API.
 type MessagesToolDefinition struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema,omitempty"`
 }
 
+// MessagesInputMessage is a messages input message value exchanged with the Polaris API.
 type MessagesInputMessage struct {
 	Role    string          `json:"role"`
 	Content json.RawMessage `json:"content"`
 }
 
+// MessagesContentSource is a messages content source value exchanged with the Polaris API.
 type MessagesContentSource struct {
 	Type      string `json:"type"`
 	MediaType string `json:"media_type,omitempty"`
@@ -397,6 +444,7 @@ type MessagesContentSource struct {
 	URL       string `json:"url,omitempty"`
 }
 
+// MessagesContentBlock is a messages content block value exchanged with the Polaris API.
 type MessagesContentBlock struct {
 	Type      string                 `json:"type"`
 	Text      string                 `json:"text,omitempty"`
@@ -408,6 +456,7 @@ type MessagesContentBlock struct {
 	Content   json.RawMessage        `json:"content,omitempty"`
 }
 
+// MessagesResponse is the response returned for messages.
 type MessagesResponse struct {
 	ID           string                `json:"id"`
 	Type         string                `json:"type"`
@@ -419,6 +468,7 @@ type MessagesResponse struct {
 	Usage        MessagesUsage         `json:"usage"`
 }
 
+// MessagesOutputBlock is a messages output block value exchanged with the Polaris API.
 type MessagesOutputBlock struct {
 	Type  string          `json:"type"`
 	Text  string          `json:"text,omitempty"`
@@ -427,12 +477,14 @@ type MessagesOutputBlock struct {
 	Input json.RawMessage `json:"input,omitempty"`
 }
 
+// MessagesUsage reports token or resource usage.
 type MessagesUsage struct {
 	InputTokens  int    `json:"input_tokens"`
 	OutputTokens int    `json:"output_tokens"`
 	Source       string `json:"source,omitempty"`
 }
 
+// MessagesStreamEvent is a messages stream event value exchanged with the Polaris API.
 type MessagesStreamEvent struct {
 	Type         string               `json:"type"`
 	Message      *MessagesResponse    `json:"message,omitempty"`
@@ -442,6 +494,7 @@ type MessagesStreamEvent struct {
 	Usage        *MessagesUsage       `json:"usage,omitempty"`
 }
 
+// TokenCountRequest is the request body for token count.
 type TokenCountRequest struct {
 	Model              string          `json:"model"`
 	Routing            *RoutingOptions `json:"routing,omitempty"`
@@ -452,6 +505,7 @@ type TokenCountRequest struct {
 	MaxOutputTokens    int             `json:"max_output_tokens,omitempty"`
 }
 
+// TokenCountResponse is the response returned for token count.
 type TokenCountResponse struct {
 	Model                string   `json:"model"`
 	InputTokens          int      `json:"input_tokens"`
@@ -460,6 +514,7 @@ type TokenCountResponse struct {
 	Notes                []string `json:"notes,omitempty"`
 }
 
+// TranslationRequest is the request body for translation.
 type TranslationRequest struct {
 	Model          string            `json:"model"`
 	Routing        *RoutingOptions   `json:"routing,omitempty"`
@@ -469,19 +524,23 @@ type TranslationRequest struct {
 	Glossary       map[string]string `json:"glossary,omitempty"`
 }
 
+// TranslationInput is a polymorphic input accepting either a single value or many.
 type TranslationInput struct {
 	Single *string
 	Many   []string
 }
 
+// NewSingleTranslationInput constructs a new single translation input.
 func NewSingleTranslationInput(value string) TranslationInput {
 	return TranslationInput{Single: &value}
 }
 
+// NewMultiTranslationInput constructs a new multi translation input.
 func NewMultiTranslationInput(values ...string) TranslationInput {
 	return TranslationInput{Many: append([]string(nil), values...)}
 }
 
+// Values returns the input normalized to a slice of strings.
 func (input TranslationInput) Values() []string {
 	if input.Single != nil {
 		return []string{*input.Single}
@@ -489,6 +548,7 @@ func (input TranslationInput) Values() []string {
 	return append([]string(nil), input.Many...)
 }
 
+// MarshalJSON marshals the value to its JSON wire form.
 func (input TranslationInput) MarshalJSON() ([]byte, error) {
 	if input.Single != nil {
 		return json.Marshal(*input.Single)
@@ -496,6 +556,7 @@ func (input TranslationInput) MarshalJSON() ([]byte, error) {
 	return json.Marshal(input.Many)
 }
 
+// UnmarshalJSON unmarshals the value from its JSON wire form.
 func (input *TranslationInput) UnmarshalJSON(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	switch {
@@ -524,6 +585,7 @@ func (input *TranslationInput) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// TranslationResponse is the response returned for translation.
 type TranslationResponse struct {
 	Object       string              `json:"object"`
 	Model        string              `json:"model"`
@@ -531,12 +593,14 @@ type TranslationResponse struct {
 	Usage        Usage               `json:"usage"`
 }
 
+// TranslationResult is a translation result value exchanged with the Polaris API.
 type TranslationResult struct {
 	Index                  int    `json:"index"`
 	Text                   string `json:"text"`
 	DetectedSourceLanguage string `json:"detected_source_language,omitempty"`
 }
 
+// EmbeddingRequest is the request body for embedding.
 type EmbeddingRequest struct {
 	Model          string          `json:"model"`
 	Routing        *RoutingOptions `json:"routing,omitempty"`
@@ -546,19 +610,23 @@ type EmbeddingRequest struct {
 	User           string          `json:"user,omitempty"`
 }
 
+// EmbeddingInput is a polymorphic input accepting either a single value or many.
 type EmbeddingInput struct {
 	Single *string
 	Many   []string
 }
 
+// NewSingleEmbeddingInput constructs a new single embedding input.
 func NewSingleEmbeddingInput(value string) EmbeddingInput {
 	return EmbeddingInput{Single: &value}
 }
 
+// NewMultiEmbeddingInput constructs a new multi embedding input.
 func NewMultiEmbeddingInput(values ...string) EmbeddingInput {
 	return EmbeddingInput{Many: append([]string(nil), values...)}
 }
 
+// Values returns the input normalized to a slice of strings.
 func (input EmbeddingInput) Values() []string {
 	if input.Single != nil {
 		return []string{*input.Single}
@@ -566,6 +634,7 @@ func (input EmbeddingInput) Values() []string {
 	return append([]string(nil), input.Many...)
 }
 
+// MarshalJSON marshals the value to its JSON wire form.
 func (input EmbeddingInput) MarshalJSON() ([]byte, error) {
 	if input.Single != nil {
 		return json.Marshal(*input.Single)
@@ -573,6 +642,7 @@ func (input EmbeddingInput) MarshalJSON() ([]byte, error) {
 	return json.Marshal(input.Many)
 }
 
+// UnmarshalJSON unmarshals the value from its JSON wire form.
 func (input *EmbeddingInput) UnmarshalJSON(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	switch {
@@ -601,6 +671,7 @@ func (input *EmbeddingInput) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// EmbeddingResponse is the response returned for embedding.
 type EmbeddingResponse struct {
 	Object string          `json:"object"`
 	Data   []EmbeddingData `json:"data"`
@@ -608,17 +679,20 @@ type EmbeddingResponse struct {
 	Usage  EmbeddingUsage  `json:"usage"`
 }
 
+// EmbeddingData is a embedding data value exchanged with the Polaris API.
 type EmbeddingData struct {
 	Object    string          `json:"object"`
 	Index     int             `json:"index"`
 	Embedding EmbeddingValues `json:"embedding"`
 }
 
+// EmbeddingValues is a embedding values value exchanged with the Polaris API.
 type EmbeddingValues struct {
 	Float32 []float32
 	Base64  string
 }
 
+// MarshalJSON marshals the value to its JSON wire form.
 func (values EmbeddingValues) MarshalJSON() ([]byte, error) {
 	if values.Base64 != "" {
 		return json.Marshal(values.Base64)
@@ -629,6 +703,7 @@ func (values EmbeddingValues) MarshalJSON() ([]byte, error) {
 	return json.Marshal(values.Float32)
 }
 
+// UnmarshalJSON unmarshals the value from its JSON wire form.
 func (values *EmbeddingValues) UnmarshalJSON(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	switch {
@@ -655,12 +730,14 @@ func (values *EmbeddingValues) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// EmbeddingUsage reports token or resource usage.
 type EmbeddingUsage struct {
 	PromptTokens int    `json:"prompt_tokens"`
 	TotalTokens  int    `json:"total_tokens"`
 	Source       string `json:"source,omitempty"`
 }
 
+// ImageGenerationRequest is the request body for image generation.
 type ImageGenerationRequest struct {
 	Model           string          `json:"model"`
 	Routing         *RoutingOptions `json:"routing,omitempty"`
@@ -673,6 +750,7 @@ type ImageGenerationRequest struct {
 	ReferenceImages []string        `json:"reference_images,omitempty"`
 }
 
+// ImageEditRequest is the request body for image edit.
 type ImageEditRequest struct {
 	Model            string
 	Routing          *RoutingOptions
@@ -688,17 +766,20 @@ type ImageEditRequest struct {
 	ResponseFormat   string
 }
 
+// ImageResponse is the response returned for image.
 type ImageResponse struct {
 	Created int64         `json:"created"`
 	Data    []ImageResult `json:"data"`
 }
 
+// ImageResult is a image result value exchanged with the Polaris API.
 type ImageResult struct {
 	URL           string `json:"url,omitempty"`
 	B64JSON       string `json:"b64_json,omitempty"`
 	RevisedPrompt string `json:"revised_prompt,omitempty"`
 }
 
+// VideoGenerationRequest is the request body for video generation.
 type VideoGenerationRequest struct {
 	Model           string          `json:"model"`
 	Routing         *RoutingOptions `json:"routing,omitempty"`
@@ -715,6 +796,7 @@ type VideoGenerationRequest struct {
 	Audio           string   `json:"audio,omitempty"`
 }
 
+// VideoJob is a video job value exchanged with the Polaris API.
 type VideoJob struct {
 	JobID         string `json:"job_id"`
 	Status        string `json:"status"`
@@ -722,6 +804,7 @@ type VideoJob struct {
 	Model         string `json:"model,omitempty"`
 }
 
+// VideoStatus is a video status value exchanged with the Polaris API.
 type VideoStatus struct {
 	JobID       string       `json:"job_id"`
 	Status      string       `json:"status"`
@@ -733,6 +816,7 @@ type VideoStatus struct {
 	ExpiresAt   int64        `json:"expires_at,omitempty"`
 }
 
+// VideoResult is a video result value exchanged with the Polaris API.
 type VideoResult struct {
 	VideoURL    string `json:"video_url,omitempty"`
 	AudioURL    string `json:"audio_url,omitempty"`
@@ -743,12 +827,14 @@ type VideoResult struct {
 	Height      int    `json:"height,omitempty"`
 }
 
+// VideoError describes an error returned by the gateway.
 type VideoError struct {
 	Type    string `json:"type,omitempty"`
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
+// SpeechRequest is the request body for speech.
 type SpeechRequest struct {
 	Model          string          `json:"model"`
 	Routing        *RoutingOptions `json:"routing,omitempty"`
@@ -758,16 +844,19 @@ type SpeechRequest struct {
 	Speed          *float64        `json:"speed,omitempty"`
 }
 
+// Audio is a audio value exchanged with the Polaris API.
 type Audio struct {
 	Data        []byte
 	ContentType string
 }
 
+// VideoAsset is a video asset value exchanged with the Polaris API.
 type VideoAsset struct {
 	Data        []byte
 	ContentType string
 }
 
+// MusicGenerationRequest is the request body for music generation.
 type MusicGenerationRequest struct {
 	Mode            string          `json:"mode,omitempty"`
 	Model           string          `json:"model"`
@@ -785,6 +874,7 @@ type MusicGenerationRequest struct {
 	SignWithC2PA    bool            `json:"sign_with_c2pa,omitempty"`
 }
 
+// MusicEditRequest is the request body for music edit.
 type MusicEditRequest struct {
 	Mode            string          `json:"mode,omitempty"`
 	Model           string          `json:"model"`
@@ -808,6 +898,7 @@ type MusicEditRequest struct {
 	SignWithC2PA    bool            `json:"sign_with_c2pa,omitempty"`
 }
 
+// MusicStemRequest is the request body for music stem.
 type MusicStemRequest struct {
 	Mode         string          `json:"mode,omitempty"`
 	Model        string          `json:"model"`
@@ -822,6 +913,7 @@ type MusicStemRequest struct {
 	SignWithC2PA bool            `json:"sign_with_c2pa,omitempty"`
 }
 
+// MusicLyricsRequest is the request body for music lyrics.
 type MusicLyricsRequest struct {
 	Model   string          `json:"model"`
 	Routing *RoutingOptions `json:"routing,omitempty"`
@@ -831,6 +923,7 @@ type MusicLyricsRequest struct {
 	Title   string          `json:"title,omitempty"`
 }
 
+// MusicPlanRequest is the request body for music plan.
 type MusicPlanRequest struct {
 	Model      string          `json:"model"`
 	Routing    *RoutingOptions `json:"routing,omitempty"`
@@ -839,6 +932,7 @@ type MusicPlanRequest struct {
 	SourcePlan json.RawMessage `json:"source_plan,omitempty"`
 }
 
+// MusicJob is a music job value exchanged with the Polaris API.
 type MusicJob struct {
 	JobID     string `json:"job_id"`
 	Status    string `json:"status"`
@@ -846,6 +940,7 @@ type MusicJob struct {
 	Operation string `json:"operation,omitempty"`
 }
 
+// MusicStatus is a music status value exchanged with the Polaris API.
 type MusicStatus struct {
 	JobID       string       `json:"job_id"`
 	Status      string       `json:"status"`
@@ -859,6 +954,7 @@ type MusicStatus struct {
 	ExpiresAt   int64        `json:"expires_at,omitempty"`
 }
 
+// MusicResult is a music result value exchanged with the Polaris API.
 type MusicResult struct {
 	SongID       string          `json:"song_id,omitempty"`
 	DownloadURL  string          `json:"download_url,omitempty"`
@@ -872,37 +968,44 @@ type MusicResult struct {
 	Plan         json.RawMessage `json:"plan,omitempty"`
 }
 
+// MusicError describes an error returned by the gateway.
 type MusicError struct {
 	Type    string `json:"type,omitempty"`
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
+// MusicLyricsResponse is the response returned for music lyrics.
 type MusicLyricsResponse struct {
 	Title     string `json:"title,omitempty"`
 	StyleTags string `json:"style_tags,omitempty"`
 	Lyrics    string `json:"lyrics,omitempty"`
 }
 
+// MusicPlanResponse is the response returned for music plan.
 type MusicPlanResponse struct {
 	Plan json.RawMessage `json:"plan"`
 }
 
+// MusicAsset is a music asset value exchanged with the Polaris API.
 type MusicAsset struct {
 	Data        []byte
 	ContentType string
 }
 
+// MusicStream is a server-sent-event iterator over music chunks.
 type MusicStream struct {
 	Body        io.ReadCloser
 	ContentType string
 }
 
+// MusicOperationResponse is the response returned for music operation.
 type MusicOperationResponse struct {
 	Job   *MusicJob
 	Asset *MusicAsset
 }
 
+// AudioSessionRequest is the request body for audio session.
 type AudioSessionRequest struct {
 	Model             string              `json:"model"`
 	Routing           *RoutingOptions     `json:"routing,omitempty"`
@@ -914,12 +1017,14 @@ type AudioSessionRequest struct {
 	TurnDetection     *AudioTurnDetection `json:"turn_detection,omitempty"`
 }
 
+// AudioTurnDetection is a audio turn detection value exchanged with the Polaris API.
 type AudioTurnDetection struct {
 	Mode            string `json:"mode"`
 	SilenceMS       int    `json:"silence_ms,omitempty"`
 	PrefixPaddingMS int    `json:"prefix_padding_ms,omitempty"`
 }
 
+// AudioSession is a audio session value exchanged with the Polaris API.
 type AudioSession struct {
 	ID           string `json:"id"`
 	Object       string `json:"object"`
@@ -929,11 +1034,13 @@ type AudioSession struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+// AudioEventResponse is the response returned for audio event.
 type AudioEventResponse struct {
 	Voice        string `json:"voice,omitempty"`
 	Instructions string `json:"instructions,omitempty"`
 }
 
+// AudioClientEvent is a audio client event value exchanged with the Polaris API.
 type AudioClientEvent struct {
 	Type       string               `json:"type"`
 	EventID    string               `json:"event_id,omitempty"`
@@ -944,6 +1051,7 @@ type AudioClientEvent struct {
 	Response   *AudioEventResponse  `json:"response,omitempty"`
 }
 
+// AudioServerEvent is a audio server event value exchanged with the Polaris API.
 type AudioServerEvent struct {
 	Type       string         `json:"type"`
 	EventID    string         `json:"event_id,omitempty"`
@@ -956,6 +1064,7 @@ type AudioServerEvent struct {
 	Error      *AudioWSSError `json:"error,omitempty"`
 }
 
+// AudioUsage reports token or resource usage.
 type AudioUsage struct {
 	InputAudioSeconds  float64 `json:"input_audio_seconds,omitempty"`
 	OutputAudioSeconds float64 `json:"output_audio_seconds,omitempty"`
@@ -965,6 +1074,7 @@ type AudioUsage struct {
 	Source             string  `json:"source,omitempty"`
 }
 
+// AudioWSSError describes an error returned by the gateway.
 type AudioWSSError struct {
 	Type    string `json:"type,omitempty"`
 	Code    string `json:"code,omitempty"`
@@ -972,6 +1082,7 @@ type AudioWSSError struct {
 	Param   string `json:"param,omitempty"`
 }
 
+// StreamingTranscriptionSessionRequest is the request body for streaming transcription session.
 type StreamingTranscriptionSessionRequest struct {
 	Model            string          `json:"model"`
 	Routing          *RoutingOptions `json:"routing,omitempty"`
@@ -982,6 +1093,7 @@ type StreamingTranscriptionSessionRequest struct {
 	ReturnUtterances *bool           `json:"return_utterances,omitempty"`
 }
 
+// StreamingTranscriptionSession is a streaming transcription session value exchanged with the Polaris API.
 type StreamingTranscriptionSession struct {
 	ID           string `json:"id"`
 	Object       string `json:"object"`
@@ -991,6 +1103,7 @@ type StreamingTranscriptionSession struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+// StreamingTranscriptionClientEvent is a streaming transcription client event value exchanged with the Polaris API.
 type StreamingTranscriptionClientEvent struct {
 	Type    string                                `json:"type"`
 	EventID string                                `json:"event_id,omitempty"`
@@ -998,6 +1111,7 @@ type StreamingTranscriptionClientEvent struct {
 	Audio   string                                `json:"audio,omitempty"`
 }
 
+// StreamingTranscriptionEvent is a streaming transcription event value exchanged with the Polaris API.
 type StreamingTranscriptionEvent struct {
 	Type       string                         `json:"type"`
 	EventID    string                         `json:"event_id,omitempty"`
@@ -1008,11 +1122,13 @@ type StreamingTranscriptionEvent struct {
 	Error      *AudioWSSError                 `json:"error,omitempty"`
 }
 
+// InterpretingGlossaryEntry is a interpreting glossary entry value exchanged with the Polaris API.
 type InterpretingGlossaryEntry struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
 }
 
+// InterpretingSessionRequest is the request body for interpreting session.
 type InterpretingSessionRequest struct {
 	Model              string                      `json:"model"`
 	Routing            *RoutingOptions             `json:"routing,omitempty"`
@@ -1028,6 +1144,7 @@ type InterpretingSessionRequest struct {
 	Glossary           []InterpretingGlossaryEntry `json:"glossary,omitempty"`
 }
 
+// InterpretingSession is a interpreting session value exchanged with the Polaris API.
 type InterpretingSession struct {
 	ID           string `json:"id"`
 	Object       string `json:"object"`
@@ -1037,6 +1154,7 @@ type InterpretingSession struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+// InterpretingClientEvent is a interpreting client event value exchanged with the Polaris API.
 type InterpretingClientEvent struct {
 	Type    string                      `json:"type"`
 	EventID string                      `json:"event_id,omitempty"`
@@ -1044,6 +1162,7 @@ type InterpretingClientEvent struct {
 	Audio   string                      `json:"audio,omitempty"`
 }
 
+// InterpretingUsage reports token or resource usage.
 type InterpretingUsage struct {
 	InputAudioSeconds  float64 `json:"input_audio_seconds,omitempty"`
 	OutputAudioSeconds float64 `json:"output_audio_seconds,omitempty"`
@@ -1051,6 +1170,7 @@ type InterpretingUsage struct {
 	Source             string  `json:"source,omitempty"`
 }
 
+// InterpretingEvent is a interpreting event value exchanged with the Polaris API.
 type InterpretingEvent struct {
 	Type       string               `json:"type"`
 	EventID    string               `json:"event_id,omitempty"`
@@ -1063,6 +1183,7 @@ type InterpretingEvent struct {
 	Error      *AudioWSSError       `json:"error,omitempty"`
 }
 
+// TranscriptionRequest is the request body for transcription.
 type TranscriptionRequest struct {
 	Model          string
 	Routing        *RoutingOptions
@@ -1074,6 +1195,7 @@ type TranscriptionRequest struct {
 	Temperature    *float64
 }
 
+// TranscriptionResponse is the response returned for transcription.
 type TranscriptionResponse struct {
 	Text        string              `json:"text,omitempty"`
 	Language    string              `json:"language,omitempty"`
@@ -1084,6 +1206,7 @@ type TranscriptionResponse struct {
 	Format      string              `json:"-"`
 }
 
+// TranscriptSegment is a transcript segment value exchanged with the Polaris API.
 type TranscriptSegment struct {
 	ID    int     `json:"id"`
 	Start float64 `json:"start"`
@@ -1091,6 +1214,7 @@ type TranscriptSegment struct {
 	Text  string  `json:"text"`
 }
 
+// Model is a model value exchanged with the Polaris API.
 type Model struct {
 	ID                string                `json:"id"`
 	Object            string                `json:"object"`
@@ -1132,6 +1256,7 @@ type Model struct {
 	ResolvesTo        string                `json:"resolves_to,omitempty"`
 }
 
+// ModelCapabilityFlags is a model capability flags value exchanged with the Polaris API.
 type ModelCapabilityFlags struct {
 	Chat              bool `json:"chat"`
 	Vision            bool `json:"vision"`
@@ -1145,6 +1270,7 @@ type ModelCapabilityFlags struct {
 	Streaming         bool `json:"streaming"`
 }
 
+// ModelLifecycle is a model lifecycle value exchanged with the Polaris API.
 type ModelLifecycle struct {
 	Enabled           bool   `json:"enabled"`
 	Status            string `json:"status,omitempty"`
@@ -1152,12 +1278,14 @@ type ModelLifecycle struct {
 	VerificationClass string `json:"verification_class,omitempty"`
 }
 
+// ModelHostedTool is a model hosted tool value exchanged with the Polaris API.
 type ModelHostedTool struct {
 	Name               string `json:"name"`
 	Capability         string `json:"capability"`
 	ResolvedServerSide bool   `json:"resolved_server_side"`
 }
 
+// ModelBillingMetadata is a model billing metadata value exchanged with the Polaris API.
 type ModelBillingMetadata struct {
 	BillingMode     string                        `json:"billing_mode,omitempty"`
 	Unit            string                        `json:"unit,omitempty"`
@@ -1172,12 +1300,14 @@ type ModelBillingMetadata struct {
 	AdditionalUnits map[string]float64            `json:"additional_units,omitempty"`
 }
 
+// ModelTieredRate is a model tiered rate value exchanged with the Polaris API.
 type ModelTieredRate struct {
 	ID    string             `json:"id,omitempty"`
 	Range [2]int             `json:"range"`
 	Rates map[string]float64 `json:"rates,omitempty"`
 }
 
+// ModelQuotaMetadata is a model quota metadata value exchanged with the Polaris API.
 type ModelQuotaMetadata struct {
 	QuotaBucket      string   `json:"quota_bucket,omitempty"`
 	Unit             string   `json:"unit,omitempty"`
@@ -1185,12 +1315,14 @@ type ModelQuotaMetadata struct {
 	ConcurrencyLimit *int     `json:"concurrency_limit,omitempty"`
 }
 
+// ModelRoutingMetadata is a model routing metadata value exchanged with the Polaris API.
 type ModelRoutingMetadata struct {
 	Aliases   []ModelRoutingAlias             `json:"aliases,omitempty"`
 	Selectors []ModelRoutingSelector          `json:"selectors,omitempty"`
 	Defaults  map[string]ModelExecutorDefault `json:"defaults,omitempty"`
 }
 
+// ModelRoutingAlias is a model routing alias value exchanged with the Polaris API.
 type ModelRoutingAlias struct {
 	Alias      string `json:"alias"`
 	Target     string `json:"target"`
@@ -1198,6 +1330,7 @@ type ModelRoutingAlias struct {
 	Kind       string `json:"kind"`
 }
 
+// ModelRoutingSelector is a model routing selector value exchanged with the Polaris API.
 type ModelRoutingSelector struct {
 	Alias               string   `json:"alias"`
 	ResolvesTo          string   `json:"resolves_to,omitempty"`
@@ -1212,6 +1345,7 @@ type ModelRoutingSelector struct {
 	LatencyTier         string   `json:"latency_tier,omitempty"`
 }
 
+// ModelExecutorDefault is a model executor default value exchanged with the Polaris API.
 type ModelExecutorDefault struct {
 	Alias        string   `json:"alias"`
 	Model        string   `json:"model"`
@@ -1220,12 +1354,14 @@ type ModelExecutorDefault struct {
 	Capabilities []string `json:"capabilities,omitempty"`
 }
 
+// ModelList is a model list value exchanged with the Polaris API.
 type ModelList struct {
 	Object  string                `json:"object"`
 	Data    []Model               `json:"data"`
 	Routing *ModelRoutingMetadata `json:"routing,omitempty"`
 }
 
+// VoiceListRequest is the request body for voice list.
 type VoiceListRequest struct {
 	Provider        string
 	Model           string
@@ -1236,6 +1372,7 @@ type VoiceListRequest struct {
 	IncludeArchived bool
 }
 
+// VoiceList is a voice list value exchanged with the Polaris API.
 type VoiceList struct {
 	Object   string      `json:"object"`
 	Scope    string      `json:"scope"`
@@ -1243,6 +1380,7 @@ type VoiceList struct {
 	Data     []VoiceItem `json:"data"`
 }
 
+// VoiceItem is a voice item value exchanged with the Polaris API.
 type VoiceItem struct {
 	ID          string         `json:"id"`
 	Provider    string         `json:"provider,omitempty"`
@@ -1260,6 +1398,7 @@ type VoiceItem struct {
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
+// VoiceStyle is a voice style value exchanged with the Polaris API.
 type VoiceStyle struct {
 	Name        string `json:"name"`
 	Type        string `json:"type,omitempty"`
@@ -1267,6 +1406,7 @@ type VoiceStyle struct {
 	PreviewText string `json:"preview_text,omitempty"`
 }
 
+// VoiceCloneRequest is the request body for voice clone.
 type VoiceCloneRequest struct {
 	Model                  string          `json:"model"`
 	Routing                *RoutingOptions `json:"routing,omitempty"`
@@ -1283,6 +1423,7 @@ type VoiceCloneRequest struct {
 	DenoiseModel           string          `json:"denoise_model,omitempty"`
 }
 
+// VoiceDesignRequest is the request body for voice design.
 type VoiceDesignRequest struct {
 	Model          string          `json:"model"`
 	Routing        *RoutingOptions `json:"routing,omitempty"`
@@ -1292,11 +1433,13 @@ type VoiceDesignRequest struct {
 	PromptImageURL string          `json:"prompt_image_url,omitempty"`
 }
 
+// VoiceActivationRequest is the request body for voice activation.
 type VoiceActivationRequest struct {
 	Model    string `json:"model"`
 	Provider string `json:"provider,omitempty"`
 }
 
+// AudioNoteRequest is the request body for audio note.
 type AudioNoteRequest struct {
 	Model              string          `json:"model"`
 	Routing            *RoutingOptions `json:"routing,omitempty"`
@@ -1310,6 +1453,7 @@ type AudioNoteRequest struct {
 	TargetLanguage     string          `json:"target_language,omitempty"`
 }
 
+// AudioNoteJob is a audio note job value exchanged with the Polaris API.
 type AudioNoteJob struct {
 	ID     string           `json:"id"`
 	Object string           `json:"object"`
@@ -1319,6 +1463,7 @@ type AudioNoteJob struct {
 	Error  *AudioWSSError   `json:"error,omitempty"`
 }
 
+// AudioNoteResult is a audio note result value exchanged with the Polaris API.
 type AudioNoteResult struct {
 	Transcript  string                `json:"transcript,omitempty"`
 	Summary     string                `json:"summary,omitempty"`
@@ -1329,6 +1474,7 @@ type AudioNoteResult struct {
 	Metadata    map[string]any        `json:"metadata,omitempty"`
 }
 
+// AudioNoteChapter is a audio note chapter value exchanged with the Polaris API.
 type AudioNoteChapter struct {
 	Title string  `json:"title,omitempty"`
 	Start float64 `json:"start,omitempty"`
@@ -1336,6 +1482,7 @@ type AudioNoteChapter struct {
 	Text  string  `json:"text,omitempty"`
 }
 
+// AudioNoteActionItem is a audio note action item value exchanged with the Polaris API.
 type AudioNoteActionItem struct {
 	Content   string   `json:"content,omitempty"`
 	Executor  []string `json:"executor,omitempty"`
@@ -1343,11 +1490,13 @@ type AudioNoteActionItem struct {
 	StartTime float64  `json:"start_time,omitempty"`
 }
 
+// AudioNoteQAPair is a audio note qa pair value exchanged with the Polaris API.
 type AudioNoteQAPair struct {
 	Question string `json:"question,omitempty"`
 	Answer   string `json:"answer,omitempty"`
 }
 
+// PodcastRequest is the request body for podcast.
 type PodcastRequest struct {
 	Model        string           `json:"model"`
 	Routing      *RoutingOptions  `json:"routing,omitempty"`
@@ -1357,12 +1506,14 @@ type PodcastRequest struct {
 	UseHeadMusic *bool            `json:"use_head_music,omitempty"`
 }
 
+// PodcastSegment is a podcast segment value exchanged with the Polaris API.
 type PodcastSegment struct {
 	Speaker string `json:"speaker"`
 	Voice   string `json:"voice,omitempty"`
 	Text    string `json:"text"`
 }
 
+// PodcastJob is a podcast job value exchanged with the Polaris API.
 type PodcastJob struct {
 	ID     string `json:"id"`
 	Object string `json:"object"`
@@ -1370,6 +1521,7 @@ type PodcastJob struct {
 	Status string `json:"status"`
 }
 
+// PodcastStatus is a podcast status value exchanged with the Polaris API.
 type PodcastStatus struct {
 	ID     string         `json:"id"`
 	Object string         `json:"object"`
@@ -1379,17 +1531,20 @@ type PodcastStatus struct {
 	Error  *AudioWSSError `json:"error,omitempty"`
 }
 
+// PodcastResult is a podcast result value exchanged with the Polaris API.
 type PodcastResult struct {
 	ContentType string         `json:"content_type,omitempty"`
 	Usage       Usage          `json:"usage,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
+// PodcastAsset is a podcast asset value exchanged with the Polaris API.
 type PodcastAsset struct {
 	Data        []byte
 	ContentType string
 }
 
+// UsageParams is a usage params value exchanged with the Polaris API.
 type UsageParams struct {
 	From     *time.Time
 	To       *time.Time
@@ -1398,6 +1553,7 @@ type UsageParams struct {
 	GroupBy  string
 }
 
+// DailyUsage reports token or resource usage.
 type DailyUsage struct {
 	Date     string  `json:"date"`
 	Requests int64   `json:"requests"`
@@ -1405,6 +1561,7 @@ type DailyUsage struct {
 	CostUSD  float64 `json:"cost_usd"`
 }
 
+// ModelUsage reports token or resource usage.
 type ModelUsage struct {
 	Model    string  `json:"model"`
 	Requests int64   `json:"requests"`
@@ -1412,6 +1569,7 @@ type ModelUsage struct {
 	CostUSD  float64 `json:"cost_usd"`
 }
 
+// UsageReport is a usage report value exchanged with the Polaris API.
 type UsageReport struct {
 	From                string           `json:"from"`
 	To                  string           `json:"to"`
@@ -1423,6 +1581,7 @@ type UsageReport struct {
 	ByModel             []ModelUsage     `json:"by_model,omitempty"`
 }
 
+// CreateKeyRequest is the request body for create key.
 type CreateKeyRequest struct {
 	Name          string   `json:"name"`
 	OwnerID       string   `json:"owner_id,omitempty"`
@@ -1432,11 +1591,13 @@ type CreateKeyRequest struct {
 	ExpiresAt     string   `json:"expires_at,omitempty"`
 }
 
+// ListKeysParams is a list keys params value exchanged with the Polaris API.
 type ListKeysParams struct {
 	OwnerID        string
 	IncludeRevoked *bool
 }
 
+// APIKey is a api key value exchanged with the Polaris API.
 type APIKey struct {
 	ID            string     `json:"id"`
 	Name          string     `json:"name"`
@@ -1452,11 +1613,13 @@ type APIKey struct {
 	IsRevoked     bool       `json:"is_revoked,omitempty"`
 }
 
+// APIKeyList is a api key list value exchanged with the Polaris API.
 type APIKeyList struct {
 	Object string   `json:"object"`
 	Data   []APIKey `json:"data"`
 }
 
+// Project is a project value exchanged with the Polaris API.
 type Project struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
@@ -1465,16 +1628,19 @@ type Project struct {
 	ArchivedAt  *time.Time `json:"archived_at,omitempty"`
 }
 
+// ProjectList is a project list value exchanged with the Polaris API.
 type ProjectList struct {
 	Object string    `json:"object"`
 	Data   []Project `json:"data"`
 }
 
+// CreateProjectRequest is the request body for create project.
 type CreateProjectRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 }
 
+// CreateVirtualKeyRequest is the request body for create virtual key.
 type CreateVirtualKeyRequest struct {
 	ProjectID         string   `json:"project_id"`
 	Name              string   `json:"name"`
@@ -1487,11 +1653,13 @@ type CreateVirtualKeyRequest struct {
 	ExpiresAt         string   `json:"expires_at,omitempty"`
 }
 
+// ListVirtualKeysParams is a list virtual keys params value exchanged with the Polaris API.
 type ListVirtualKeysParams struct {
 	ProjectID      string
 	IncludeRevoked *bool
 }
 
+// VirtualKey is a virtual key value exchanged with the Polaris API.
 type VirtualKey struct {
 	ID                string     `json:"id"`
 	ProjectID         string     `json:"project_id,omitempty"`
@@ -1510,11 +1678,13 @@ type VirtualKey struct {
 	IsRevoked         bool       `json:"is_revoked,omitempty"`
 }
 
+// VirtualKeyList is a virtual key list value exchanged with the Polaris API.
 type VirtualKeyList struct {
 	Object string       `json:"object"`
 	Data   []VirtualKey `json:"data"`
 }
 
+// CreatePolicyRequest is the request body for create policy.
 type CreatePolicyRequest struct {
 	ProjectID         string   `json:"project_id"`
 	Name              string   `json:"name"`
@@ -1525,6 +1695,7 @@ type CreatePolicyRequest struct {
 	AllowedMCP        []string `json:"allowed_mcp_bindings,omitempty"`
 }
 
+// Policy is a policy value exchanged with the Polaris API.
 type Policy struct {
 	ID                string    `json:"id"`
 	ProjectID         string    `json:"project_id"`
@@ -1537,11 +1708,13 @@ type Policy struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
+// PolicyList is a policy list value exchanged with the Polaris API.
 type PolicyList struct {
 	Object string   `json:"object"`
 	Data   []Policy `json:"data"`
 }
 
+// CreateBudgetRequest is the request body for create budget.
 type CreateBudgetRequest struct {
 	ProjectID     string  `json:"project_id"`
 	Name          string  `json:"name"`
@@ -1551,6 +1724,7 @@ type CreateBudgetRequest struct {
 	Window        string  `json:"window,omitempty"`
 }
 
+// Budget is a budget value exchanged with the Polaris API.
 type Budget struct {
 	ID            string    `json:"id"`
 	ProjectID     string    `json:"project_id"`
@@ -1562,11 +1736,13 @@ type Budget struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// BudgetList is a budget list value exchanged with the Polaris API.
 type BudgetList struct {
 	Object string   `json:"object"`
 	Data   []Budget `json:"data"`
 }
 
+// CreateToolRequest is the request body for create tool.
 type CreateToolRequest struct {
 	Name           string          `json:"name"`
 	Description    string          `json:"description,omitempty"`
@@ -1575,6 +1751,7 @@ type CreateToolRequest struct {
 	Enabled        *bool           `json:"enabled,omitempty"`
 }
 
+// ToolDefinitionResponse is the response returned for tool definition.
 type ToolDefinitionResponse struct {
 	ID             string    `json:"id"`
 	Name           string    `json:"name"`
@@ -1585,17 +1762,20 @@ type ToolDefinitionResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+// ToolDefinitionList is a tool definition list value exchanged with the Polaris API.
 type ToolDefinitionList struct {
 	Object string                   `json:"object"`
 	Data   []ToolDefinitionResponse `json:"data"`
 }
 
+// CreateToolsetRequest is the request body for create toolset.
 type CreateToolsetRequest struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	ToolIDs     []string `json:"tool_ids"`
 }
 
+// Toolset is a toolset value exchanged with the Polaris API.
 type Toolset struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
@@ -1604,11 +1784,13 @@ type Toolset struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// ToolsetList is a toolset list value exchanged with the Polaris API.
 type ToolsetList struct {
 	Object string    `json:"object"`
 	Data   []Toolset `json:"data"`
 }
 
+// CreateMCPBindingRequest is the request body for create mcp binding.
 type CreateMCPBindingRequest struct {
 	Name        string            `json:"name"`
 	Kind        string            `json:"kind"`
@@ -1618,6 +1800,7 @@ type CreateMCPBindingRequest struct {
 	Enabled     *bool             `json:"enabled,omitempty"`
 }
 
+// MCPBinding is a mcp binding value exchanged with the Polaris API.
 type MCPBinding struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
@@ -1629,6 +1812,7 @@ type MCPBinding struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// MCPBindingList is a mcp binding list value exchanged with the Polaris API.
 type MCPBindingList struct {
 	Object string       `json:"object"`
 	Data   []MCPBinding `json:"data"`

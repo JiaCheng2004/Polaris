@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// CreateTranslation creates a translation.
 func (c *Client) CreateTranslation(ctx context.Context, req *TranslationRequest) (*TranslationResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")

@@ -11,6 +11,7 @@ import (
 	"strconv"
 )
 
+// CreateSpeech creates a speech.
 func (c *Client) CreateSpeech(ctx context.Context, req *SpeechRequest) (*Audio, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -39,6 +40,7 @@ func (c *Client) CreateSpeech(ctx context.Context, req *SpeechRequest) (*Audio, 
 	}, nil
 }
 
+// CreateTranscription creates a transcription.
 func (c *Client) CreateTranscription(ctx context.Context, req *TranscriptionRequest) (*TranscriptionResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")

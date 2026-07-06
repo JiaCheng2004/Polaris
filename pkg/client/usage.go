@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// GetUsage retrieves the usage.
 func (c *Client) GetUsage(ctx context.Context, params *UsageParams) (*UsageReport, error) {
 	query := url.Values{}
 	if params != nil {

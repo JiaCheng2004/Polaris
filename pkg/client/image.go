@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// GenerateImage generates an image.
 func (c *Client) GenerateImage(ctx context.Context, req *ImageGenerationRequest) (*ImageResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")
@@ -23,6 +24,7 @@ func (c *Client) GenerateImage(ctx context.Context, req *ImageGenerationRequest)
 	return &response, nil
 }
 
+// EditImage edits the image.
 func (c *Client) EditImage(ctx context.Context, req *ImageEditRequest) (*ImageResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")

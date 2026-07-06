@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// CreateEmbedding creates an embedding.
 func (c *Client) CreateEmbedding(ctx context.Context, req *EmbeddingRequest) (*EmbeddingResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required")

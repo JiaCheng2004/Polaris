@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+// Option configures a [Client] at construction time. Pass options to [New].
 type Option func(*Client) error
 
+// WithAPIKey sets the bearer API key sent on every request.
 func WithAPIKey(apiKey string) Option {
 	return func(client *Client) error {
 		client.apiKey = strings.TrimSpace(apiKey)
@@ -16,6 +18,8 @@ func WithAPIKey(apiKey string) Option {
 	}
 }
 
+// WithTimeout sets the per-request timeout on the client's HTTP transport. The
+// timeout must be greater than zero.
 func WithTimeout(timeout time.Duration) Option {
 	return func(client *Client) error {
 		if timeout <= 0 {
@@ -29,6 +33,9 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
+// WithHTTPClient replaces the underlying [http.Client]. If the supplied client
+// has no timeout, any timeout already configured on the Polaris client is
+// preserved. This is the hook for custom transports, proxies, or TLS settings.
 func WithHTTPClient(httpClient *http.Client) Option {
 	return func(client *Client) error {
 		if httpClient == nil {
