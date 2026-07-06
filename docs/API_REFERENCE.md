@@ -2292,6 +2292,15 @@ Legacy key request fields:
 
 ## 16. MCP Broker
 
+### `GET /mcp`, `POST /mcp`
+
+Aggregate MCP endpoint. `GET` returns transport/capability metadata; `POST`
+accepts JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`) over every
+binding the caller's scopes allow. Tools from each binding are namespaced
+`{binding_id}:{tool}` so names never collide. A short result is returned as a
+single JSON body; sending `Accept: text/event-stream` returns the response as SSE
+frames on the POST.
+
 ### `GET /mcp/:binding_id`, `GET /mcp/:binding_id/*path`
 
 Metadata probe for a configured MCP binding. For `local_toolset` bindings Polaris returns broker metadata:

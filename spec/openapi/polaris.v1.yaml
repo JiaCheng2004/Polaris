@@ -182,6 +182,9 @@ paths:
     post: {operationId: createMCPBinding, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /v1/admin/cache/purge:
     post: {operationId: purgeSemanticCache, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /mcp:
+    get: {operationId: mcpAggregateMetadata, tags: [mcp], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: mcpAggregateRpc, tags: [mcp], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
 components:
   parameters:

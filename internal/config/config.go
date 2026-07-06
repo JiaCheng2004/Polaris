@@ -307,7 +307,16 @@ type ToolsConfig struct {
 }
 
 type MCPConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool           `yaml:"enabled"`
+	Auth    []string       `yaml:"auth"` // api_key | oauth (default [api_key])
+	OAuth   MCPOAuthConfig `yaml:"oauth"`
+}
+
+// MCPOAuthConfig configures the MCP OAuth 2.1 resource server (RFC 9728).
+type MCPOAuthConfig struct {
+	AuthorizationServers []string      `yaml:"authorization_servers"`
+	ResourceURI          string        `yaml:"resource_uri"`
+	JWKSCacheTTL         time.Duration `yaml:"jwks_cache_ttl"`
 }
 
 type FilesConfig struct {

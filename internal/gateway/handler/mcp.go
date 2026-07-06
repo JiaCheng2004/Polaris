@@ -14,6 +14,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/middleware"
 	gwruntime "github.com/JiaCheng2004/Polaris/internal/gateway/runtime"
+	"github.com/JiaCheng2004/Polaris/internal/mcp"
 	"github.com/JiaCheng2004/Polaris/internal/obs"
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/tooling"
@@ -27,6 +28,7 @@ type MCPHandler struct {
 	tools   *tooling.Registry
 	metrics *metrics.Recorder
 	client  *http.Client
+	server  *mcp.Server
 }
 
 func NewMCPHandler(runtime *gwruntime.Holder, appStore store.Store, tools *tooling.Registry, recorder *metrics.Recorder) *MCPHandler {
@@ -38,6 +40,7 @@ func NewMCPHandler(runtime *gwruntime.Holder, appStore store.Store, tools *tooli
 		client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
+		server: mcp.NewServer(""),
 	}
 }
 
@@ -122,6 +125,63 @@ func (h *MCPHandler) Serve(c *gin.Context) {
 	}
 }
 
+// ServeAggregate exposes every binding the caller's scopes allow through a
+// single MCP endpoint. Tools are namespaced `{binding_id}:{tool}`.
+func (h *MCPHandler) ServeAggregate(c *gin.Context) {
+	ctx, span := obs.StartInternalSpan(c.Request.Context(), "mcp.aggregate")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+	middleware.SetRequestOutcome(c, middleware.RequestOutcome{InterfaceFamily: "mcp", MCPBinding: "_aggregate"})
+
+	if c.Request.Method == http.MethodGet {
+		c.JSON(http.StatusOK, gin.H{
+			"transport":        "streamable_http",
+			"protocol_version": mcp.ProtocolVersionLatest,
+			"capabilities":     gin.H{"tools": true},
+			"aggregate":        true,
+		})
+		return
+	}
+
+	snapshot := middleware.RuntimeSnapshot(c, h.runtime)
+	if snapshot == nil || snapshot.Config == nil {
+		httputil.WriteError(c, httputil.NewError(http.StatusInternalServerError, "internal_error", "runtime_unavailable", "", "Runtime configuration is unavailable."))
+		return
+	}
+	auth := middleware.GetAuthContext(c)
+	bindings, err := h.store.ListMCPBindings(ctx)
+	if err != nil {
+		httputil.WriteError(c, err)
+		return
+	}
+
+	agg := mcp.NewAggregate(30 * time.Second)
+	for _, binding := range bindings {
+		if !binding.Enabled || !middleware.StringScopeAllowed(auth.AllowedMCPBindings, auth.PolicyMCPBindings, binding.ID) {
+			continue
+		}
+		switch binding.Kind {
+		case store.MCPBindingKindLocalToolset:
+			if !snapshot.Config.Tools.Enabled || !middleware.StringScopeAllowed(auth.AllowedToolsets, auth.PolicyToolsets, binding.ToolsetID) {
+				continue
+			}
+			toolset, err := h.store.GetToolset(ctx, binding.ToolsetID)
+			if err != nil {
+				continue
+			}
+			agg.Add(binding.ID, &localToolSource{store: h.store, tools: h.tools, toolset: *toolset, metrics: h.metrics})
+		case store.MCPBindingKindUpstreamProxy:
+			agg.Add(binding.ID, h.upstreamClientFor(binding))
+		}
+	}
+
+	if h.metrics != nil {
+		h.metrics.IncMCPRequest("_aggregate", "ok")
+	}
+	h.server.Handle(c.Writer, c.Request, agg)
+	c.Abort()
+}
+
 func (h *MCPHandler) proxyUpstream(c *gin.Context, binding store.MCPBinding) error {
 	ctx, span := obs.StartInternalSpan(c.Request.Context(), "mcp.proxy",
 		attribute.String("polaris.mcp_binding_id", binding.ID),
@@ -190,143 +250,23 @@ func (h *MCPHandler) serveLocalToolset(c *gin.Context, binding store.MCPBinding)
 	c.Request = c.Request.WithContext(ctx)
 
 	if c.Request.Method == http.MethodGet {
-		c.JSON(http.StatusOK, gin.H{
-			"binding_id":   binding.ID,
-			"kind":         binding.Kind,
-			"toolset_id":   binding.ToolsetID,
-			"transport":    "streamable_http",
-			"capabilities": gin.H{"tools": true},
-		})
+		c.JSON(http.StatusOK, localMetadata(binding))
 		return nil
 	}
 	if c.Request.Method != http.MethodPost {
 		return httputil.NewError(http.StatusMethodNotAllowed, "invalid_request_error", "method_not_allowed", "", "Local MCP toolsets support GET and POST.")
 	}
 
-	var req mcpRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		if httputil.IsRequestBodyTooLarge(err) {
-			return httputil.RequestBodyTooLargeError(0)
-		}
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_json", "", "Request body must be valid JSON-RPC.")
-	}
 	toolset, err := h.store.GetToolset(c.Request.Context(), binding.ToolsetID)
 	if err != nil {
 		obs.RecordSpanError(span, err)
 		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_toolset", "binding_id", "Referenced toolset was not found.")
 	}
 
-	switch req.Method {
-	case "initialize":
-		c.JSON(http.StatusOK, mcpResponse{
-			JSONRPC: "2.0",
-			ID:      req.ID,
-			Result: gin.H{
-				"protocolVersion": "2025-03-26",
-				"capabilities": gin.H{
-					"tools": gin.H{"listChanged": false},
-				},
-				"serverInfo": gin.H{
-					"name":    "polaris",
-					"version": "control-plane-preview",
-				},
-			},
-		})
-		return nil
-	case "ping":
-		c.JSON(http.StatusOK, mcpResponse{JSONRPC: "2.0", ID: req.ID, Result: gin.H{}})
-		return nil
-	case "tools/list":
-		tools, err := h.resolveToolsetTools(c.Request.Context(), *toolset)
-		if err != nil {
-			return err
-		}
-		items := make([]gin.H, 0, len(tools))
-		for _, tool := range tools {
-			items = append(items, gin.H{
-				"name":        tool.Name,
-				"description": tool.Description,
-				"inputSchema": rawJSON(tool.InputSchema),
-			})
-		}
-		c.JSON(http.StatusOK, mcpResponse{JSONRPC: "2.0", ID: req.ID, Result: gin.H{"tools": items}})
-		return nil
-	case "tools/call":
-		var params struct {
-			Name      string          `json:"name"`
-			Arguments json.RawMessage `json:"arguments"`
-		}
-		if err := json.Unmarshal(req.Params, &params); err != nil {
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "invalid_tool_call", "params", "tools/call params must include name and arguments.")
-		}
-		tool, err := h.lookupToolByName(c.Request.Context(), *toolset, strings.TrimSpace(params.Name))
-		if err != nil {
-			return err
-		}
-		result, err := h.tools.Execute(c.Request.Context(), tool.Implementation, params.Arguments)
-		if err != nil {
-			if h.metrics != nil {
-				h.metrics.IncToolInvocation(tool.Name, "error")
-			}
-			return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "tool_execution_failed", "params", err.Error())
-		}
-		if h.metrics != nil {
-			h.metrics.IncToolInvocation(tool.Name, "ok")
-		}
-		c.JSON(http.StatusOK, mcpResponse{
-			JSONRPC: "2.0",
-			ID:      req.ID,
-			Result: gin.H{
-				"content": []gin.H{
-					{"type": "text", "text": result.Text},
-				},
-				"structuredContent": result.Structured,
-				"isError":           false,
-			},
-		})
-		return nil
-	default:
-		return httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unsupported_mcp_method", "method", "MCP method is not supported by this Polaris runtime.")
-	}
-}
-
-func (h *MCPHandler) resolveToolsetTools(ctx context.Context, toolset store.Toolset) ([]store.ToolDefinition, error) {
-	tools := make([]store.ToolDefinition, 0, len(toolset.ToolIDs))
-	for _, toolID := range toolset.ToolIDs {
-		tool, err := h.store.GetToolDefinition(ctx, toolID)
-		if err != nil {
-			return nil, httputil.NewError(http.StatusBadRequest, "invalid_request_error", "unknown_tool", "tool_ids", "Toolset references an unknown tool definition.")
-		}
-		tools = append(tools, *tool)
-	}
-	return tools, nil
-}
-
-func (h *MCPHandler) lookupToolByName(ctx context.Context, toolset store.Toolset, name string) (*store.ToolDefinition, error) {
-	tools, err := h.resolveToolsetTools(ctx, toolset)
-	if err != nil {
-		return nil, err
-	}
-	for _, tool := range tools {
-		if strings.EqualFold(tool.Name, name) {
-			return &tool, nil
-		}
-	}
-	return nil, httputil.NewError(http.StatusNotFound, "invalid_request_error", "tool_not_found", "name", "Tool is not part of this toolset.")
-}
-
-type mcpRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params"`
-}
-
-type mcpResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Result  any             `json:"result,omitempty"`
-	Error   any             `json:"error,omitempty"`
+	source := &localToolSource{store: h.store, tools: h.tools, toolset: *toolset, metrics: h.metrics}
+	h.server.Handle(c.Writer, c.Request, source)
+	c.Abort()
+	return nil
 }
 
 func parseStringMap(raw string) map[string]string {
@@ -336,17 +276,6 @@ func parseStringMap(raw string) map[string]string {
 	out := map[string]string{}
 	_ = json.Unmarshal([]byte(raw), &out)
 	return out
-}
-
-func rawJSON(value string) any {
-	if strings.TrimSpace(value) == "" {
-		return gin.H{}
-	}
-	var decoded any
-	if err := json.Unmarshal([]byte(value), &decoded); err != nil {
-		return gin.H{}
-	}
-	return decoded
 }
 
 func copyMCPProxyHeaders(dst http.Header, src http.Header) {

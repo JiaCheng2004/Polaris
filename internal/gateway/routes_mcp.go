@@ -12,6 +12,8 @@ func registerMCPRoutes(engine *gin.Engine, deps Dependencies, handlers routeHand
 		middleware.Auth(deps.Runtime, deps.Store, deps.AuthCache, deps.VirtualKeyCache, deps.Logger),
 		middleware.Budget(deps.Runtime, deps.Store, deps.Metrics, deps.AuditLogger, deps.Logger),
 	)
+	mcp.GET("", handlers.mcp.ServeAggregate)
+	mcp.POST("", handlers.mcp.ServeAggregate)
 	mcp.Any("/:binding_id/*path", handlers.mcp.Serve)
 	mcp.Any("/:binding_id", handlers.mcp.Serve)
 }
