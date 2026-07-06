@@ -101,8 +101,19 @@ jobs:
       - name: Build binary
         run: go build ./cmd/polaris
 
-      - name: Validate Docker build
-        run: docker build -f deployments/Dockerfile .
+      - name: Build Docker image
+        run: docker build -f deployments/Dockerfile -t polaris:ci .
+
+      - name: Quickstart smoke (container starts + serves /health)
+        run: |
+          docker run -d --name polaris-ci -p 8080:8080 polaris:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+              echo "container healthy"; docker rm -f polaris-ci; exit 0
+            fi
+            sleep 1
+          done
+          echo "container did not become healthy within 30s"; docker logs polaris-ci; docker rm -f polaris-ci; exit 1
 
   compliance:
     runs-on: ubuntu-latest

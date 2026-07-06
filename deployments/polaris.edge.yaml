@@ -6,8 +6,6 @@ version: 2
 imports:
   - ./providers/openai.yaml
   - ./providers/anthropic.yaml
-  - ./providers/zai-token.yaml
-  - ./providers/minimax-token.yaml
   - ./routing/local.yaml
 
 runtime:
