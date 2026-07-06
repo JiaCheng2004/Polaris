@@ -65,6 +65,8 @@ type RequestOutcome struct {
 	Images             int
 	UnitCounts         map[string]int
 	FinishReasons      []string
+	RouteStrategy      string
+	Hedged             bool
 }
 
 func SetAuthContext(c *gin.Context, auth AuthContext) {

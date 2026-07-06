@@ -14,6 +14,11 @@ import (
 
 func (h *ChatHandler) completeWithFailover(c *gin.Context, primary chatTarget, fallbacks []chatTarget, req *modality.ChatRequest) (*modality.ChatResponse, middleware.RequestOutcome, string, error) {
 	targets := append([]chatTarget{primary}, fallbacks...)
+	// Hedging (opt-in via a route policy) races idempotent unary completions to
+	// cut tail latency; the default path is the sequential failover loop.
+	if hedge := h.hedgeConfigFor(c, primary.model.ID, modality.ModalityChat); hedge.DelayMs > 0 && len(targets) > 1 {
+		return h.completeHedged(c, targets, req, "", hedge)
+	}
 	response, _, outcome, fallbackModel, err := runFailover(h, c, targets, primary, req, "", 1, true, noAvailableProviderError(), invokeComplete, onCompleteSuccess)
 	return response, outcome, fallbackModel, err
 }

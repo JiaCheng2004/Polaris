@@ -221,6 +221,15 @@ type RoutePolicy struct {
 	Match    RouteMatch   `yaml:"match"`
 	Strategy string       `yaml:"strategy"`
 	Weights  RouteWeights `yaml:"weights"`
+	Hedge    HedgeConfig  `yaml:"hedge"`
+}
+
+// HedgeConfig enables request hedging for idempotent unary chat requests: after
+// delay_ms with no response, up to max_extra additional candidates are raced;
+// the first success wins and losers are cancelled. Disabled when delay_ms is 0.
+type HedgeConfig struct {
+	DelayMs  int `yaml:"delay_ms"`
+	MaxExtra int `yaml:"max_extra"`
 }
 
 type RouteMatch struct {

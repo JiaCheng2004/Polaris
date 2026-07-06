@@ -3134,6 +3134,72 @@ func TestChatFallbackStopsAtFirstSuccess(t *testing.T) {
 	}
 }
 
+func TestChatHedgingCutsTailLatency(t *testing.T) {
+	openaiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(500 * time.Millisecond) // slow tail
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"c","object":"chat.completion","created":1744329600,"model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"openai-slow"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer openaiSrv.Close()
+
+	deepseekSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(10 * time.Millisecond) // fast
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"d","object":"chat.completion","created":1744329600,"model":"deepseek-chat","choices":[{"index":0,"message":{"role":"assistant","content":"deepseek-fast"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer deepseekSrv.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{
+		"openai":   openaiSrv.URL + "/v1",
+		"deepseek": deepseekSrv.URL + "/v1",
+	})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*", "deepseek/*"}},
+	}
+	cfg.Routing.Fallbacks = []config.FallbackRule{
+		{From: "openai/gpt-4o", To: []string{"deepseek/deepseek-chat"}, On: []string{"rate_limit", "timeout", "server_error"}},
+	}
+	cfg.Routing.Policies = []config.RoutePolicy{
+		{Match: config.RouteMatch{Model: "openai/*"}, Hedge: config.HedgeConfig{DelayMs: 30, MaxExtra: 1}},
+	}
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:   cfg,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:    testSQLiteStore(t),
+		Cache:    cache.NewMemory(),
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hi"}]}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	start := time.Now()
+	engine.ServeHTTP(res, req)
+	elapsed := time.Since(start)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", res.Code, res.Body.String())
+	}
+	// The hedge fires deepseek after 30ms; it wins at ~40ms, far before the 500ms
+	// slow primary, and its response is returned.
+	if !strings.Contains(res.Body.String(), "deepseek-fast") {
+		t.Fatalf("hedge did not return the fast winner: %s", res.Body.String())
+	}
+	if elapsed > 300*time.Millisecond {
+		t.Fatalf("hedged request took %v; should finish well before the 500ms tail", elapsed)
+	}
+}
+
 func TestRoutingLeastLatencyReorders(t *testing.T) {
 	openaiCalls := 0
 	openaiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
