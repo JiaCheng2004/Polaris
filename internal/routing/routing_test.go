@@ -146,3 +146,22 @@ func TestInputNotMutated(t *testing.T) {
 		t.Fatalf("input slice mutated: %v", ids(cands))
 	}
 }
+
+func BenchmarkRouterOrderAdaptive(b *testing.B) {
+	r := NewRouter()
+	cands := []Candidate{
+		{ModelID: "openai/gpt-4o", Provider: "openai", CostPer1K: 0.03},
+		{ModelID: "anthropic/claude", Provider: "anthropic", CostPer1K: 0.02},
+		{ModelID: "deepseek/chat", Provider: "deepseek", CostPer1K: 0.001},
+	}
+	health := healthMap(map[string]Health{
+		"openai":    {Score: 0.9, LatencyMs: 200},
+		"anthropic": {Score: 0.95, LatencyMs: 150},
+		"deepseek":  {Score: 0.8, LatencyMs: 90},
+	})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = r.Order("openai/gpt-4o", StrategyAdaptive, cands, health, AdaptiveWeights{})
+	}
+}

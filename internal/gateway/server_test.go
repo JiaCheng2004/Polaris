@@ -31,6 +31,7 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/store"
 	"github.com/JiaCheng2004/Polaris/internal/store/cache"
 	"github.com/JiaCheng2004/Polaris/internal/store/sqlite"
+	"github.com/JiaCheng2004/Polaris/internal/transport"
 	"github.com/gin-gonic/gin"
 )
 
@@ -3131,6 +3132,93 @@ func TestChatFallbackStopsAtFirstSuccess(t *testing.T) {
 	}
 	if deepseekCalls != 1 || xaiCalls != 0 {
 		t.Fatalf("expected first fallback only, got deepseek=%d xai=%d", deepseekCalls, xaiCalls)
+	}
+}
+
+// TestSimulationDeadPrimaryBoundedLatency drives real traffic through the engine
+// with the transport observer feeding the reliability manager: a slow-dead
+// primary trips the breaker, after which requests skip it and latency is bounded
+// (the P3 dead-primary-penalty proof).
+func TestSimulationDeadPrimaryBoundedLatency(t *testing.T) {
+	transport.ResetObservers()
+	defer transport.ResetObservers()
+
+	openai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(100 * time.Millisecond) // slow-dead: hangs then fails
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"message":"boom","type":"server_error"}}`))
+	}))
+	defer openai.Close()
+
+	deepseek := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"d","object":"chat.completion","created":1744329600,"model":"deepseek-chat","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer deepseek.Close()
+
+	cfg := testConfigWithProviderBaseURLs(t, map[string]string{
+		"openai":   openai.URL + "/v1",
+		"deepseek": deepseek.URL + "/v1",
+	})
+	cfg.Auth.Mode = config.AuthModeStatic
+	cfg.Auth.StaticKeys = []config.StaticKeyConfig{
+		{Name: "k", KeyHash: middleware.HashAPIKey("secret"), RateLimit: "1000000/min", AllowedModels: []string{"openai/*", "deepseek/*"}},
+	}
+	cfg.Routing.Fallbacks = []config.FallbackRule{
+		{From: "openai/gpt-4o", To: []string{"deepseek/deepseek-chat"}, On: []string{"rate_limit", "timeout", "server_error"}},
+	}
+
+	mgr := reliability.NewManager(reliability.Config{Breaker: reliability.BreakerConfig{ErrorRate: 0.5, MinSamples: 8, OpenFor: time.Minute}}, nil)
+	transport.AddObserver(mgr.Observe)
+
+	registry, _, err := provider.New(cfg)
+	if err != nil {
+		t.Fatalf("provider.New: %v", err)
+	}
+	engine, err := NewEngine(Dependencies{
+		Config:      cfg,
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Store:       testSQLiteStore(t),
+		Cache:       cache.NewMemory(),
+		Registry:    registry,
+		Reliability: mgr,
+	})
+	if err != nil {
+		t.Fatalf("NewEngine: %v", err)
+	}
+
+	do := func() time.Duration {
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"openai/gpt-4o","messages":[{"role":"user","content":"Hi"}]}`))
+		req.Header.Set("Authorization", "Bearer secret")
+		req.Header.Set("Content-Type", "application/json")
+		res := httptest.NewRecorder()
+		start := time.Now()
+		engine.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("status = %d body=%s", res.Code, res.Body.String())
+		}
+		return time.Since(start)
+	}
+
+	const n = 40
+	var lat []time.Duration
+	for i := 0; i < n; i++ {
+		lat = append(lat, do())
+	}
+
+	// Once the breaker opens, the slow-dead primary is skipped: the tail of the
+	// run must be fast (no 100ms primary hang).
+	var maxTail time.Duration
+	for _, d := range lat[n-15:] {
+		if d > maxTail {
+			maxTail = d
+		}
+	}
+	if maxTail > 60*time.Millisecond {
+		t.Fatalf("dead-primary penalty not bounded: max tail latency = %v (breaker-skip should keep it low)", maxTail)
+	}
+	if mgr.Health("openai").Breaker != reliability.Open {
+		t.Fatal("breaker did not open under the dead-primary load")
 	}
 }
 
