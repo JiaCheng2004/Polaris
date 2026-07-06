@@ -1,0 +1,9 @@
+# Vacuum ruleset for the Polaris OpenAPI contract (see `make openapi-lint`).
+# Extends the recommended OpenAPI ruleset but disables two style rules that are
+# false positives for an intentionally OpenAI-compatible API:
+#   - property names are snake_case (max_tokens, top_p) by wire contract, not camelCase
+#   - paths carry versioned/segment names (/v1/chat/completions) that are not kebab-case
+extends: [[vacuum:oas, recommended]]
+rules:
+  camel-case-properties: false
+  paths-kebab-case: false

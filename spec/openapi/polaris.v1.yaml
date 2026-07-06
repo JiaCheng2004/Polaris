@@ -8,18 +8,23 @@ info:
     docs/API_REFERENCE.md remains the human-readable companion.
 servers:
   - url: http://localhost:8080
+    description: Local development
+  - url: https://gateway.example.com
+    description: Production deployment (replace with your own host)
 tags:
   - name: health
   - name: mcp
   - name: gateway
   - name: control-plane
+security:
+  - bearerAuth: []
 paths:
   /health:
-    get: {operationId: healthLiveness, tags: [health], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
+    get: {operationId: healthLiveness, tags: [health], security: [], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
   /ready:
-    get: {operationId: healthReadiness, tags: [health], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
+    get: {operationId: healthReadiness, tags: [health], security: [], responses: {"200": {$ref: "#/components/responses/JSONOK"}}}
   /metrics:
-    get: {operationId: prometheusMetrics, tags: [health], responses: {"200": {description: Prometheus metrics, content: {text/plain: {schema: {type: string}}}}}}
+    get: {operationId: prometheusMetrics, tags: [health], security: [], responses: {"200": {description: Prometheus metrics, content: {text/plain: {schema: {type: string}}}}}}
 
   /mcp/{binding_id}:
     get: {operationId: mcpGetBindingRoot, tags: [mcp], parameters: [{$ref: "#/components/parameters/BindingID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
@@ -47,15 +52,15 @@ paths:
   /v1/usage:
     get: {operationId: getUsage, tags: [gateway], responses: {"200": {description: Usage report, content: {application/json: {schema: {$ref: "#/components/schemas/UsageReport"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/chat/completions:
-    post: {operationId: createChatCompletion, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Chat completion, content: {application/json: {schema: {$ref: "#/components/schemas/ChatCompletion"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createChatCompletion, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ChatCompletionRequest"}}}}, responses: {"200": {description: Chat completion, content: {application/json: {schema: {$ref: "#/components/schemas/ChatCompletion"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/responses:
     post: {operationId: createResponse, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /v1/messages:
     post: {operationId: createMessage, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /v1/embeddings:
-    post: {operationId: createEmbedding, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createEmbedding, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/EmbeddingRequest"}}}}, responses: {"200": {description: Embeddings, content: {application/json: {schema: {$ref: "#/components/schemas/EmbeddingResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/tokens/count:
-    post: {operationId: countTokens, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: countTokens, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/TokenCountRequest"}}}}, responses: {"200": {description: Token count, content: {application/json: {schema: {$ref: "#/components/schemas/TokenCountResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/files:
     get: {operationId: listFiles, tags: [gateway], responses: {"200": {description: File list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
     post: {operationId: createFile, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {type: object}}, multipart/form-data: {schema: {type: object}}}}, responses: {"200": {description: File object, content: {application/json: {schema: {$ref: "#/components/schemas/FileObject"}}}}, default: {$ref: "#/components/responses/Error"}}}
@@ -74,15 +79,15 @@ paths:
   /v1/batches/{id}/output:
     get: {operationId: getBatchOutput, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Batch output}, default: {$ref: "#/components/responses/Error"}}}
   /v1/translations:
-    post: {operationId: createTranslation, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createTranslation, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/TranslationRequest"}}}}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
   /v1/images/generations:
-    post: {operationId: createImageGeneration, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createImageGeneration, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ImageGenerationRequest"}}}}, responses: {"200": {description: Generated images, content: {application/json: {schema: {$ref: "#/components/schemas/ImageResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/images/edits:
     post: {operationId: createImageEdit, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/Multipart"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
   /v1/video/generations:
-    post: {operationId: createVideoGeneration, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Video job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createVideoGeneration, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/VideoGenerationRequest"}}}}, responses: {"200": {description: Video job, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/video/generations/{id}:
     get: {operationId: getVideoGeneration, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Video status, content: {application/json: {schema: {$ref: "#/components/schemas/AsyncJob"}}}}, default: {$ref: "#/components/responses/Error"}}}
     delete: {operationId: cancelVideoGeneration, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
@@ -90,7 +95,7 @@ paths:
     get: {operationId: getVideoContent, tags: [gateway], parameters: [{$ref: "#/components/parameters/ID"}], responses: {"200": {description: Binary video content}, default: {$ref: "#/components/responses/Error"}}}
 
   /v1/audio/speech:
-    post: {operationId: createSpeech, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {description: Audio bytes}, default: {$ref: "#/components/responses/Error"}}}
+    post: {operationId: createSpeech, tags: [gateway], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/SpeechRequest"}}}}, responses: {"200": {description: Audio bytes, content: {application/octet-stream: {schema: {type: string, format: binary}}}}, default: {$ref: "#/components/responses/Error"}}}
   /v1/audio/transcriptions:
     post: {operationId: createTranscription, tags: [gateway], requestBody: {$ref: "#/components/requestBodies/Multipart"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /v1/audio/transcriptions/stream:
@@ -187,6 +192,16 @@ paths:
     post: {operationId: mcpAggregateRpc, tags: [mcp], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Polaris API key presented as a Bearer token:
+        `Authorization: Bearer <key>`. Keys are provisioned through the control
+        plane or static config; the gateway persists only their SHA-256 hash.
+        MCP endpoints may additionally accept OAuth 2.1 bearer tokens when
+        `mcp.auth` includes `oauth`.
   parameters:
     ID:
       name: id
@@ -232,6 +247,194 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    RoutingOptions:
+      type: object
+      description: Optional directives that steer provider/model selection for a request.
+      properties:
+        providers: {type: array, items: {type: string}}
+        exclude_providers: {type: array, items: {type: string}}
+        capabilities: {type: array, items: {type: string}}
+        statuses: {type: array, items: {type: string}}
+        verification_classes: {type: array, items: {type: string}}
+        prefer: {type: array, items: {type: string}}
+        cost_tier: {type: string}
+        latency_tier: {type: string}
+    ContentPart:
+      type: object
+      description: One part of a structured, multi-modal message (text, image, audio, file, …).
+      required: [type]
+      properties:
+        type: {type: string, description: "Part kind, e.g. text, image_url, input_audio, file."}
+        text: {type: string}
+      additionalProperties: true
+    MessageContent:
+      description: Message content — either a plain string or an array of typed content parts.
+      oneOf:
+        - type: string
+        - type: array
+          items: {$ref: "#/components/schemas/ContentPart"}
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role: {type: string, enum: [system, user, assistant, tool], description: Author of the message.}
+        content: {$ref: "#/components/schemas/MessageContent"}
+        name: {type: string}
+        tool_call_id: {type: string}
+        tool_calls: {type: array, items: {type: object, additionalProperties: true}}
+    ToolDefinition:
+      type: object
+      description: A tool the model may call (OpenAI function-tool shape).
+      properties:
+        type: {type: string, default: function}
+        function: {type: object, additionalProperties: true}
+      additionalProperties: true
+    ResponseFormat:
+      type: object
+      description: Constrains the model's output format.
+      properties:
+        type: {type: string, enum: [text, json_object, json_schema]}
+      additionalProperties: true
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model: {type: string, description: "Model as \"provider/model\" or a configured alias.", examples: ["openai/gpt-4o"]}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        messages: {type: array, items: {$ref: "#/components/schemas/ChatMessage"}}
+        temperature: {type: number, minimum: 0, maximum: 2}
+        top_p: {type: number}
+        max_tokens: {type: integer}
+        stream: {type: boolean, description: "When true, the response streams as OpenAI-compatible SSE."}
+        tools: {type: array, items: {$ref: "#/components/schemas/ToolDefinition"}}
+        tool_choice: {description: "auto | none | required, or a specific {type, function} selector."}
+        response_format: {$ref: "#/components/schemas/ResponseFormat"}
+        stop: {type: array, items: {type: string}}
+        metadata: {type: object, additionalProperties: {type: string}}
+    EmbeddingInput:
+      description: Embedding input — a single string or an array of strings.
+      oneOf:
+        - type: string
+        - type: array
+          items: {type: string}
+    EmbeddingRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model: {type: string, examples: ["openai/text-embedding-3-small"]}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        input: {$ref: "#/components/schemas/EmbeddingInput"}
+        dimensions: {type: integer}
+        encoding_format: {type: string, enum: [float, base64]}
+        user: {type: string}
+    EmbeddingValues:
+      description: A single embedding — an array of floats, or a base64 string when encoding_format=base64.
+      oneOf:
+        - type: array
+          items: {type: number}
+        - type: string
+    EmbeddingData:
+      type: object
+      required: [object, index, embedding]
+      properties:
+        object: {type: string}
+        index: {type: integer}
+        embedding: {$ref: "#/components/schemas/EmbeddingValues"}
+    EmbeddingResponse:
+      type: object
+      required: [object, data, model, usage]
+      properties:
+        object: {type: string}
+        data: {type: array, items: {$ref: "#/components/schemas/EmbeddingData"}}
+        model: {type: string}
+        usage: {$ref: "#/components/schemas/Usage"}
+    TokenCountRequest:
+      type: object
+      required: [model]
+      properties:
+        model: {type: string}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        messages: {type: array, items: {$ref: "#/components/schemas/ChatMessage"}}
+        input: {description: "Freeform input to count (string or provider-native shape)."}
+        tool_context: {description: "Optional tool/function context included in the count."}
+        requested_interface: {type: string}
+        max_output_tokens: {type: integer}
+    TokenCountResponse:
+      type: object
+      required: [model, input_tokens, output_tokens_estimate, source]
+      properties:
+        model: {type: string}
+        input_tokens: {type: integer}
+        output_tokens_estimate: {type: integer}
+        source: {type: string, enum: [provider_reported, estimated, unavailable]}
+        notes: {type: array, items: {type: string}}
+    TranslationInput:
+      description: Translation input — a single string or an array of strings.
+      oneOf:
+        - type: string
+        - type: array
+          items: {type: string}
+    TranslationRequest:
+      type: object
+      required: [model, input, target_language]
+      properties:
+        model: {type: string}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        input: {$ref: "#/components/schemas/TranslationInput"}
+        target_language: {type: string, examples: ["es"]}
+        source_language: {type: string}
+        glossary: {type: object, additionalProperties: {type: string}}
+    ImageGenerationRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model: {type: string}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        prompt: {type: string}
+        n: {type: integer}
+        size: {type: string, examples: ["1024x1024"]}
+        quality: {type: string}
+        style: {type: string}
+        response_format: {type: string, enum: [url, b64_json]}
+        reference_images: {type: array, items: {type: string}}
+    ImageResult:
+      type: object
+      properties:
+        url: {type: string}
+        b64_json: {type: string}
+        revised_prompt: {type: string}
+    ImageResponse:
+      type: object
+      required: [created, data]
+      properties:
+        created: {type: integer, format: int64}
+        data: {type: array, items: {$ref: "#/components/schemas/ImageResult"}}
+    SpeechRequest:
+      type: object
+      required: [model, input, voice]
+      properties:
+        model: {type: string}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        input: {type: string, description: Text to synthesize.}
+        voice: {type: string}
+        response_format: {type: string, examples: ["mp3"]}
+        speed: {type: number}
+    VideoGenerationRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model: {type: string}
+        routing: {$ref: "#/components/schemas/RoutingOptions"}
+        prompt: {type: string}
+        duration: {type: integer}
+        aspect_ratio: {type: string}
+        resolution: {type: string}
+        first_frame: {type: string}
+        last_frame: {type: string}
+        reference_images: {type: array, items: {type: string}}
+        reference_videos: {type: array, items: {type: string}}
+        with_audio: {type: boolean}
+        audio: {type: string}
     ErrorEnvelope:
       type: object
       required: [error]
@@ -256,13 +459,6 @@ components:
         source:
           type: string
           enum: [provider_reported, estimated, unavailable]
-    Routing:
-      type: object
-      properties:
-        providers: {type: array, items: {type: string}}
-        exclude_providers: {type: array, items: {type: string}}
-        prefer_cost: {type: string}
-        prefer_latency: {type: string}
     ListResponse:
       type: object
       required: [object, data]

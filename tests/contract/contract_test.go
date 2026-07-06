@@ -43,11 +43,13 @@ type openAPIDocument struct {
 	OpenAPI    string                    `yaml:"openapi"`
 	Info       map[string]any            `yaml:"info"`
 	Paths      map[string]map[string]any `yaml:"paths"`
+	Security   []map[string][]string     `yaml:"security"`
 	Components openAPIComponents         `yaml:"components"`
 }
 
 type openAPIComponents struct {
-	Schemas map[string]any `yaml:"schemas"`
+	Schemas         map[string]any `yaml:"schemas"`
+	SecuritySchemes map[string]any `yaml:"securitySchemes"`
 }
 
 type contractEngine struct {
@@ -78,19 +80,111 @@ func TestOpenAPIContractParsesAndDefinesSharedSchemas(t *testing.T) {
 	requiredSchemas := []string{
 		"ErrorEnvelope",
 		"Usage",
-		"Routing",
+		"RoutingOptions",
 		"ListResponse",
 		"ChatCompletion",
 		"AsyncJob",
 		"SessionDescriptor",
 		"Project",
 		"UsageReport",
+		// Core request/response bodies enriched in WS-A — kept present + typed.
+		"ChatCompletionRequest",
+		"ChatMessage",
+		"MessageContent",
+		"EmbeddingRequest",
+		"EmbeddingResponse",
+		"TokenCountRequest",
+		"TokenCountResponse",
+		"TranslationRequest",
+		"ImageGenerationRequest",
+		"ImageResponse",
+		"SpeechRequest",
+		"VideoGenerationRequest",
 	}
 	for _, schema := range requiredSchemas {
 		if _, ok := doc.Components.Schemas[schema]; !ok {
 			t.Fatalf("missing OpenAPI schema %q", schema)
 		}
 	}
+}
+
+// TestOpenAPIContractCoreEndpointsAreTyped is the WS-A schema-completeness gate:
+// it asserts a bearer security scheme + global security are declared, and that
+// the high-traffic operations carry a concrete request-body schema rather than
+// the generic {type:object} placeholder — so the enrichment cannot silently
+// regress and the generated TS SDK stays typed. The long-tail async/binary/proxy
+// operations remain on the documented generic bodies by design.
+func TestOpenAPIContractCoreEndpointsAreTyped(t *testing.T) {
+	doc := loadOpenAPI(t)
+
+	if _, ok := doc.Components.SecuritySchemes["bearerAuth"]; !ok {
+		t.Fatal("missing securitySchemes.bearerAuth")
+	}
+	if len(doc.Security) == 0 {
+		t.Fatal("missing top-level security requirement")
+	}
+
+	// operationId -> the concrete request-body schema it must reference.
+	typedRequests := map[string]string{
+		"createChatCompletion":  "ChatCompletionRequest",
+		"createEmbedding":       "EmbeddingRequest",
+		"countTokens":           "TokenCountRequest",
+		"createTranslation":     "TranslationRequest",
+		"createImageGeneration": "ImageGenerationRequest",
+		"createSpeech":          "SpeechRequest",
+		"createVideoGeneration": "VideoGenerationRequest",
+	}
+	found := map[string]bool{}
+	for _, methods := range doc.Paths {
+		for _, op := range methods {
+			opMap, ok := op.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := opMap["operationId"].(string)
+			want, tracked := typedRequests[id]
+			if !tracked {
+				continue
+			}
+			found[id] = true
+			ref := requestBodySchemaRef(opMap)
+			if ref == "" {
+				t.Errorf("operation %q has no request-body schema $ref (still a generic placeholder?)", id)
+				continue
+			}
+			if !strings.HasSuffix(ref, "/schemas/"+want) {
+				t.Errorf("operation %q request body = %q, want a $ref to schemas/%s", id, ref, want)
+			}
+		}
+	}
+	for id := range typedRequests {
+		if !found[id] {
+			t.Errorf("operation %q not found in the spec", id)
+		}
+	}
+}
+
+// requestBodySchemaRef returns the application/json request-body schema $ref for
+// an operation, or "" if absent or inlined.
+func requestBodySchemaRef(op map[string]any) string {
+	body, ok := op["requestBody"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	content, ok := body["content"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	appJSON, ok := content["application/json"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	schema, ok := appJSON["schema"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	ref, _ := schema["$ref"].(string)
+	return ref
 }
 
 func TestRegisteredRoutesMatchOpenAPIContract(t *testing.T) {

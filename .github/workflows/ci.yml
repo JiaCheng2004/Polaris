@@ -30,6 +30,9 @@ jobs:
       - name: SDK doc coverage (revive exported, pkg/client)
         run: make doc-check
 
+      - name: OpenAPI quality (vacuum)
+        run: make openapi-lint
+
       - name: gosec
         run: make security-check
 
