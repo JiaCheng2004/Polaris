@@ -14,9 +14,18 @@ export POLARIS_KEY=sk-...
 
 ## Go SDK
 
-The Go SDK lives at `github.com/JiaCheng2004/Polaris/pkg/client`. Runnable
-examples for every surface are in `pkg/client/example_test.go` and render on
-[pkg.go.dev](https://pkg.go.dev/github.com/JiaCheng2004/Polaris/pkg/client).
+The Go SDK lives at `github.com/JiaCheng2004/Polaris/pkg/client`. Standalone,
+runnable programs are in `go/`:
+
+```bash
+export POLARIS_API_KEY=sk-...
+go run ./examples/go/chat         # one chat completion
+go run ./examples/go/stream       # streaming chat completion (SSE)
+go run ./examples/go/embeddings   # an embedding vector
+```
+
+Godoc examples for every surface also live in `pkg/client/example_test.go` and
+render on [pkg.go.dev](https://pkg.go.dev/github.com/JiaCheng2004/Polaris/pkg/client).
 
 ## Configuration
 
