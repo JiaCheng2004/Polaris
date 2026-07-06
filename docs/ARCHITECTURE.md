@@ -30,6 +30,76 @@ spec/openapi/             machine-readable public HTTP contract
 tests/                    contract, integration, e2e, live-smoke, and load validation
 ```
 
+## Dependency Direction
+
+Packages depend inward only; the direction is lint-enforced (`make check-layering`
++ depguard), so a provider or tooling package can never import the gateway:
+
+```text
+modality  ←  apierror / obs / transport  ←  provider/*  ←  reliability / routing /
+             guardrails / semcache / mcp  ←  gateway  ←  cmd
+```
+
+New cross-cutting packages (reliability, guardrails, semcache, mcp) define their
+own small sink interfaces (metrics, stores, tool sources); the gateway's concrete
+types satisfy them structurally. This keeps those packages below the gateway
+layer while still reporting through the shared observability spine.
+
+## Request Lifecycle
+
+A unary chat request flows through a stable pipeline:
+
+1. **Middleware** (fixed order): recovery → request ID → tracing → runtime holder
+   → body limit → CORS → logging → metrics → **auth** → **rate limit** → **budget**
+   → usage. Auth resolves the API key / virtual key / signed headers into an
+   `AuthContext` (allowed models, scopes, project).
+2. **Bind + validate** the request against the modality contract.
+3. **Guardrails (request phase)** — if a policy matches, run detectors and
+   observe / redact / block *before* routing or caching.
+4. **Semantic cache lookup** — on an eligible request, an exact then embedding
+   lookup can short-circuit with a cached response.
+5. **Routing** — the registry resolves the model (alias/selector/family), and the
+   router orders candidates by the matched strategy (static, weighted,
+   least-latency, cost, adaptive), demoting open-breaker targets.
+6. **Execution with reliability** — each attempt passes breaker/shed admission,
+   a per-attempt timeout, and health reporting; failover and hedging follow the
+   policy. Streaming failover is only allowed before the first byte is written.
+7. **Guardrails (response phase)** + **cache store** — the response is screened
+   and (if enabled) cached post-redaction.
+8. **Usage** is pushed onto a buffered channel and written asynchronously; the
+   response path never blocks on the store.
+
+Errors at any stage return the OpenAI-compatible envelope; streaming errors
+terminate with an error frame + `[DONE]`.
+
+## Frontier Subsystems
+
+- `internal/reliability` — process-lifetime health (EWMA + sliding error window),
+  circuit breakers, load shedding, retry budgets, hedging, and idempotency.
+- `internal/routing` — compiled route policies and ordering strategies over the
+  registry's candidate expansion.
+- `internal/guardrails` — a detector engine (PII/secrets/prompt-injection/content
+  + webhook/LLM-judge) with a streaming hold-back redactor.
+- `internal/semcache` — exact + embedding response cache, namespaced for
+  security-grade isolation, degrading to exact-only when the embedder is unhealthy.
+- `internal/mcp` — a stateless streamable-HTTP MCP server, upstream client,
+  aggregation, and OAuth 2.1 resource server.
+
+## Policy vs State (Hot Reload)
+
+The hot-reload invariant separates two kinds of data:
+
+- **Policy** is a pure function of config — compiled route/guardrail policies,
+  the registry, static keys, pricing. It lives in a `runtime.Snapshot` that is
+  rebuilt and **atomically swapped** on reload.
+- **State** accumulates at runtime — breaker/health scores, in-flight gauges,
+  retry-budget buckets, semantic-cache indexes, the idempotency table, and the WS
+  drain registry. It lives in process-lifetime managers constructed in
+  `cmd/polaris/main.go` and **survives snapshot swaps by construction**.
+
+A reload therefore builds a new snapshot, swaps it, then reconfigures the
+process-lifetime managers — never dropping accumulated reliability state.
+
 ## Provider Pattern
 
 Each provider owns its implementation under `internal/provider/<name>/` and registers through `internal/provider/registry_<name>.go`. New provider work must include a real adapter, catalog metadata, config snippet, docs, and tests. Placeholder provider directories are not part of the architecture.
