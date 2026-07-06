@@ -1,0 +1,12 @@
+# Default owner for everything in the repo.
+* @JiaCheng2004
+
+# Architecture-owned areas (interface changes require review).
+/internal/modality/ @JiaCheng2004
+/internal/gateway/middleware/ @JiaCheng2004
+/internal/store/ @JiaCheng2004
+
+# Public contract surfaces.
+/spec/openapi/ @JiaCheng2004
+/docs/API_REFERENCE.md @JiaCheng2004
+/pkg/client/ @JiaCheng2004

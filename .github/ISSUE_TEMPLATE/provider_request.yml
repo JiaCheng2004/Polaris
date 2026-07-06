@@ -1,0 +1,42 @@
+name: Provider request
+description: Request support for a new AI provider
+labels: ["provider"]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      placeholder: "e.g. Cohere, Perplexity"
+    validations:
+      required: true
+  - type: input
+    id: api-docs
+    attributes:
+      label: API documentation URL
+    validations:
+      required: true
+  - type: checkboxes
+    id: modalities
+    attributes:
+      label: Modalities
+      options:
+        - label: Chat
+        - label: Embeddings
+        - label: Image
+        - label: Audio / voice
+        - label: Video
+  - type: dropdown
+    id: compat
+    attributes:
+      label: API compatibility
+      options:
+        - OpenAI-compatible
+        - Anthropic-compatible
+        - Custom / other
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Auth and quirks
+      description: Auth scheme, base URL, streaming format, and any known gotchas.
