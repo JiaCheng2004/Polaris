@@ -190,7 +190,7 @@ Polaris 暴露稳定的 `/v1` 网关接口，并提供 health、metrics 和 MCP 
 | Amazon Bedrock | 原生 Converse Chat 和 Titan Embeddings。 |
 | ByteDance / Volcengine | Chat、Images、Video、TTS、STT、Streaming STT、Realtime Audio、同传、翻译、笔记、播客、声音目录和声音资产。 |
 | Qwen / DashScope | Chat 和 Images。 |
-| DeepSeek、xAI、OpenRouter、Together、Groq、Fireworks、Featherless、Moonshot、GLM、Mistral、NVIDIA | 通过原生或 OpenAI-compatible 接口提供 Chat-first 适配；NVIDIA 还支持 Embeddings。 |
+| DeepSeek、xAI、OpenRouter、Together、Groq、Fireworks、Mistral、NVIDIA | 通过原生或 OpenAI-compatible 接口提供 Chat-first 适配；NVIDIA 还支持 Embeddings。 |
 | Replicate | 基于 Predictions 的异步视频。 |
 | MiniMax | 音乐生成、翻唱编辑和歌词。 |
 | ElevenLabs | Preview 音乐生成、流式生成、计划和 stems。 |

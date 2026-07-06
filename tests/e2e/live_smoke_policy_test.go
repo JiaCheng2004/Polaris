@@ -68,35 +68,3 @@ func TestLiveSmokeProviderOptInName(t *testing.T) {
 		t.Fatalf("provider opt-in env = %q", got)
 	}
 }
-
-func TestMiniMaxTokenPlanIsExperimentalOptIn(t *testing.T) {
-	t.Setenv("MINIMAX_BASE_URL", "https://api.minimax.io")
-	t.Setenv("MINIMAX_TOKEN_API_KEY", "sk-test-minimax")
-
-	cfg, warnings, err := config.Load(filepath.Join("..", "..", "config", "polaris.live-smoke.yaml"))
-	if err != nil {
-		t.Fatalf("config.Load() error = %v", err)
-	}
-	_ = warnings
-
-	registry, _, err := provider.New(cfg)
-	if err != nil {
-		t.Fatalf("provider.New() error = %v", err)
-	}
-
-	model, err := registry.ResolveModel("minimax-token/minimax-m2.7")
-	if err != nil {
-		t.Fatalf("ResolveModel(minimax-token/minimax-m2.7) error = %v", err)
-	}
-	if model.Status != "experimental" {
-		t.Fatalf("status = %q, want experimental", model.Status)
-	}
-
-	result, err := verification.ForConfig(cfg, registry, "minimax-token/minimax-m2.7")
-	if err != nil {
-		t.Fatalf("verification.ForConfig() error = %v", err)
-	}
-	if result.Class != verification.ClassOptIn {
-		t.Fatalf("verification class = %q, want %q", result.Class, verification.ClassOptIn)
-	}
-}

@@ -171,33 +171,6 @@ func TestRegistryRegistersPhaseAProviderFamilies(t *testing.T) {
 					},
 				},
 			},
-			"featherless": {
-				APIKey: "sk-featherless",
-				Models: map[string]config.ModelConfig{
-					"meta-llama/Meta-Llama-3.1-8B-Instruct": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming},
-					},
-				},
-			},
-			"moonshot": {
-				APIKey: "sk-moonshot",
-				Models: map[string]config.ModelConfig{
-					"kimi-k2-turbo-preview": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling},
-					},
-				},
-			},
-			"glm": {
-				APIKey: "sk-glm",
-				Models: map[string]config.ModelConfig{
-					"glm-5.1": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling},
-					},
-				},
-			},
 			"mistral": {
 				APIKey: "sk-mistral",
 				Models: map[string]config.ModelConfig{
@@ -252,9 +225,6 @@ func TestRegistryRegistersPhaseAProviderFamilies(t *testing.T) {
 		"together/meta-llama/Llama-3.3-70B-Instruct-Turbo",
 		"groq/llama-3.3-70b-versatile",
 		"fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct",
-		"featherless/meta-llama/Meta-Llama-3.1-8B-Instruct",
-		"moonshot/kimi-k2-turbo-preview",
-		"glm/glm-5.1",
 		"mistral/mistral-medium-latest",
 		"bedrock/amazon.nova-2-lite-v1:0",
 		"nvidia/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",
@@ -268,108 +238,9 @@ func TestRegistryRegistersPhaseAProviderFamilies(t *testing.T) {
 	}
 }
 
-func TestRegistryRegistersTokenPlanProviders(t *testing.T) {
-	cfg := &config.Config{
-		Providers: map[string]config.ProviderConfig{
-			"zai-token": {
-				APIKey: "sk-zai",
-				Models: map[string]config.ModelConfig{
-					"glm-5.1": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityAnthropicMessages},
-					},
-				},
-			},
-			"minimax-token": {
-				APIKey: "sk-minimax",
-				Models: map[string]config.ModelConfig{
-					"minimax-m2.7": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming, modality.CapabilityFunctionCalling, modality.CapabilityAnthropicMessages},
-					},
-				},
-			},
-		},
-	}
-
-	registry, warnings, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	if len(warnings) != 0 {
-		t.Fatalf("expected no warnings, got %v", warnings)
-	}
-
-	zaiModel, err := registry.ResolveModel("zai-token/glm-5.1")
-	if err != nil {
-		t.Fatalf("ResolveModel(zai-token/glm-5.1) error = %v", err)
-	}
-	if zaiModel.ID != "zai-token/glm-5.1" {
-		t.Fatalf("zai model ID = %s", zaiModel.ID)
-	}
-	zaiAlias, err := registry.ResolveModel("Z.ai GLM-5.1")
-	if err != nil {
-		t.Fatalf("ResolveModel(Z.ai GLM-5.1) error = %v", err)
-	}
-	if zaiAlias.ID != "zai-token/glm-5.1" {
-		t.Fatalf("zai alias resolved to %s", zaiAlias.ID)
-	}
-	if _, _, err := registry.GetChatAdapter("zai-token/glm-5.1"); err != nil {
-		t.Fatalf("GetChatAdapter(zai-token) error = %v", err)
-	}
-	if _, _, err := registry.GetNativeMessagesAdapter("zai-token/glm-5.1"); err != nil {
-		t.Fatalf("GetNativeMessagesAdapter(zai-token) error = %v", err)
-	}
-
-	miniModel, err := registry.ResolveModel("minimax-token/minimax-m2.7")
-	if err != nil {
-		t.Fatalf("ResolveModel(minimax-token/minimax-m2.7) error = %v", err)
-	}
-	if miniModel.ID != "minimax-token/minimax-m2.7" {
-		t.Fatalf("minimax model ID = %s", miniModel.ID)
-	}
-	if miniModel.Status != "experimental" {
-		t.Fatalf("minimax model status = %q, want experimental", miniModel.Status)
-	}
-	if miniModel.VerificationClass != "opt_in" {
-		t.Fatalf("minimax model verification_class = %q, want opt_in", miniModel.VerificationClass)
-	}
-	miniAlias, err := registry.ResolveModel("MiniMax-M2.7")
-	if err != nil {
-		t.Fatalf("ResolveModel(MiniMax-M2.7) error = %v", err)
-	}
-	if miniAlias.ID != "minimax-token/minimax-m2.7" {
-		t.Fatalf("minimax alias resolved to %s", miniAlias.ID)
-	}
-	if _, _, err := registry.GetChatAdapter("minimax-token/minimax-m2.7"); err != nil {
-		t.Fatalf("GetChatAdapter(minimax-token) error = %v", err)
-	}
-	if _, _, err := registry.GetNativeMessagesAdapter("minimax-token/minimax-m2.7"); err != nil {
-		t.Fatalf("GetNativeMessagesAdapter(minimax-token) error = %v", err)
-	}
-}
-
 func TestRegistryAddsCatalogAliasesAndMetadata(t *testing.T) {
 	cfg := &config.Config{
 		Providers: map[string]config.ProviderConfig{
-			"moonshot": {
-				APIKey: "sk-moonshot",
-				Models: map[string]config.ModelConfig{
-					"kimi-k2-turbo-preview": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming},
-					},
-				},
-			},
-			"glm": {
-				APIKey: "sk-glm",
-				Models: map[string]config.ModelConfig{
-					"glm-5.1": {
-						Modality:     modality.ModalityChat,
-						Capabilities: []modality.Capability{modality.CapabilityStreaming},
-					},
-				},
-			},
 			"bedrock": {
 				AccessKeyID:     "AKIAEXAMPLE",
 				AccessKeySecret: "secret",
@@ -410,22 +281,6 @@ func TestRegistryAddsCatalogAliasesAndMetadata(t *testing.T) {
 		t.Fatalf("expected no warnings, got %v", warnings)
 	}
 
-	model, err := registry.ResolveModel("Kimi K2 Turbo Preview")
-	if err != nil {
-		t.Fatalf("ResolveModel(Kimi K2 Turbo Preview) error = %v", err)
-	}
-	if model.ID != "moonshot/kimi-k2-turbo-preview" {
-		t.Fatalf("resolved model = %s", model.ID)
-	}
-
-	glmModel, err := registry.ResolveModel("GLM-5.1")
-	if err != nil {
-		t.Fatalf("ResolveModel(GLM-5.1) error = %v", err)
-	}
-	if glmModel.DisplayName != "GLM-5.1" {
-		t.Fatalf("display name = %q", glmModel.DisplayName)
-	}
-
 	bedrockModel, err := registry.ResolveModel("Nova 2.0 Pro Preview")
 	if err != nil {
 		t.Fatalf("ResolveModel(Nova 2.0 Pro Preview) error = %v", err)
@@ -451,21 +306,6 @@ func TestRegistryAddsCatalogAliasesAndMetadata(t *testing.T) {
 	}
 
 	models := registry.ListModels(true)
-	foundGLM := false
-	for _, item := range models {
-		if item.ID == "GLM-5.1" {
-			if item.ResolvesTo != "glm/glm-5.1" {
-				t.Fatalf("alias resolves_to = %q", item.ResolvesTo)
-			}
-			if item.DisplayName != "GLM-5.1" {
-				t.Fatalf("alias display name = %q", item.DisplayName)
-			}
-			foundGLM = true
-		}
-	}
-	if !foundGLM {
-		t.Fatal("expected GLM-5.1 alias in ListModels(true)")
-	}
 	for _, item := range models {
 		if item.ID == "Replicate MiniMax Video 01" {
 			if item.ResolvesTo != "replicate/minimax/video-01" {

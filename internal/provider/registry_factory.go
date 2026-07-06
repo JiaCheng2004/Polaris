@@ -75,8 +75,6 @@ func ProviderRuntimeEnabled(name string, providerCfg config.ProviderConfig) bool
 			(strings.TrimSpace(providerCfg.AppID) != "" && strings.TrimSpace(providerCfg.SpeechAccessToken) != "")
 	case "google-vertex":
 		return strings.TrimSpace(providerCfg.ProjectID) != "" && strings.TrimSpace(providerCfg.Location) != "" && strings.TrimSpace(providerCfg.SecretKey) != ""
-	case "zai-token", "minimax-token":
-		return strings.TrimSpace(providerCfg.APIKey) != ""
 	case "ollama":
 		return true
 	default:

@@ -45,12 +45,7 @@ routing:
     together-chat: together/meta-llama/Llama-3.3-70B-Instruct-Turbo
     groq-chat: groq/llama-3.3-70b-versatile
     fireworks-chat: fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct
-    featherless-chat: featherless/meta-llama/Meta-Llama-3.1-8B-Instruct
-    moonshot-chat: moonshot/kimi-k2-turbo-preview
-    glm-chat: glm/glm-5.1
-    zai-token-chat: zai-token/glm-5.1
     # Experimental/opt-in: smoke tests enforce final-only sentinel responses.
-    minimax-token-chat: minimax-token/minimax-m2.7
     mistral-chat: mistral/mistral-medium-latest
     bedrock-chat: bedrock/amazon.nova-2-lite-v1:0
     bedrock-embed: bedrock/amazon.titan-embed-text-v2:0

@@ -7,12 +7,9 @@ import (
 	"github.com/JiaCheng2004/Polaris/internal/modality"
 	"github.com/JiaCheng2004/Polaris/internal/provider/bedrock"
 	"github.com/JiaCheng2004/Polaris/internal/provider/common/contracttest"
-	"github.com/JiaCheng2004/Polaris/internal/provider/featherless"
 	"github.com/JiaCheng2004/Polaris/internal/provider/fireworks"
-	"github.com/JiaCheng2004/Polaris/internal/provider/glm"
 	"github.com/JiaCheng2004/Polaris/internal/provider/groq"
 	"github.com/JiaCheng2004/Polaris/internal/provider/mistral"
-	"github.com/JiaCheng2004/Polaris/internal/provider/moonshot"
 	"github.com/JiaCheng2004/Polaris/internal/provider/nvidia"
 	"github.com/JiaCheng2004/Polaris/internal/provider/openrouter"
 	"github.com/JiaCheng2004/Polaris/internal/provider/together"
@@ -60,35 +57,11 @@ func TestPhaseAOpenAICompatibleChatContracts(t *testing.T) {
 			},
 		},
 		{
-			name:              "featherless",
-			canonicalModel:    "featherless/meta-llama/Meta-Llama-3.1-8B-Instruct",
-			expectedWireModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
-			factory: func(cfg config.ProviderConfig, model string) modality.ChatAdapter {
-				return featherless.NewChatAdapter(featherless.NewClient(cfg), model)
-			},
-		},
-		{
 			name:              "nvidia",
 			canonicalModel:    "nvidia/nvidia/NVIDIA-Nemotron-Nano-9B-v2",
 			expectedWireModel: "nvidia/NVIDIA-Nemotron-Nano-9B-v2",
 			factory: func(cfg config.ProviderConfig, model string) modality.ChatAdapter {
 				return nvidia.NewChatAdapter(nvidia.NewClient(cfg), model)
-			},
-		},
-		{
-			name:              "moonshot",
-			canonicalModel:    "moonshot/kimi-k2-turbo-preview",
-			expectedWireModel: "kimi-k2-turbo-preview",
-			factory: func(cfg config.ProviderConfig, model string) modality.ChatAdapter {
-				return moonshot.NewChatAdapter(moonshot.NewClient(cfg), model)
-			},
-		},
-		{
-			name:              "glm",
-			canonicalModel:    "glm/glm-5.1",
-			expectedWireModel: "glm-5.1",
-			factory: func(cfg config.ProviderConfig, model string) modality.ChatAdapter {
-				return glm.NewChatAdapter(glm.NewClient(cfg), model)
 			},
 		},
 		{

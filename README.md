@@ -247,7 +247,7 @@ Provider adapters are isolated under [`internal/provider`](./internal/provider),
 | Amazon Bedrock | Native Converse chat and Titan embeddings. |
 | ByteDance / Volcengine | Chat, images, video, TTS, STT, streaming STT, realtime audio, interpretation, translation, notes, podcasts, voice catalog, and voice assets. |
 | Qwen / DashScope | Chat and images. |
-| DeepSeek, xAI, OpenRouter, Together, Groq, Fireworks, Featherless, Moonshot, GLM, Mistral, NVIDIA | Chat-first adapters through native or OpenAI-compatible provider surfaces; NVIDIA also supports embeddings. |
+| DeepSeek, xAI, OpenRouter, Together, Groq, Fireworks, Mistral, NVIDIA | Chat-first adapters through native or OpenAI-compatible provider surfaces; NVIDIA also supports embeddings. |
 | Replicate | Async video through Predictions. |
 | MiniMax | Music generation, cover edit, and lyrics. |
 | ElevenLabs | Preview music generation, streaming generation, plans, and stems. |

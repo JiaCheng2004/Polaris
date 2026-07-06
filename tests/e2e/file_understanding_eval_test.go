@@ -338,18 +338,12 @@ func requiredProviderEnv(providerName string) []string {
 		return []string{"GROQ_API_KEY"}
 	case "mistral":
 		return []string{"MISTRAL_API_KEY"}
-	case "moonshot":
-		return []string{"MOONSHOT_API_KEY"}
-	case "glm":
-		return []string{"GLM_API_KEY"}
 	case "openrouter":
 		return []string{"OPENROUTER_API_KEY"}
 	case "together":
 		return []string{"TOGETHER_API_KEY"}
 	case "fireworks":
 		return []string{"FIREWORKS_API_KEY"}
-	case "featherless":
-		return []string{"FEATHERLESS_API_KEY"}
 	case "nvidia":
 		return []string{"NVIDIA_API_KEY"}
 	case "bedrock":
