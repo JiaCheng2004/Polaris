@@ -1,0 +1,482 @@
+/* Base element + shell styles. All values resolve from tokens.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden; /* the body never scrolls horizontally */
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: var(--letter-macro);
+  line-height: 1.1;
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+code,
+kbd,
+samp,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-weak);
+}
+
+/* Tabular numerals everywhere numbers matter. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: var(--letter-meta);
+  color: var(--text-3);
+  text-transform: var(--case-nav);
+}
+
+/* ---------- App shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: var(--nav-w) 1fr;
+  min-height: 100dvh;
+}
+
+.main {
+  min-width: 0; /* allow children to shrink; prevents horizontal overflow */
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  padding: var(--pad-panel);
+  max-width: var(--maxw);
+  width: 100%;
+  margin: 0 auto;
+  container-type: inline-size;
+}
+
+/* Panels reflow by their OWN width via container queries, not global breakpoints. */
+.grid {
+  display: grid;
+  gap: var(--grid-gap);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.panel {
+  background: var(--surface-1);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 14px var(--pad-panel);
+  border-bottom: var(--border-w) solid var(--border);
+}
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: var(--letter-meta);
+  text-transform: var(--case-nav);
+  color: var(--text-2);
+  margin: 0;
+}
+.panel-body {
+  padding: var(--pad-panel);
+}
+
+/* Wide content (tables, charts) scrolls inside its own container only. */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-1);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
+}
+.btn:hover {
+  background: var(--surface-2);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.btn-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.05);
+}
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* ---------- Fields ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius-1);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+}
+.textarea {
+  font-family: var(--font-mono);
+  resize: vertical;
+  min-height: 92px;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---------- Tables ---------- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: var(--letter-meta);
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 10px 12px;
+  border-bottom: var(--border-w) solid var(--border);
+  white-space: nowrap;
+}
+.table td {
+  padding: 11px 12px;
+  border-bottom: var(--border-w) solid var(--border);
+  color: var(--text-1);
+  vertical-align: middle;
+}
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+.table tr:hover td {
+  background: var(--surface-2);
+}
+
+/* ---------- Tags / chips ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: var(--letter-meta);
+  white-space: nowrap;
+}
+
+/* ---------- Page header ---------- */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--gap);
+  margin-bottom: 24px;
+}
+.page-head-main {
+  min-width: 0;
+}
+.page-title {
+  font-size: clamp(20px, 2.4cqw, 26px);
+  line-height: 1.12;
+}
+.page-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ---------- Dense readout grid (Advanced KPI strips) ---------- */
+/* Fixed responsive columns (2/3/4/6) so a 12-readout strip always fills its rows —
+ * no empty trailing cells. Container-query driven off .content's inline size. */
+.readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--border-w);
+  background: var(--border);
+  border: var(--border-w) solid var(--border);
+}
+@container (min-width: 560px) {
+  .readout-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container (min-width: 840px) {
+  .readout-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container (min-width: 1140px) {
+  .readout-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+.readout {
+  background: var(--surface-1);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.readout-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.readout-value {
+  font-family: var(--font-mono);
+  font-size: clamp(15px, 1.5cqw, 18px);
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.readout-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ---------- Vertical rhythm + readable prose ---------- */
+.stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prose {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+:root[data-mode="advanced"] .stack-lg {
+  gap: var(--grid-gap);
+}
+:root[data-mode="advanced"] .stack-sm {
+  gap: 8px;
+}
+:root[data-mode="advanced"] .prose {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Standard is airy: give the header room to breathe. Advanced is a telemetry bar. */
+:root[data-mode="advanced"] .page-head {
+  align-items: baseline;
+  margin-bottom: 16px;
+  padding-bottom: 9px;
+  border-bottom: var(--border-w) solid var(--border-strong);
+}
+:root[data-mode="advanced"] .page-title {
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Advanced-mode telemetry treatments ---------- */
+:root[data-mode="advanced"] .panel {
+  background: linear-gradient(var(--surface-1), var(--surface-1));
+}
+:root[data-mode="advanced"] .panel-title::before {
+  content: "// ";
+  color: var(--accent);
+}
+/* Faint CRT scanlines only in advanced dark; purely decorative, pointer-none. */
+:root[data-mode="advanced"][data-theme="dark"] .app::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.16) 2px,
+    rgba(0, 0, 0, 0.16) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+/* ---------- Responsive: nav collapses, grid reflows ---------- */
+.menu-btn {
+  display: none !important;
+}
+@media (max-width: 880px) {
+  .app,
+  .app[data-nav="rail"] {
+    grid-template-columns: 1fr;
+  }
+  /* Sidebar becomes an overlay drawer on narrow screens. */
+  .app > nav {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    width: min(280px, 84vw);
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform var(--dur-1) var(--ease);
+  }
+  .app[data-nav-open="true"] > nav {
+    transform: translateX(0);
+  }
+  .menu-btn {
+    display: inline-flex !important;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.col-12 { grid-column: span 12; }
+.col-8 { grid-column: span 8; }
+.col-6 { grid-column: span 6; }
+.col-4 { grid-column: span 4; }
+.col-3 { grid-column: span 3; }
+
+/* Panels reflow by their OWN container width (.content is the inline-size container),
+ * not the viewport. These overrides come AFTER the base spans so that, at equal
+ * specificity, source order lets the matching query win. Wide blocks stack first;
+ * stat tiles go two-up, then stack on the narrowest widths. */
+@container (max-width: 900px) {
+  .col-8,
+  .col-6,
+  .col-4 {
+    grid-column: span 12;
+  }
+  .col-3 {
+    grid-column: span 6;
+  }
+}
+@container (max-width: 520px) {
+  .col-3 {
+    grid-column: span 12;
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

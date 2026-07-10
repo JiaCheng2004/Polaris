@@ -70,6 +70,8 @@ type FileStore interface {
 type AuditStore interface {
 	LogAuditEvent(ctx context.Context, event AuditEvent) error
 	LogAuditEventBatch(ctx context.Context, events []AuditEvent) error
+	// ListAuditEvents returns audit events newest-first, filtered and keyset-paginated.
+	ListAuditEvents(ctx context.Context, filter AuditFilter) ([]AuditEvent, error)
 }
 
 // ToolStore manages tool definitions.
@@ -111,6 +113,10 @@ type RequestLogStore interface {
 type UsageStore interface {
 	GetUsage(ctx context.Context, filter UsageFilter) (UsageReport, error)
 	GetUsageByModel(ctx context.Context, filter UsageFilter) (UsageReport, error)
+	// SummarizeUsage aggregates request_logs into buckets grouped by dimension
+	// (one of a fixed allow-list: "" for grand totals, "day", "model", "modality",
+	// "token_source", "cost_source", "status", "error_type", "interface_family").
+	SummarizeUsage(ctx context.Context, filter UsageFilter, dimension string) ([]UsageSummaryRow, error)
 }
 
 // IdempotencyStore persists idempotency-key outcomes for job-submit endpoints.

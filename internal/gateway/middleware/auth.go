@@ -575,6 +575,7 @@ func isControlPlaneRequest(c *gin.Context) bool {
 		strings.HasPrefix(path, "/v1/tools"),
 		strings.HasPrefix(path, "/v1/toolsets"),
 		strings.HasPrefix(path, "/v1/mcp/bindings"),
+		strings.HasPrefix(path, "/v1/admin"),
 		strings.HasPrefix(path, "/v1/keys"):
 		return true
 	default:

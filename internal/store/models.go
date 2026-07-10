@@ -137,14 +137,14 @@ type FileUnderstandingArtifact struct {
 }
 
 type AuditEvent struct {
-	ID           string
-	ProjectID    string
-	ActorKeyID   string
-	Kind         string
-	ResourceType string
-	ResourceID   string
-	MetadataJSON string
-	CreatedAt    time.Time
+	ID           string    `json:"id"`
+	ProjectID    string    `json:"project_id"`
+	ActorKeyID   string    `json:"actor_key_id"`
+	Kind         string    `json:"kind"`
+	ResourceType string    `json:"resource_type"`
+	ResourceID   string    `json:"resource_id"`
+	MetadataJSON string    `json:"metadata_json"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type ToolDefinition struct {
@@ -215,29 +215,32 @@ type APIKey struct {
 }
 
 type RequestLog struct {
-	ID                string
-	RequestID         string
-	KeyID             string
-	ProjectID         string
-	Model             string
-	Modality          modality.Modality
-	InterfaceFamily   string
-	TokenSource       string
-	CacheStatus       string
-	FallbackModel     string
-	TraceID           string
-	Toolset           string
-	MCPBinding        string
-	ProviderLatencyMs int
-	TotalLatencyMs    int
-	InputTokens       int
-	OutputTokens      int
-	TotalTokens       int
-	EstimatedCost     float64
-	CostSource        string
-	StatusCode        int
-	ErrorType         string
-	CreatedAt         time.Time
+	ID                 string
+	RequestID          string
+	KeyID              string
+	ProjectID          string
+	Model              string
+	Modality           modality.Modality
+	InterfaceFamily    string
+	TokenSource        string
+	CacheStatus        string
+	FallbackModel      string
+	TraceID            string
+	Toolset            string
+	MCPBinding         string
+	ProviderLatencyMs  int
+	TotalLatencyMs     int
+	InputTokens        int
+	OutputTokens       int
+	TotalTokens        int
+	CachedInputTokens  int
+	CacheWrite5mTokens int
+	CacheWrite1hTokens int
+	EstimatedCost      float64
+	CostSource         string
+	StatusCode         int
+	ErrorType          string
+	CreatedAt          time.Time
 }
 
 type UsageFilter struct {
@@ -245,9 +248,40 @@ type UsageFilter struct {
 	OwnerID   string
 	ProjectID string
 	Model     string
+	Provider  string
 	Modality  modality.Modality
 	From      *time.Time
 	To        *time.Time
+}
+
+// UsageSummaryRow is one aggregated bucket returned by SummarizeUsage. Key is the
+// value of the grouping dimension ("total" for the grand totals row). Latency
+// fields are sums; callers derive averages as sum/requests.
+type UsageSummaryRow struct {
+	Key                  string
+	Requests             int64
+	InputTokens          int64
+	OutputTokens         int64
+	CachedInputTokens    int64
+	CacheWriteTokens     int64
+	TotalTokens          int64
+	CostUSD              float64
+	Errors               int64
+	ProviderLatencySumMs int64
+	TotalLatencySumMs    int64
+}
+
+// AuditFilter scopes an audit-event listing. Before implements keyset pagination
+// (created_at < Before), ordering newest-first.
+type AuditFilter struct {
+	ProjectID    string
+	ActorKeyID   string
+	Kind         string
+	ResourceType string
+	From         *time.Time
+	To           *time.Time
+	Before       *time.Time
+	Limit        int
 }
 
 type DailyUsage struct {

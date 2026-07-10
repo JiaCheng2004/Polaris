@@ -89,6 +89,9 @@ func (h *ChatHandler) streamResponses(c *gin.Context, selected chatTarget, strea
 			outcome.PromptTokens = chunk.Usage.PromptTokens
 			outcome.CompletionTokens = chunk.Usage.CompletionTokens
 			outcome.TotalTokens = chunk.Usage.TotalTokens
+			outcome.CachedInputTokens = chunk.Usage.CachedInputTokens
+			outcome.CacheWrite5mTokens = chunk.Usage.CacheWrite5mTokens
+			outcome.CacheWrite1hTokens = chunk.Usage.CacheWrite1hTokens
 			outcome.TokenSource = providerUsageSource(*chunk.Usage)
 			state.Usage = responsesUsage{
 				InputTokens:  chunk.Usage.PromptTokens,
@@ -209,6 +212,9 @@ func (h *ChatHandler) streamMessages(c *gin.Context, selected chatTarget, stream
 			outcome.PromptTokens = chunk.Usage.PromptTokens
 			outcome.CompletionTokens = chunk.Usage.CompletionTokens
 			outcome.TotalTokens = chunk.Usage.TotalTokens
+			outcome.CachedInputTokens = chunk.Usage.CachedInputTokens
+			outcome.CacheWrite5mTokens = chunk.Usage.CacheWrite5mTokens
+			outcome.CacheWrite1hTokens = chunk.Usage.CacheWrite1hTokens
 			outcome.TokenSource = providerUsageSource(*chunk.Usage)
 			state.Usage = messagesUsage{
 				InputTokens:  chunk.Usage.PromptTokens,

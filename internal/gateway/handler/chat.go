@@ -178,6 +178,9 @@ func (h *ChatHandler) streamChatCompletions(c *gin.Context, selected chatTarget,
 			outcome.PromptTokens = chunk.Usage.PromptTokens
 			outcome.CompletionTokens = chunk.Usage.CompletionTokens
 			outcome.TotalTokens = chunk.Usage.TotalTokens
+			outcome.CachedInputTokens = chunk.Usage.CachedInputTokens
+			outcome.CacheWrite5mTokens = chunk.Usage.CacheWrite5mTokens
+			outcome.CacheWrite1hTokens = chunk.Usage.CacheWrite1hTokens
 			outcome.TokenSource = providerUsageSource(*chunk.Usage)
 		}
 		for i := range chunk.Choices {

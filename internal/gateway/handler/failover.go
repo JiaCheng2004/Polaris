@@ -169,6 +169,9 @@ func onCompleteSuccess(response *modality.ChatResponse, outcome *middleware.Requ
 	outcome.PromptTokens = response.Usage.PromptTokens
 	outcome.CompletionTokens = response.Usage.CompletionTokens
 	outcome.TotalTokens = response.Usage.TotalTokens
+	outcome.CachedInputTokens = response.Usage.CachedInputTokens
+	outcome.CacheWrite5mTokens = response.Usage.CacheWrite5mTokens
+	outcome.CacheWrite1hTokens = response.Usage.CacheWrite1hTokens
 	outcome.TokenSource = providerUsageSource(response.Usage)
 	outcome.FinishReasons = collectFinishReasons(response)
 }

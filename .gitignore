@@ -98,3 +98,10 @@ test-results/
 .terraform/
 *.tfstate
 *.tfstate.*
+
+# Embedded console assets (built by `make build-console`); keep only the placeholder.
+internal/console/dist/*
+!internal/console/dist/index.html
+
+# Local, uncommitted configs (console-ready dev configs, etc.)
+*.local.yaml

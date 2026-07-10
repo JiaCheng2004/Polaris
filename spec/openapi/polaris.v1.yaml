@@ -185,6 +185,37 @@ paths:
   /v1/mcp/bindings:
     get: {operationId: listMCPBindings, tags: [control-plane], responses: {"200": {description: MCP binding list, content: {application/json: {schema: {$ref: "#/components/schemas/ListResponse"}}}}, default: {$ref: "#/components/responses/Error"}}}
     post: {operationId: createMCPBinding, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
+  /v1/admin/usage:
+    get:
+      operationId: adminUsage
+      tags: [control-plane]
+      summary: Admin usage analytics with scope and breakdowns
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [global, project, key]}}
+        - {name: group_by, in: query, schema: {type: string, enum: [day, model, provider, modality, status, token_source, cost_source, error_type, interface_family]}}
+        - {name: project_id, in: query, schema: {type: string}}
+        - {name: key_id, in: query, schema: {type: string}}
+        - {name: model, in: query, schema: {type: string}}
+        - {name: provider, in: query, schema: {type: string}}
+        - {name: modality, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+      responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}
+  /v1/admin/audit-events:
+    get:
+      operationId: adminAuditEvents
+      tags: [control-plane]
+      summary: List control-plane audit events (paginated)
+      parameters:
+        - {name: project_id, in: query, schema: {type: string}}
+        - {name: actor_key_id, in: query, schema: {type: string}}
+        - {name: kind, in: query, schema: {type: string}}
+        - {name: resource_type, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: limit, in: query, schema: {type: integer}}
+        - {name: cursor, in: query, schema: {type: string}}
+      responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}
   /v1/admin/cache/purge:
     post: {operationId: purgeSemanticCache, tags: [control-plane], requestBody: {$ref: "#/components/requestBodies/JSON"}, responses: {"200": {$ref: "#/components/responses/JSONOK"}, default: {$ref: "#/components/responses/Error"}}}
   /mcp:

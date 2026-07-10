@@ -215,10 +215,6 @@ func anthropicUsageFromAny(value any) *modality.Usage {
 
 	input := intFromAny(object["input_tokens"])
 	output := intFromAny(object["output_tokens"])
-	total := intFromAny(object["total_tokens"])
-	if total == 0 {
-		total = input + output
-	}
 	cacheRead := intFromAny(object["cache_read_input_tokens"])
 	cacheWrite5m := intFromAny(object["cache_creation_5m_input_tokens"])
 	cacheWrite1h := intFromAny(object["cache_creation_1h_input_tokens"])
@@ -229,12 +225,21 @@ func anthropicUsageFromAny(value any) *modality.Usage {
 		cacheWrite5m += intFromAny(creation["ephemeral_5m_input_tokens"])
 		cacheWrite1h += intFromAny(creation["ephemeral_1h_input_tokens"])
 	}
-	if input == 0 && output == 0 && total == 0 && cacheRead == 0 && cacheWrite5m == 0 && cacheWrite1h == 0 {
+	// Anthropic's input_tokens excludes cache reads/writes; fold them back into the
+	// prompt total so internal accounting matches the OpenAI-style convention the
+	// pricing estimator assumes (see anthropicUsage.toModalityUsage). This mutates
+	// only the internal usage struct, never the native wire body.
+	promptTokens := input + cacheRead + cacheWrite5m + cacheWrite1h
+	total := intFromAny(object["total_tokens"])
+	if total == 0 {
+		total = promptTokens + output
+	}
+	if promptTokens == 0 && output == 0 && total == 0 {
 		return nil
 	}
 
 	return &modality.Usage{
-		PromptTokens:       input,
+		PromptTokens:       promptTokens,
 		CompletionTokens:   output,
 		TotalTokens:        total,
 		CachedInputTokens:  cacheRead,

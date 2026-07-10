@@ -51,6 +51,8 @@ runtime:
       shared_secret: ${POLARIS_EXTERNAL_AUTH_SECRET}
       max_clock_skew: 60s
       cache_ttl: 60s
+    # sha256: hash of an admin key you choose; log in with the raw key.
+    # Generate: printf '%s' "$KEY" | openssl dgst -sha256 -r  (see docs/AUTHENTICATION.md)
     bootstrap_admin_key_hash: ${POLARIS_BOOTSTRAP_ADMIN_KEY_HASH}
 
   store:

@@ -151,3 +151,36 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm publish --dry-run
+
+  web-console:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/console/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  console-embed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.4"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/console/package-lock.json
+      # Exercises the tag-gated embed path end to end (console build → embed → -tags console).
+      - run: make build-console
+      - run: ./bin/polaris --version

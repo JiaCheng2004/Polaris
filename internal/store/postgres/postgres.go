@@ -184,8 +184,9 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 		INSERT INTO request_logs (
 			id, request_id, key_id, project_id, model, modality, interface_family, token_source,
 			cache_status, fallback_model, trace_id, toolset, mcp_binding, provider_latency_ms, total_latency_ms,
-			input_tokens, output_tokens, total_tokens, estimated_cost, cost_source, status_code, error_type, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+			input_tokens, output_tokens, total_tokens, cached_input_tokens, cache_write_5m_tokens, cache_write_1h_tokens,
+			estimated_cost, cost_source, status_code, error_type, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare request log batch: %w", err)
@@ -220,6 +221,9 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 			entry.InputTokens,
 			entry.OutputTokens,
 			entry.TotalTokens,
+			entry.CachedInputTokens,
+			entry.CacheWrite5mTokens,
+			entry.CacheWrite1hTokens,
 			entry.EstimatedCost,
 			nullableString(entry.CostSource),
 			entry.StatusCode,
@@ -369,6 +373,9 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS toolset TEXT;`,
 		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS mcp_binding TEXT;`,
 		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS cost_source TEXT;`,
+		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS cached_input_tokens INTEGER NOT NULL DEFAULT 0;`,
+		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS cache_write_5m_tokens INTEGER NOT NULL DEFAULT 0;`,
+		`ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0;`,
 		`CREATE TABLE IF NOT EXISTS virtual_keys (
 			id TEXT PRIMARY KEY,
 			project_id TEXT NOT NULL REFERENCES projects(id),
@@ -1260,6 +1267,9 @@ func usageWhereClause(filter store.UsageFilter) (string, []any) {
 	}
 	if filter.Model != "" {
 		addClause("request_logs.model = $%d", filter.Model)
+	}
+	if filter.Provider != "" {
+		addClause("request_logs.model LIKE $%d", filter.Provider+"/%")
 	}
 	if filter.Modality != "" {
 		addClause("request_logs.modality = $%d", string(filter.Modality))

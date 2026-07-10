@@ -24,6 +24,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Optional admin/observability console. Opt-in: `docker compose --profile console up console`.
+  # It talks to the gateway from the browser; enter the gateway URL + an admin key in its UI.
+  console:
+    profiles: ["console"]
+    build:
+      context: ./web/console
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:

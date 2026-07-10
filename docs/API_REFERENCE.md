@@ -2252,6 +2252,50 @@ Registers MCP broker bindings.
 | `headers` | object | no | Static headers injected into upstream proxy requests. |
 | `enabled` | boolean | no | Defaults to `true`. |
 
+### `GET /v1/admin/usage`
+
+Admin-scoped usage analytics with breakdowns. Unlike `GET /v1/usage` (which is
+always scoped to the caller's own key), this returns project-wide or global usage
+and richer per-dimension aggregates, including cache-token economics. Admin-only;
+requires `control_plane.enabled: true`.
+
+| Query | Type | Notes |
+|---|---|---|
+| `scope` | string | `global` (default), `project` (requires `project_id`), or `key` (requires `key_id`). |
+| `group_by` | string | `day` (default), `model`, `provider`, `modality`, `status`, `token_source`, `cost_source`, `error_type`, `interface_family`. |
+| `project_id`, `key_id` | string | Scope selectors. |
+| `model`, `provider`, `modality` | string | Additional filters. |
+| `from`, `to` | RFC3339 | Time window; default last 30 days. |
+
+Response:
+
+```json
+{
+  "from": "2026-06-01T00:00:00Z",
+  "to": "2026-07-01T00:00:00Z",
+  "scope": "global",
+  "group_by": "model",
+  "totals": { "key": "total", "requests": 0, "input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cache_write_tokens": 0, "total_tokens": 0, "cost_usd": 0, "errors": 0, "avg_provider_latency_ms": 0, "avg_total_latency_ms": 0 },
+  "rows": [ { "key": "openai/gpt-4o", "requests": 0, "input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cache_write_tokens": 0, "total_tokens": 0, "cost_usd": 0, "errors": 0, "avg_provider_latency_ms": 0, "avg_total_latency_ms": 0 } ]
+}
+```
+
+### `GET /v1/admin/audit-events`
+
+Lists control-plane audit events, newest first, with keyset pagination. Admin-only;
+requires `control_plane.enabled: true`.
+
+| Query | Type | Notes |
+|---|---|---|
+| `project_id`, `actor_key_id`, `kind`, `resource_type` | string | Filters. |
+| `from`, `to` | RFC3339 | Time window. |
+| `limit` | integer | Page size (default 50, max 200). |
+| `cursor` | RFC3339 | Pass the previous response's `next_cursor` for the next page. |
+
+Returns `{"object": "list", "data": [<AuditEvent>], "next_cursor": "<RFC3339>"}` where each
+event has `id`, `project_id`, `actor_key_id`, `kind`, `resource_type`, `resource_id`,
+`metadata_json`, and `created_at`.
+
 ### `POST /v1/admin/cache/purge`
 
 Drops semantic-cache entries. Admin-only. An empty body purges everything; the

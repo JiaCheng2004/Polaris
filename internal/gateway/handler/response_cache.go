@@ -118,6 +118,9 @@ func cachedRequestOutcome(model provider.Model, requestModality modality.Modalit
 		outcome.PromptTokens = response.Usage.PromptTokens
 		outcome.CompletionTokens = response.Usage.CompletionTokens
 		outcome.TotalTokens = response.Usage.TotalTokens
+		outcome.CachedInputTokens = response.Usage.CachedInputTokens
+		outcome.CacheWrite5mTokens = response.Usage.CacheWrite5mTokens
+		outcome.CacheWrite1hTokens = response.Usage.CacheWrite1hTokens
 		outcome.TokenSource = response.Usage.Source
 	case modality.ModalityEmbed:
 		var response modality.EmbedResponse

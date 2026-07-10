@@ -250,10 +250,16 @@ func (u anthropicUsage) toModalityUsage() modality.Usage {
 		cacheWrite5m = u.CacheCreationInputTokens
 	}
 	cacheWrite1h := u.CacheCreation1hInputTokens + u.CacheCreation.Ephemeral1hInputTokens
+	// Anthropic reports input_tokens EXCLUDING cache reads and cache creation; the
+	// gateway convention (matching OpenAI/DeepSeek/Google) is that prompt tokens are
+	// the grand total and the cache buckets are subsets of it, so pricing bills fresh
+	// input, cache reads, and cache writes each exactly once. Fold the cache tokens
+	// back in here so accounting is correct across every provider.
+	promptTokens := u.InputTokens + u.CacheReadInputTokens + cacheWrite5m + cacheWrite1h
 	return modality.Usage{
-		PromptTokens:       u.InputTokens,
+		PromptTokens:       promptTokens,
 		CompletionTokens:   u.OutputTokens,
-		TotalTokens:        u.InputTokens + u.OutputTokens,
+		TotalTokens:        promptTokens + u.OutputTokens,
 		CachedInputTokens:  u.CacheReadInputTokens,
 		CacheWrite5mTokens: cacheWrite5m,
 		CacheWrite1hTokens: cacheWrite1h,
@@ -772,12 +778,15 @@ func decodeStream(r io.Reader, canonicalModel string, dst chan<- modality.ChatCh
 }
 
 type anthropicStreamState struct {
-	id               string
-	promptTokens     int
-	completionTokens int
-	stopReason       string
-	roleSent         bool
-	toolBlocks       map[int]anthropicToolBlockState
+	id                 string
+	promptTokens       int
+	completionTokens   int
+	cachedInputTokens  int
+	cacheWrite5mTokens int
+	cacheWrite1hTokens int
+	stopReason         string
+	roleSent           bool
+	toolBlocks         map[int]anthropicToolBlockState
 }
 
 type anthropicToolBlockState struct {
@@ -802,7 +811,11 @@ func (s *anthropicStreamState) consume(eventType string, payload string, model s
 			return nil, false, fmt.Errorf("decode anthropic-compatible message_start: %w", err)
 		}
 		s.id = event.Message.ID
-		s.promptTokens = event.Message.Usage.InputTokens
+		startUsage := event.Message.Usage.toModalityUsage()
+		s.promptTokens = startUsage.PromptTokens
+		s.cachedInputTokens = startUsage.CachedInputTokens
+		s.cacheWrite5mTokens = startUsage.CacheWrite5mTokens
+		s.cacheWrite1hTokens = startUsage.CacheWrite1hTokens
 		return nil, false, nil
 	case "content_block_start":
 		var event struct {
@@ -942,9 +955,12 @@ func (s *anthropicStreamState) consume(eventType string, payload string, model s
 				FinishReason: &finishReason,
 			}},
 			Usage: &modality.Usage{
-				PromptTokens:     s.promptTokens,
-				CompletionTokens: s.completionTokens,
-				TotalTokens:      s.promptTokens + s.completionTokens,
+				PromptTokens:       s.promptTokens,
+				CompletionTokens:   s.completionTokens,
+				TotalTokens:        s.promptTokens + s.completionTokens,
+				CachedInputTokens:  s.cachedInputTokens,
+				CacheWrite5mTokens: s.cacheWrite5mTokens,
+				CacheWrite1hTokens: s.cacheWrite1hTokens,
 			},
 		}}, true, nil
 	default:

@@ -72,10 +72,38 @@
     },
     {
       "rule_id": "G704",
-      "file": "internal/gateway/middleware/ssrf.go",
+      "file": "internal/transport/safeclient.go",
       "symbol": "Do",
       "snippet": "return c.client.Do(req)",
-      "rationale": "SSRFClient validates scheme and denylisted hosts before executing requests, uses a custom DialContext that resolves the host and rejects private/reserved IPs, and revalidates every redirect."
+      "rationale": "The SSRF-guarded outbound client (moved here from internal/gateway/middleware/ssrf.go) validates scheme and denylisted hosts before executing requests, uses a custom DialContext that resolves the host and rejects private/reserved IPs, and revalidates every redirect."
+    },
+    {
+      "rule_id": "G704",
+      "file": "internal/mcp/client.go",
+      "symbol": "do",
+      "snippet": "httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(reqBody))",
+      "rationale": "The MCP JSON-RPC client requests the operator-configured MCP binding upstream_url (set through the control-plane admin API), the same trust model as configured provider base URLs."
+    },
+    {
+      "rule_id": "G704",
+      "file": "internal/mcp/client.go",
+      "symbol": "do",
+      "snippet": "resp, err := c.http.Do(httpReq)",
+      "rationale": "The MCP JSON-RPC client requests the operator-configured MCP binding upstream_url (set through the control-plane admin API), the same trust model as configured provider base URLs."
+    },
+    {
+      "rule_id": "G404",
+      "file": "internal/transport/retry.go",
+      "symbol": "backoff",
+      "snippet": "return time.Duration(rand.Int64N(int64(ceil) + 1))",
+      "rationale": "math/rand is used only to jitter retry backoff durations; jitter is non-cryptographic by design and crypto/rand would add cost without any security benefit here."
+    },
+    {
+      "rule_id": "G202",
+      "file": "internal/store/postgres/adminanalytics.go",
+      "symbol": "ListAuditEvents",
+      "snippet": "query += fmt.Sprintf(",
+      "rationale": "Only the positional placeholder index (len(args)) is formatted into the SQL; the LIMIT value itself is appended to args and passed as a bound parameter to QueryContext, never concatenated as a literal."
     }
   ]
 }

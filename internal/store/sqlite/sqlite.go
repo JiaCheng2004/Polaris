@@ -172,8 +172,9 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 		INSERT INTO request_logs (
 			id, request_id, key_id, project_id, model, modality, interface_family, token_source,
 			cache_status, fallback_model, trace_id, toolset, mcp_binding, provider_latency_ms, total_latency_ms,
-			input_tokens, output_tokens, total_tokens, estimated_cost, cost_source, status_code, error_type, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			input_tokens, output_tokens, total_tokens, cached_input_tokens, cache_write_5m_tokens, cache_write_1h_tokens,
+			estimated_cost, cost_source, status_code, error_type, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare request log batch: %w", err)
@@ -208,6 +209,9 @@ func (s *Store) LogRequestBatch(ctx context.Context, logs []store.RequestLog) er
 			entry.InputTokens,
 			entry.OutputTokens,
 			entry.TotalTokens,
+			entry.CachedInputTokens,
+			entry.CacheWrite5mTokens,
+			entry.CacheWrite1hTokens,
 			entry.EstimatedCost,
 			nullableString(entry.CostSource),
 			entry.StatusCode,
@@ -443,15 +447,18 @@ func (s *Store) ensureControlPlaneUpgrade(ctx context.Context) error {
 	}
 
 	requestLogColumns := map[string]string{
-		"project_id":       "TEXT",
-		"interface_family": "TEXT",
-		"token_source":     "TEXT",
-		"cache_status":     "TEXT",
-		"fallback_model":   "TEXT",
-		"trace_id":         "TEXT",
-		"toolset":          "TEXT",
-		"mcp_binding":      "TEXT",
-		"cost_source":      "TEXT",
+		"project_id":            "TEXT",
+		"interface_family":      "TEXT",
+		"token_source":          "TEXT",
+		"cache_status":          "TEXT",
+		"fallback_model":        "TEXT",
+		"trace_id":              "TEXT",
+		"toolset":               "TEXT",
+		"mcp_binding":           "TEXT",
+		"cost_source":           "TEXT",
+		"cached_input_tokens":   "INTEGER NOT NULL DEFAULT 0",
+		"cache_write_5m_tokens": "INTEGER NOT NULL DEFAULT 0",
+		"cache_write_1h_tokens": "INTEGER NOT NULL DEFAULT 0",
 	}
 	for column, columnType := range requestLogColumns {
 		exists, err := s.sqliteColumnExists(ctx, "request_logs", column)
@@ -1323,6 +1330,10 @@ func usageWhereClause(filter store.UsageFilter) (string, []any) {
 	if filter.Model != "" {
 		clauses = append(clauses, "request_logs.model = ?")
 		args = append(args, filter.Model)
+	}
+	if filter.Provider != "" {
+		clauses = append(clauses, "request_logs.model LIKE ?")
+		args = append(args, filter.Provider+"/%")
 	}
 	if filter.Modality != "" {
 		clauses = append(clauses, "request_logs.modality = ?")

@@ -28,13 +28,18 @@ Every mode enforces the same downstream checks — model, modality, toolset, MCP
 
 ## Keys And Hashing
 
-Polaris never stores or logs plaintext API keys. It persists only the SHA-256 hash; the 8-character `key_prefix` is the only key material that appears in logs. Generate a key and its hash with:
+Polaris never stores or logs plaintext API keys. It persists only the SHA-256 hash; the 8-character `key_prefix` is the only key material that appears in logs.
+
+For `static` keys and the `virtual_keys` bootstrap admin key, **you choose the key** — Polaris only stores its hash. Produce the hash with nothing but `openssl` (no Go toolchain needed, so it works from the published container too):
 
 ```bash
-go run ./scripts/generate-key.go
+# The key you choose is the bearer token you will actually use. Keep it.
+export POLARIS_ADMIN_KEY=$(openssl rand -hex 32)
+# The value to store in config (only the hash is persisted):
+echo "sha256:$(printf '%s' "$POLARIS_ADMIN_KEY" | openssl dgst -sha256 -r | awk '{print $1}')"
 ```
 
-Commit only the emitted `sha256:` hash (into `static` keys or `bootstrap_admin_key_hash`), never the raw key. See [CONFIGURATION.md](CONFIGURATION.md) for the exact `auth.static` and `auth.virtual_keys` shapes.
+Put the printed `sha256:…` into `auth.static[].key_hash` or `auth.bootstrap_admin_key_hash` (or the `POLARIS_BOOTSTRAP_ADMIN_KEY_HASH` env), and authenticate with the raw `$POLARIS_ADMIN_KEY`. Commit only the hash, never the raw key. If you have a Go toolchain, `go run ./scripts/generate-key.go` is an equivalent alternative. See [CONFIGURATION.md](CONFIGURATION.md) for the exact `auth.static` and `auth.virtual_keys` shapes.
 
 ## External Signed Headers
 

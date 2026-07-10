@@ -1,0 +1,180 @@
+/*
+ * Polaris Console design tokens.
+ *
+ * Two independent axes, both set as data-attributes on <html>:
+ *   data-theme = light | dark      (surfaces, ink, chart palette)
+ *   data-mode  = standard | advanced
+ *     standard = minimalist-ui skill (default): warm monochrome, editorial, Phosphor icons, soft radius
+ *     advanced = industrial-brutalist-ui skill: tactical telemetry (dark) / Swiss print (light), mono, hazard red, 0 radius
+ *
+ * CHROME tokens (bg/surface/border/ink/accent/fonts/radius/density) vary by mode x theme.
+ * CHART tokens (--viz-*, --series-*, --seq-*, --div-*, --status-*) vary by THEME ONLY
+ * and use the validated, colorblind-safe dataviz palette in BOTH modes, so charts read
+ * as one accessible system regardless of aesthetic. This palette is defined COMPLETE on
+ * purpose: the categorical ramp (--series-1..8) is assigned in fixed order (never
+ * cycled), so it declares all eight slots even when a given view only plots a few — do
+ * not prune the ramp, or a later series would recolour the existing ones.
+ */
+
+:root {
+  /* ---- Motion (shared) ---- */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 0.2s;
+
+  /* ---- Layout (shared) ---- */
+  --nav-w: 232px;
+  --topbar-h: 56px;
+  --gap: 16px;
+  --grid-gap: 16px;
+  --pad-panel: clamp(16px, 2vw, 28px);
+  --maxw: 1560px;
+
+  /* ---- STANDARD / LIGHT (default: minimalist-ui) ---- */
+  --bg: #fbfbfa;
+  --surface-1: #ffffff;
+  --surface-2: #f7f6f3;
+  --surface-inset: #f2f1ee;
+  --border: #eaeaea;
+  --border-strong: #d9d8d3;
+  --text-1: #1b1b19;
+  --text-2: #52514e;
+  --text-3: #8a8985;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --accent-weak: #e1f3fe;
+  --danger: #9f2f2d;
+  --danger-weak: #fdebec;
+
+  --font-sans: "Geist", "Switzer", "Helvetica Neue", system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader", "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-mono: "Geist Mono", "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-display: var(--font-serif);
+
+  --radius-1: 6px;
+  --radius-2: 10px;
+  --radius-pill: 9999px;
+  --border-w: 1px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --letter-macro: -0.02em;
+  --letter-meta: 0.01em;
+  --case-nav: none;
+
+  /* ---- CHART palette / LIGHT (dataviz reference instance) ---- */
+  --viz-surface: #fcfcfb;
+  --viz-ink: #0b0b0b;
+  --viz-ink-2: #52514e;
+  --viz-grid: rgba(0, 0, 0, 0.08);
+  --series-1: #2a78d6;
+  --series-2: #1baf7a;
+  --series-3: #eda100;
+  --series-4: #008300;
+  --series-5: #4a3aa7;
+  --series-6: #e34948;
+  --series-7: #e87ba4;
+  --series-8: #eb6834;
+  --seq-100: #cde2fb;
+  --seq-300: #6da7ec;
+  --seq-450: #2a78d6;
+  --seq-600: #184f95;
+  --seq-700: #0d366b;
+  --div-pos: #2a78d6;
+  --div-neg: #e34948;
+  --div-mid: #f0efec;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+/* ---- STANDARD / DARK (minimalist-ui dark) ---- */
+:root[data-theme="dark"] {
+  --bg: #191918;
+  --surface-1: #212120;
+  --surface-2: #262625;
+  --surface-inset: #1c1c1b;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-1: #ededec;
+  --text-2: #b4b3ae;
+  --text-3: #82817c;
+  --accent: #3987e5;
+  --accent-ink: #ffffff;
+  --accent-weak: rgba(57, 135, 229, 0.16);
+  --danger: #e66767;
+  --danger-weak: rgba(230, 103, 103, 0.16);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 10px 34px rgba(0, 0, 0, 0.55);
+
+  --viz-surface: #1a1a19;
+  --viz-ink: #ffffff;
+  --viz-ink-2: #c3c2b7;
+  --viz-grid: rgba(255, 255, 255, 0.1);
+  --series-1: #3987e5;
+  --series-2: #199e70;
+  --series-3: #c98500;
+  --series-4: #008300;
+  --series-5: #9085e9;
+  --series-6: #e66767;
+  --series-7: #d55181;
+  --series-8: #d95926;
+  --seq-100: #184f95;
+  --seq-300: #256abf;
+  --seq-450: #3987e5;
+  --seq-600: #6da7ec;
+  --seq-700: #9ec5f4;
+  --div-mid: #383835;
+}
+
+/* ---- ADVANCED / LIGHT (Swiss industrial print) ---- */
+:root[data-mode="advanced"] {
+  --bg: #f4f4f0;
+  --surface-1: #eae8e3;
+  --surface-2: #ffffff;
+  --surface-inset: #e4e2dc;
+  --border: #050505;
+  --border-strong: #050505;
+  --text-1: #050505;
+  --text-2: #2a2a28;
+  --text-3: #6a6a64;
+  --accent: #e61919;
+  --accent-ink: #ffffff;
+  --accent-weak: rgba(230, 25, 25, 0.1);
+  --danger: #e61919;
+  --danger-weak: rgba(230, 25, 25, 0.1);
+
+  --font-sans: "JetBrains Mono", "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  --font-display: "Archivo Black", "Archivo", "Helvetica Neue", system-ui, sans-serif;
+
+  --radius-1: 0px;
+  --radius-2: 0px;
+  --radius-pill: 0px;
+  --border-w: 1px;
+  --shadow-card: none;
+  --shadow-pop: none;
+  --letter-macro: -0.03em;
+  --letter-meta: 0.06em;
+  --case-nav: uppercase;
+
+  --grid-gap: 1px;
+  --pad-panel: clamp(10px, 1.4vw, 18px);
+}
+
+/* ---- ADVANCED / DARK (tactical telemetry CRT) ---- */
+:root[data-mode="advanced"][data-theme="dark"] {
+  --bg: #0a0a0a;
+  --surface-1: #121212;
+  --surface-2: #161616;
+  --surface-inset: #0d0d0d;
+  --border: rgba(234, 234, 234, 0.18);
+  --border-strong: rgba(234, 234, 234, 0.34);
+  --text-1: #eaeaea;
+  --text-2: #a9a9a9;
+  --text-3: #6e6e6e;
+  --accent: #ff2a2a;
+  --accent-ink: #0a0a0a;
+  --accent-weak: rgba(255, 42, 42, 0.14);
+  --danger: #ff2a2a;
+  --danger-weak: rgba(255, 42, 42, 0.14);
+}

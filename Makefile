@@ -3,7 +3,6 @@ CONFIG ?= ./config/polaris.yaml
 STACK ?= local
 LIVE_SMOKE_TIMEOUT ?= 45m
 LOAD_CHECK_TIMEOUT ?= 60m
-FILE_UNDERSTANDING_EVAL_REPORT ?= /tmp/polaris-file-understanding-eval.json
 GOLANGCI_LINT_VERSION ?= v2.11.4
 GOLANGCI_LINT_MODULE := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOLANGCI_LINT ?= go run $(GOLANGCI_LINT_MODULE)
@@ -12,62 +11,96 @@ GOSEC_MODULE := github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 GOSEC ?= go run $(GOSEC_MODULE)
 GOSEC_ALLOWLIST ?= ./config/security/gosec_allowlist.json
 
+# Version metadata stamped into `make build` binaries so `--version` is meaningful
+# locally. The release artifacts are stamped by GoReleaser (.goreleaser.yaml) and the
+# Dockerfiles inject the same three vars at image build; this is best-effort from git.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE)
+
 .DEFAULT_GOAL := help
 
-.PHONY: help dev build run test bench lint check-layering security-check license-check reuse-check sdk-ts doc-check openapi-lint docs-config-check migrate docker-build verify-models verify-models-json live-smoke live-smoke-strict live-smoke-opt-in file-understanding-eval load-check config-check contract-check release-check panic-scan fmt-check \
-	local-up local-down local-restart local-logs local-ps local-config \
+.PHONY: help dev build run test bench lint check check-layering security-check \
+	license-check reuse-check sdk-ts web-console build-console doc-check openapi-lint \
+	docs-config-check migrate docker-build verify-models verify-models-json live-smoke \
+	load-check config-check contract-check release-check panic-scan fmt-check \
 	stack-up stack-down stack-restart stack-logs stack-ps stack-config stack-validate stack-pull
 
-help:
-	@printf "\nPolaris developer commands\n\n"
-	@printf "  make dev            Run Polaris locally with CONFIG=%s\n" "$(CONFIG)"
-	@printf "  make build          Build ./bin/$(BINARY)\n"
-	@printf "  make run            Build then run ./bin/$(BINARY)\n"
-	@printf "  make test           Run go test -race ./...\n"
-	@printf "  make lint           Run pinned golangci-lint\n"
-	@printf "  make security-check Run pinned gosec with exact audited allowlist\n"
-	@printf "  make migrate        Run configured store migrations\n"
-	@printf "  make docker-build   Build the Polaris Docker image\n"
-	@printf "  make verify-models  Print configured model verification summary\n"
-	@printf "  make verify-models-json  Print configured model verification summary as JSON\n"
-	@printf "  make live-smoke     Run env-gated live provider smoke tests\n"
-	@printf "  make live-smoke-strict  Run strict live smoke for release-blocking models\n"
-	@printf "  make live-smoke-opt-in  Run live smoke including opt-in models\n"
-	@printf "  make file-understanding-eval  Run live file/image understanding evals for cheap chat models\n"
-	@printf "  make load-check     Run env-gated load validation with SQLite + memory cache\n"
-	@printf "  make config-check   Validate config loader, modular YAML, and model catalog wiring\n"
-	@printf "  make contract-check Validate OpenAPI route coverage and golden HTTP fixtures\n"
-	@printf "  make release-check  Run the current repo-local release validation gate\n"
-	@printf "  make stack-up       Start Docker stack STACK=%s\n" "$(STACK)"
-	@printf "  make stack-down     Stop Docker stack STACK=%s\n" "$(STACK)"
-	@printf "  make stack-logs     Follow logs for stack STACK=%s\n" "$(STACK)"
-	@printf "  make stack-ps       Show status for stack STACK=%s\n" "$(STACK)"
-	@printf "  make stack-config   Render Compose config for STACK=%s\n" "$(STACK)"
-	@printf "  make stack-validate Validate Compose config for STACK=%s without rendering secrets\n" "$(STACK)"
-	@printf "  make stack-pull     Pull images for stack STACK=%s\n" "$(STACK)"
-	@printf "\n"
-	@printf "  stacks: local | prod | dev\n"
-	@printf "\n"
+# `help` is generated from the `## ` doc-comments and `##@ ` group headers below, so it
+# can never drift from the real targets. Only the user-facing targets carry a comment;
+# the granular gates stay callable (and CI calls them by name) without cluttering the menu.
+help: ## Show this help
+	@printf "\nPolaris — make targets\n"
+	@awk 'BEGIN {FS = ":.*## "} \
+		/^##@ / {printf "\n\033[1m%s\033[0m\n", substr($$0, 5); next} \
+		/^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf "\n  Vars: CONFIG=%s   STACK=%s (local|prod|dev)\n\n" "$(CONFIG)" "$(STACK)"
 
-dev:
+##@ Develop
+dev: ## Run the gateway from source (CONFIG=...)
 	go run ./cmd/polaris --config $(CONFIG)
 
-build:
+build: ## Build ./bin/polaris (version-stamped)
 	mkdir -p ./bin
-	go build -o ./bin/$(BINARY) ./cmd/polaris
+	go build -ldflags "$(LDFLAGS)" -o ./bin/$(BINARY) ./cmd/polaris
 
-run: build
+run: build ## Build then run ./bin/polaris
 	./bin/$(BINARY) --config $(CONFIG)
 
-test:
+migrate: ## Run configured store migrations
+	go run ./cmd/polaris --config $(CONFIG) --migrate
+
+# Batteries-included binary: builds the console, embeds its assets, and compiles with
+# the `console` build tag so `--console` serves it. The default `make build` stays lean
+# and node-free. The embed dir is restored to its committed placeholder afterwards (the
+# binary already embedded the real assets at compile time).
+build-console: ## Build the binary with the embedded admin console (--console)
+	mkdir -p ./bin
+	cd web/console && npm ci && npm run build
+	rm -rf internal/console/dist/assets
+	cp -R web/console/dist/. internal/console/dist/
+	go build -tags console -ldflags "$(LDFLAGS)" -o ./bin/$(BINARY) ./cmd/polaris
+	@cp internal/console/placeholder.html internal/console/dist/index.html
+	@rm -rf internal/console/dist/assets
+	@echo "Built ./bin/$(BINARY) with the embedded console — run: ./bin/$(BINARY) --config $(CONFIG) --console"
+
+##@ Quality gates
+test: ## Run all tests with the race detector
 	go test -race ./...
 
-bench:
-	go test -run '^$$' -bench . -benchmem \
-		./internal/gateway ./internal/guardrails ./internal/routing ./internal/semcache
-
-lint:
+lint: ## Run pinned golangci-lint
 	$(GOLANGCI_LINT) run ./...
+
+check: ## Run all fast static gates (fmt, lint, layering, security, licenses, docs, contract)
+	$(MAKE) fmt-check
+	$(MAKE) lint
+	$(MAKE) check-layering
+	$(MAKE) security-check
+	$(MAKE) reuse-check
+	$(MAKE) license-check
+	$(MAKE) doc-check
+	$(MAKE) panic-scan
+	$(MAKE) openapi-lint
+	$(MAKE) docs-config-check
+	$(MAKE) config-check
+	$(MAKE) contract-check
+
+# Full repo-local release gate (runbook precondition; run by release.yml). Layered:
+# static gates -> race tests -> build -> Compose validation -> image. `config-check`
+# already runs `verify-models` against the default config, so it is not repeated here.
+release-check: ## Full repo-local release gate (check + tests + build + docker + compose)
+	$(MAKE) check
+	$(MAKE) test
+	$(MAKE) build
+	$(MAKE) stack-validate STACK=local
+	$(MAKE) stack-validate STACK=prod
+	$(MAKE) stack-validate STACK=dev
+	$(MAKE) docker-build
+
+# ---- Individual gates: composed by `check`/`release-check`; CI also calls them by name ----
+fmt-check:
+	test -z "$$(gofmt -l .)"
 
 check-layering:
 	@echo "Verifying provider/tooling packages never import the gateway layer..."
@@ -93,6 +126,12 @@ security-check:
 	rm -f "$$tmp" "$$log"; \
 	exit $$check_status
 
+reuse-check:
+	python3 -m reuse lint
+
+license-check:
+	go run github.com/google/go-licenses/v2@latest check ./cmd/polaris ./pkg/client
+
 doc-check:
 	go run github.com/mgechev/revive@latest -config .revive-doc.toml -set_exit_status ./pkg/client/...
 
@@ -101,42 +140,6 @@ openapi-lint:
 
 docs-config-check:
 	bash scripts/docs-config-check.sh
-
-license-check:
-	go run github.com/google/go-licenses/v2@latest check ./cmd/polaris ./pkg/client
-
-reuse-check:
-	python3 -m reuse lint
-
-sdk-ts:
-	cd sdk/typescript && npm install && npm run typecheck && npm test && npm run build && npm publish --dry-run
-
-migrate:
-	go run ./cmd/polaris --config $(CONFIG) --migrate
-
-docker-build:
-	docker build -f deployments/Dockerfile -t polaris:dev .
-
-verify-models:
-	go run ./cmd/polaris --config $(CONFIG) --verify-models
-
-verify-models-json:
-	go run ./cmd/polaris --config $(CONFIG) --verify-models-json
-
-live-smoke:
-	POLARIS_LIVE_SMOKE=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
-
-live-smoke-strict:
-	POLARIS_LIVE_SMOKE=1 POLARIS_LIVE_SMOKE_STRICT=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
-
-live-smoke-opt-in:
-	POLARIS_LIVE_SMOKE=1 POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
-
-file-understanding-eval:
-	POLARIS_FILE_UNDERSTANDING_EVAL=1 POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 POLARIS_FILE_UNDERSTANDING_EVAL_REPORT=$(FILE_UNDERSTANDING_EVAL_REPORT) go test -v -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveFileUnderstandingEval
-
-load-check:
-	POLARIS_LOAD_CHECK=1 go test -count=1 -timeout $(LOAD_CHECK_TIMEOUT) ./tests/e2e -run TestLoadCheckMatrix
 
 config-check:
 	go test -count=1 ./internal/config ./internal/provider/catalog
@@ -147,71 +150,61 @@ config-check:
 contract-check:
 	go test -count=1 ./tests/contract
 
-fmt-check:
-	test -z "$$(gofmt -l .)"
-
 panic-scan:
 	! rg -n "panic\\(" internal --glob '!**/*_test.go'
 
-release-check:
-	$(MAKE) fmt-check
-	$(MAKE) lint
-	$(MAKE) check-layering
-	$(MAKE) security-check
-	$(MAKE) reuse-check
-	$(MAKE) license-check
-	$(MAKE) doc-check
-	$(MAKE) panic-scan
-	$(MAKE) config-check
-	$(MAKE) verify-models CONFIG=$(CONFIG)
-	$(MAKE) contract-check
-	$(MAKE) openapi-lint
-	$(MAKE) docs-config-check
-	go test -race ./...
-	$(MAKE) build
-	$(MAKE) stack-validate STACK=local
-	$(MAKE) stack-validate STACK=prod
-	$(MAKE) stack-validate STACK=dev
-	$(MAKE) docker-build
+bench:
+	go test -run '^$$' -bench . -benchmem \
+		./internal/gateway ./internal/guardrails ./internal/routing ./internal/semcache
 
-local-up:
-	STACK=local ./scripts/stack.sh up
+##@ Providers & load
+verify-models: ## Print the configured model verification summary
+	go run ./cmd/polaris --config $(CONFIG) --verify-models
 
-local-down:
-	STACK=local ./scripts/stack.sh down
+verify-models-json:
+	go run ./cmd/polaris --config $(CONFIG) --verify-models-json
 
-local-restart:
-	STACK=local ./scripts/stack.sh restart
+# Real-provider smoke; needs provider API keys in the environment. For the
+# release-blocking strict matrix prefix POLARIS_LIVE_SMOKE_STRICT=1; add
+# POLARIS_LIVE_SMOKE_INCLUDE_OPT_IN=1 to include opt-in models (env vars set before
+# `make` are inherited by the recipe).
+live-smoke: ## Run the env-gated real-provider smoke matrix (needs API keys)
+	POLARIS_LIVE_SMOKE=1 go test -count=1 -timeout $(LIVE_SMOKE_TIMEOUT) ./tests/e2e -run TestLiveSmokeMatrix
 
-local-logs:
-	STACK=local ./scripts/stack.sh logs
+load-check:
+	POLARIS_LOAD_CHECK=1 go test -count=1 -timeout $(LOAD_CHECK_TIMEOUT) ./tests/e2e -run TestLoadCheckMatrix
 
-local-ps:
-	STACK=local ./scripts/stack.sh ps
+# npm-based CI checks (mirrored by the sdk-typescript / web-console CI jobs).
+sdk-ts:
+	cd sdk/typescript && npm install && npm run typecheck && npm test && npm run build && npm publish --dry-run
 
-local-config:
-	STACK=local ./scripts/stack.sh config
+web-console:
+	cd web/console && npm ci && npm run typecheck && npm test && npm run build
 
-stack-up:
+##@ Docker & stack
+docker-build: ## Build the Polaris Docker image
+	docker build -f deployments/Dockerfile -t polaris:dev .
+
+stack-up: ## Start the Docker stack (STACK=local|prod|dev)
 	STACK=$(STACK) ./scripts/stack.sh up
 
-stack-down:
+stack-down: ## Stop the Docker stack
 	STACK=$(STACK) ./scripts/stack.sh down
+
+stack-logs: ## Follow logs for the Docker stack
+	STACK=$(STACK) ./scripts/stack.sh logs
+
+stack-validate: ## Validate the Compose config without rendering secrets
+	STACK=$(STACK) ./scripts/stack.sh validate
 
 stack-restart:
 	STACK=$(STACK) ./scripts/stack.sh restart
-
-stack-logs:
-	STACK=$(STACK) ./scripts/stack.sh logs
 
 stack-ps:
 	STACK=$(STACK) ./scripts/stack.sh ps
 
 stack-config:
 	STACK=$(STACK) ./scripts/stack.sh config
-
-stack-validate:
-	STACK=$(STACK) ./scripts/stack.sh validate
 
 stack-pull:
 	STACK=$(STACK) ./scripts/stack.sh pull

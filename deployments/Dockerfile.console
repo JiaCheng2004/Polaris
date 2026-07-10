@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1.7
+#
+# Batteries-included Polaris image: the gateway plus the embedded admin console.
+# Run with `--console` to serve the console (default port 8081) alongside the API
+# (8080). The standard deployments/Dockerfile stays lean and console-free.
+
+FROM --platform=$BUILDPLATFORM node:22-alpine AS webbuilder
+WORKDIR /web/console
+COPY web/console/package.json web/console/package-lock.json ./
+RUN npm ci
+COPY web/console/ ./
+RUN npm run build
+
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+# Embed the freshly built console into the tagged binary.
+COPY --from=webbuilder /web/console/dist/ ./internal/console/dist/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -tags console \
+      -ldflags="-s -w \
+        -X main.version=${VERSION} \
+        -X main.commit=${COMMIT} \
+        -X main.buildDate=${BUILD_DATE}" \
+      -o /out/polaris ./cmd/polaris
+
+RUN mkdir -p /image-root/etc/polaris /image-root/var/lib/polaris/files && \
+    cp -R config/providers /image-root/etc/polaris/providers && \
+    cp -R config/routing /image-root/etc/polaris/routing && \
+    cp deployments/polaris.edge.yaml /image-root/etc/polaris/polaris.yaml && \
+    touch /image-root/var/lib/polaris/.keep /image-root/var/lib/polaris/files/.keep
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+LABEL org.opencontainers.image.source="https://github.com/JiaCheng2004/Polaris"
+
+WORKDIR /app
+COPY --from=builder /out/polaris /usr/local/bin/polaris
+COPY --from=builder --chown=nonroot:nonroot /image-root/etc/polaris /etc/polaris
+COPY --from=builder --chown=nonroot:nonroot /image-root/var/lib/polaris /var/lib/polaris
+
+EXPOSE 8080 8081
+
+ENTRYPOINT ["/usr/local/bin/polaris"]
+CMD ["--config", "/etc/polaris/polaris.yaml", "--console", "--console-addr", ":8081"]

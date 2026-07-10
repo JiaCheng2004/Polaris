@@ -65,6 +65,7 @@ nav:
       - Architecture: ARCHITECTURE.md
       - Provider Validation: PROVIDER_VALIDATION.md
   - Operations:
+      - Console: CONSOLE.md
       - Load Testing: LOAD_TESTING.md
       - Benchmarks: benchmarks.md
   - Contributing:

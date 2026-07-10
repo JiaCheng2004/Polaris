@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/JiaCheng2004/Polaris/internal/config"
+	"github.com/JiaCheng2004/Polaris/internal/console"
 	"github.com/JiaCheng2004/Polaris/internal/gateway"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/drain"
 	"github.com/JiaCheng2004/Polaris/internal/gateway/metrics"
@@ -52,6 +53,8 @@ func run() error {
 	verifyModelsJSON := flag.Bool("verify-models-json", false, "Print configured model verification summary as JSON and exit")
 	showVersion := flag.Bool("version", false, "Print version information and exit")
 	configLenient := flag.Bool("config-lenient", false, "Do not fail on unknown/misspelled config keys (forward-compat escape hatch)")
+	consoleUI := flag.Bool("console", false, "Serve the embedded admin console (only in a binary built with `make build-console`)")
+	consoleAddr := flag.String("console-addr", ":8081", "Listen address for the embedded console when --console is set")
 	flag.Parse()
 	if *showVersion {
 		if _, err := fmt.Fprintf(os.Stdout, "polaris %s (%s, built %s)\n", version, commit, buildDate); err != nil {
@@ -217,6 +220,24 @@ func run() error {
 		}
 	}()
 
+	// Optional embedded admin console on its own listener (does not touch the API
+	// server's routes). Only available in a `console`-tagged build; the default
+	// binary carries no UI and points the operator at the standalone console.
+	var consoleServer *http.Server
+	if *consoleUI {
+		if h, ok := console.Handler(); ok {
+			consoleServer = &http.Server{Addr: *consoleAddr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
+			go func() {
+				logger.Info("starting polaris console", "addr", *consoleAddr)
+				if err := consoleServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					logger.Error("console server exited", "error", err)
+				}
+			}()
+		} else {
+			logger.Warn("--console requested but this build does not embed the console; run it standalone from web/console, or build with `make build-console` (see docs/CONSOLE.md)")
+		}
+	}
+
 	watcherCtx, stopWatcher := context.WithCancel(context.Background())
 	defer stopWatcher()
 
@@ -245,6 +266,11 @@ func run() error {
 	streamDrainer.Drain(ctx)
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Warn("server shutdown returned an error", "error", err)
+	}
+	if consoleServer != nil {
+		if err := consoleServer.Shutdown(ctx); err != nil {
+			logger.Warn("console server shutdown returned an error", "error", err)
+		}
 	}
 	if err := requestLogger.Close(ctx); err != nil {
 		logger.Warn("request logger flush on shutdown incomplete", "error", err)

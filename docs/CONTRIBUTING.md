@@ -17,10 +17,11 @@ make build          # build ./bin/polaris
 make run            # build + run with ./config/polaris.yaml
 make test           # go test -race ./...
 make lint           # golangci-lint
+make check          # all fast static gates (fmt, lint, layering, security, licenses, docs, contract)
 make release-check  # the full repo-local close-out gate
 ```
 
-`make help` lists every target. The gateway needs no external services to run locally (SQLite + in-memory cache by default); Postgres and Redis are opt-in via config.
+`make help` lists the common targets. The gateway needs no external services to run locally (SQLite + in-memory cache by default); Postgres and Redis are opt-in via config.
 
 ## Ground Rules
 

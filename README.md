@@ -353,6 +353,30 @@ func main() {
 
 SDK helpers cover chat, streaming chat, responses, messages, token counting, embeddings, images, voice, streaming transcription, realtime audio sessions, interpreting sessions, video, music, notes, podcasts, models, usage, keys, and control-plane resources.
 
+## Console
+
+An optional web console lives in [`web/console`](./web/console) — a standalone
+single-page app for operating a gateway: manage projects, keys, policies, budgets,
+tools, and MCP bindings; browse the model catalog; watch live provider health; read
+usage and cost with breakdowns; inspect the audit trail; and test routing in a
+playground. It talks to the gateway over `/v1` and holds no state of its own, so it
+is not part of the gateway binary. See [docs/CONSOLE.md](./docs/CONSOLE.md).
+
+```bash
+cd web/console && npm ci && npm run dev   # http://localhost:5173
+```
+
+The console needs an admin token. On a fresh gateway that means the **bootstrap
+admin key**: choose a secret, store only its hash in `auth.bootstrap_admin_key_hash`,
+and log in with the raw secret — no Go toolchain required:
+
+```bash
+export POLARIS_ADMIN_KEY=$(openssl rand -hex 32)
+echo "sha256:$(printf '%s' "$POLARIS_ADMIN_KEY" | openssl dgst -sha256 -r | awk '{print $1}')"  # → bootstrap_admin_key_hash
+```
+
+Full walkthrough: [docs/CONSOLE.md#getting-an-admin-token](./docs/CONSOLE.md#getting-an-admin-token).
+
 ## Validation
 
 Use the Makefile as the stable developer command surface:

@@ -87,3 +87,6 @@ prometheus-data/
 .terraform/
 *.tfstate
 *.tfstate.*
+
+# Web console (separate frontend app; not part of the Go image build context)
+web/
