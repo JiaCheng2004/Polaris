@@ -4,7 +4,7 @@
 # Run with `--console` to serve the console (default port 8081) alongside the API
 # (8080). The standard deployments/Dockerfile stays lean and console-free.
 
-FROM --platform=$BUILDPLATFORM node:22-alpine AS webbuilder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS webbuilder
 WORKDIR /web/console
 COPY web/console/package.json web/console/package-lock.json ./
 RUN npm ci
