@@ -14,11 +14,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # GoReleaser needs full history for the changelog
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.26.4"
 
@@ -32,7 +32,7 @@ jobs:
         run: make release-check
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
@@ -42,7 +42,7 @@ jobs:
       # GitHub-native SLSA build provenance (Build L2; L3 in an isolated
       # reusable workflow), complementing GoReleaser's cosign signatures + SBOMs.
       - name: Attest build provenance (SLSA)
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/*.tar.gz
